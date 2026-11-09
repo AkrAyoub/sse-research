@@ -6,7 +6,7 @@
 
 Downloadable package: `SSE_R1_WP05_Async_Clock_Contract_Research_2026-11-09.zip`. It contains `tools/sse_async_contract_reference.py`, `tools/sse_wp05_demo.py`, `tests/test_sse_async_contract_reference.py`, and documentation + test logs. Extract into the local SSE repository root to add the files.
 
-**Local Python 3.13 tests:** 45/45 new tests, and 120/120 combined reference tests (19 WP-02 + 26 WP-03 + 30 WP-04 + 45 WP-05). Source-check tests used a copy of the existing `SSESettlement.sol` source, not EVM execution. **Existing original project 106 Python cases / Foundry 35 tests have not been rerun with WP-05; expected total Python 227, not yet verified.**
+**Local Python 3.13 tests:** 45/45 new tests, and 120/120 combined reference tests (19 WP-02 + 26 WP-03 + 30 WP-04 + 45 WP-05). Source-check tests used a copy of the existing `SSESettlement.sol` source, not EVM execution. **Existing original project 106 Python cases / Foundry 35 tests have not been rerun with WP-05; expected total Python 226, not yet verified.**
 
 ## Contract-derived conditions and conditional counterexamples
 
