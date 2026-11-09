@@ -1,6 +1,6 @@
 Phase,Track,Name,Status,Exit_Criterion,Evidence_Link,Git_Commit,Last_Updated,Completion_Percent,Change_pp
 R0,Engineering,Reproducible baseline,ACCEPTED - 106/106 Python + 35/35 Foundry + clean clone + 3/3 GitHub Actions CI successful,"Fresh clone installs, imports, compiles and runs recorded tests",docs/research/R0_VALIDATION.md;docs/research/R0_PYTHON_HOST_VALIDATION_2026-11-09.md;docs/research/R0_FOUNDRY_HOST_VALIDATION_2026-11-09.md;docs/research/R0_CLEAN_CLONE_CHECKLIST.md;https://github.com/AkrAyoub/sse-research/actions,375b6ec0f2af233542f9235179f7e545b9d44279,2026-11-09,100,5
-R1,Engineering,Formal SSE evidence protocol,WP04 FINITE OBSERVABILITY MODEL + 30 LOCAL TESTS; REPO SOURCE + HOSTED CI PENDING,Versioned world-sound evidence rules and independent reference model,,,2026-11-09,43,8
+R1,Engineering,Formal SSE evidence protocol,WP03 AND WP04 SOURCE COMMITTED ON RESEARCH BRANCH; 75 REFERENCE TESTS PASSED LOCALLY; FULL SUITE AND HOSTED CI PENDING,Versioned world-sound evidence rules and independent reference model,,,2026-11-09,43,8
 R2,Engineering,Settlement and economics hardening,PLANNED,Conservation/replay/reward/residual invariants pass,,,2026-11-09,20,0
 R3,Engineering,Open verifiable monitoring registry,PLANNED,"Scalable membership, unbiased selection, liveness/release recovery",,,2026-11-09,15,0
 R4,Engineering,Shared signed evidence/SDK,PLANNED,Remote signed canonical records and interoperable verification,,,2026-11-09,10,0
