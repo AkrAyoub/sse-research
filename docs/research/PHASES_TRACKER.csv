@@ -1,6 +1,6 @@
 Phase,Track,Name,Status,Exit_Criterion,Evidence_Link,Git_Commit,Last_Updated,Completion_Percent,Change_pp
 R0,Engineering,Reproducible baseline,ACCEPTED - 106/106 Python + 35/35 Foundry + clean clone + 3/3 GitHub Actions CI successful,"Fresh clone installs, imports, compiles and runs recorded tests",docs/research/R0_VALIDATION.md;docs/research/R0_PYTHON_HOST_VALIDATION_2026-11-09.md;docs/research/R0_FOUNDRY_HOST_VALIDATION_2026-11-09.md;docs/research/R0_CLEAN_CLONE_CHECKLIST.md;https://github.com/AkrAyoub/sse-research/actions,375b6ec0f2af233542f9235179f7e545b9d44279,2026-11-09,100,5
-R1,Engineering,Formal SSE evidence protocol,WP02 RESEARCH REFERENCE AUTHORED / 19 LOCAL UNIT TESTS PASS / NOT IN MAIN OR HOSTED CI,Versioned world-sound evidence rules and independent reference model,,,2026-11-09,25,15
+R1,Engineering,Formal SSE evidence protocol,WP03 PHYSICAL SERVICE TRACE MODEL LOCAL TESTS 26/26; HTTP + COMPUTE ONLY; REMOTE CI PENDING,Versioned world-sound evidence rules and independent reference model,,,2026-11-09,35,10
 R2,Engineering,Settlement and economics hardening,PLANNED,Conservation/replay/reward/residual invariants pass,,,2026-11-09,20,0
 R3,Engineering,Open verifiable monitoring registry,PLANNED,"Scalable membership, unbiased selection, liveness/release recovery",,,2026-11-09,15,0
 R4,Engineering,Shared signed evidence/SDK,PLANNED,Remote signed canonical records and interoperable verification,,,2026-11-09,10,0
@@ -12,9 +12,9 @@ R9,Engineering,Independent distributed experiments,PLANNED,Reproducible distribu
 R10,Engineering,Publication-grade evaluation,PLANNED,"Faithful baselines, experimental analysis and proof/claim traceability",,,2026-11-09,0,0
 R11,Engineering,Independent replication/release,PLANNED,External user reproduces representative SSE experiments,,,2026-11-09,0,0
 P0,Research,Systematic novelty analysis,FOUR PRIMARY-SOURCE MECHANISM COMPARISON DRAFTED / SYSTEMATIC NOVELTY NOT ESTABLISHED,Defensible related-work gap and source-grounded comparison,docs/research/P0_R1_SCIENTIFIC_BOOTSTRAP.md,,2026-11-09,20,10
-P1,Research,Formal problem and assumptions,PROVISIONAL PHYSICAL HISTORY ONTOLOGY / ADR-001 OPEN,"Precise physical/admissible histories, evidence interpreter and threat model",,,2026-11-09,20,10
+P1,Research,Formal problem and assumptions,SERVICE CONDITIONS AND PHYSICAL EVENT ONTOLOGY DRAFTED; ADR-001/002 OPEN,"Precise physical/admissible histories, evidence interpreter and threat model",,,2026-11-09,30,10
 P2,Research,Theorems and proofs,CONDITIONAL PROOFS OUTLINED / FINITE REFERENCE TESTS NOT FORMAL PROOF,"Conditional safety, maximality, conservation, monotonicity, budget induction",,,2026-11-09,10,5
-P3,Research,Publishable protocol specification,PROVISIONAL VERSIONED EVIDENCE POLICY / PRODUCTION SEMANTICS NOT APPROVED,"Messages, states, on/off-chain architecture and soundness boundaries",,,2026-11-09,15,5
+P3,Research,Publishable protocol specification,SERVICE-SPECIFIC PROTOCOL MANIFEST DRAFT; HASH/DELIVERY RULES NOT APPROVED,"Messages, states, on/off-chain architecture and soundness boundaries",,,2026-11-09,20,5
 P4,Research,Pre-registered experiments/baselines,PLANNED,Reproducible scenarios and fairness metrics,,,2026-11-09,5,0
 P5,Research,Original scientific manuscript,PLANNED,New paper grounded in proofs and measurements,,,2026-11-09,0,0
 P6,Research,Publication artifact/reproduction,PLANNED,"Figures, datasets and released reproducibility package",,,2026-11-09,0,0
