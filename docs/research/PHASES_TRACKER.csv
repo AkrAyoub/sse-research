@@ -1,6 +1,6 @@
 Phase,Track,Name,Status,Exit_Criterion,Evidence_Link,Git_Commit,Last_Updated,Completion_Percent,Change_pp
 R0,Engineering,Reproducible baseline,ACCEPTED - 106/106 Python + 35/35 Foundry + clean clone + 3/3 GitHub Actions CI successful,"Fresh clone installs, imports, compiles and runs recorded tests",docs/research/R0_VALIDATION.md;docs/research/R0_PYTHON_HOST_VALIDATION_2026-11-09.md;docs/research/R0_FOUNDRY_HOST_VALIDATION_2026-11-09.md;docs/research/R0_CLEAN_CLONE_CHECKLIST.md;https://github.com/AkrAyoub/sse-research/actions,375b6ec0f2af233542f9235179f7e545b9d44279,2026-11-09,100,5
-R1,Engineering,Formal SSE evidence protocol,WP03 AND WP04 SOURCE COMMITTED ON RESEARCH BRANCH; 75 REFERENCE TESTS PASSED LOCALLY; FULL SUITE AND HOSTED CI PENDING,Versioned world-sound evidence rules and independent reference model,,,2026-11-09,43,8
+R1,Engineering,Formal SSE evidence protocol,WP05 SOURCE-TRACED ASYNC/CLOCK SHADOW WITH 44 NEW LOCAL TESTS; CODE PACKAGE NOT YET IN GITHUB OR HOSTED CI,Versioned world-sound evidence rules and independent reference model,,,2026-11-09,50,7
 R2,Engineering,Settlement and economics hardening,PLANNED,Conservation/replay/reward/residual invariants pass,,,2026-11-09,20,0
 R3,Engineering,Open verifiable monitoring registry,PLANNED,"Scalable membership, unbiased selection, liveness/release recovery",,,2026-11-09,15,0
 R4,Engineering,Shared signed evidence/SDK,PLANNED,Remote signed canonical records and interoperable verification,,,2026-11-09,10,0
@@ -11,10 +11,10 @@ R8,Engineering,Read-only chain observatory,PLANNED,Rebuildable on-chain finance 
 R9,Engineering,Independent distributed experiments,PLANNED,Reproducible distributed failure and workload datasets,,,2026-11-09,5,0
 R10,Engineering,Publication-grade evaluation,PLANNED,"Faithful baselines, experimental analysis and proof/claim traceability",,,2026-11-09,0,0
 R11,Engineering,Independent replication/release,PLANNED,External user reproduces representative SSE experiments,,,2026-11-09,0,0
-P0,Research,Systematic novelty analysis,PRIMARY SOURCE MECHANISM SCAN INCLUDING FAILURE DETECTORS + TLS PROVENANCE + STORAGE + ZKVM; NOT SYSTEMATIC,Defensible related-work gap and source-grounded comparison,docs/research/P0_R1_SCIENTIFIC_BOOTSTRAP.md,,2026-11-09,32,7
-P1,Research,Formal problem and assumptions,FINITE PHYSICAL OBSERVATION EQUIVALENCE + MISSING WORLDS COUNTEREXAMPLES; GLOBAL SOUNDNESS OPEN,"Precise physical/admissible histories, evidence interpreter and threat model",,,2026-11-09,40,10
-P2,Research,Theorems and proofs,CONDITIONAL INDISTINGUISHABILITY LIMITATION AND FINITE TESTS; FORMAL PROOF NOT COMPLETED,"Conditional safety, maximality, conservation, monotonicity, budget induction",,,2026-11-09,15,5
-P3,Research,Publishable protocol specification,SERVICE SPECIFIC EVIDENCE LAYER SKETCH; CERTIFICATE / CLOCK / CANONICAL WIRE SCHEMA OPEN,"Messages, states, on/off-chain architecture and soundness boundaries",,,2026-11-09,25,5
-P4,Research,Pre-registered experiments/baselines,REPRODUCIBLE FINITE COUNTEREXAMPLE SCENARIOS; INDEPENDENT DISTRIBUTED DATA PENDING,Reproducible scenarios and fairness metrics,,,2026-11-09,10,5
+P0,Research,Systematic novelty analysis,FOCUSED PARTIAL SYNCHRONY/FAILURE DETECTOR/NTP/EIP-712 COMPARISON; SYSTEMATIC PRIOR-ART GAP OPEN,Defensible related-work gap and source-grounded comparison,docs/research/P0_R1_SCIENTIFIC_BOOTSTRAP.md,,2026-11-09,35,3
+P1,Research,Formal problem and assumptions,ASYNC TRANSPORT AND CLOCK UNCERTAINTY THREAT SCENARIOS SIMULATED; GLOBAL MODEL NOT COMPLETE,"Precise physical/admissible histories, evidence interpreter and threat model",,,2026-11-09,46,6
+P2,Research,Theorems and proofs,CONDITIONAL WORLD-SOUNDNESS COUNTEREXAMPLES; FORMAL PROOF AND EVM VALIDATION OPEN,"Conditional safety, maximality, conservation, monotonicity, budget induction",,,2026-11-09,20,5
+P3,Research,Publishable protocol specification,SOURCE-TRACED SOLIDITY TRANSITION GATES DOCUMENTED; CERTIFICATE SCHEMA STILL OPEN,"Messages, states, on/off-chain architecture and soundness boundaries",,,2026-11-09,30,5
+P4,Research,Pre-registered experiments/baselines,FINITE ASYNC/QUORUM/DEADLINE COUNTEREXAMPLE FIXTURES; DISTRIBUTED EXPERIMENTS PENDING,Reproducible scenarios and fairness metrics,,,2026-11-09,12,2
 P5,Research,Original scientific manuscript,PLANNED,New paper grounded in proofs and measurements,,,2026-11-09,0,0
 P6,Research,Publication artifact/reproduction,PLANNED,"Figures, datasets and released reproducibility package",,,2026-11-09,0,0
