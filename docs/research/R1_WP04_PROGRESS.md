@@ -26,3 +26,7 @@ Run all new source/tests plus existing Python/Foundry suites on the user's host,
 
 ## Estimated phase changes
 R0 100% unchanged, R1 **43% (+8 pp)**; P0 **32% (+7 pp)**, P1 **40% (+10 pp)**, P2 **15% (+5 pp)**, P3 **25% (+5 pp)**, P4 **10% (+5 pp)**. All other phases unchanged. Engineering approx **19%**, research approx **17%**, total approx **19%** (equal-phase rounded averages). Scientific novelty remains unconfirmed.
+
+## Additional primary-source comparison (after initial WP-04 scan)
+
+Optimistic fair exchange is materially closer prior art to SSE's dispute/liveness problem than cloud witnesses alone: Asokan, Shoup and Waidner, *Asynchronous Protocols for Optimistic Fair Exchange* (IEEE S&P 1998), https://research.ibm.com/publications/asynchronous-protocols-for-optimistic-fair-exchange and *Optimistic Fair Exchange of Digital Signatures* https://research.ibm.com/publications/optimistic-fair-exchange-of-digital-signatures. Their protocols use a third party under exception conditions; this is a possible **explicitly trust-based R2 alternative** for SSE's unresolved escrow deadlock, not a fully trustless guarantee. Payment dispute evidence already distinguishes a signed party assertion from event truth in https://www.usenix.org/legacy/event/ec98/full_papers/asokan/asokan_html/asokan.html. Never present that conceptual distinction as SSE's own novel discovery. The full source comparison is in the delivered ZIP's P0 document.
