@@ -21,3 +21,19 @@ git status --short
 
 Expected source commit: `45689eaeaac0f4f65b16f3e06e60c0133925ab59`.
 Do not interpret a clean-clone test as hosted CI; CI must be checked separately. Do not claim new service-independent or remote multi-VM verification from these local tests. Keep the clean clone's virtualenv and `lib/` dependencies out of Git.
+
+## Result recorded from the 2026-11-09 host transcript
+
+- **Fresh requirements install, dependency check, 106/106 Python tests, Solidity compilation and 35/35 Foundry tests: PASS.**
+- **Hosted GitHub Actions CI and explicit displayed clean-clone HEAD/status: pending.**
+- See `R0_CLEAN_CLONE_HOST_VALIDATION_2026-11-09.md`.
+
+Run the final checks from the source repository (not the temporary clone):
+
+```bash
+git rev-parse HEAD
+git status --short
+git remote -v
+```
+
+For hosted CI, push a reviewed source snapshot to an appropriate authorized GitHub repository, inspect **Actions → CI** and retain the passing run URL and commit SHA. Do not add a fabricated remote or publicly push sensitive files.
