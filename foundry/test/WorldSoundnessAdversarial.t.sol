@@ -199,7 +199,7 @@ contract WorldSoundnessAdversarialTest is Test {
         assertEq(e.unresolvedExposure, 0);
     }
 
-    function testFailureVoteRejectedOneSecondBeforeDeadlineAcceptedAtBoundary() public {
+    function test_RevertFailureVoteRejectedOneSecondBeforeDeadlineAcceptedAtBoundary() public {
         vm.warp(uint256(initialEpoch.responseDeadline) - 1);
         bytes32 evidence = keccak256("before-deadline");
         bytes memory sig = _voteSignature(
@@ -291,7 +291,7 @@ contract WorldSoundnessAdversarialTest is Test {
         settlement.submitProviderResponse(leaseId, 0, sig);
     }
 
-    function testFailureVoteAfterMonitoringCloseRejected() public {
+    function test_RevertFailureVoteAfterMonitoringCloseRejected() public {
         vm.warp(uint256(initialEpoch.monitoringClose) + 1);
         bytes32 evidence = keccak256("late-failure-report");
         bytes memory sig = _voteSignature(
