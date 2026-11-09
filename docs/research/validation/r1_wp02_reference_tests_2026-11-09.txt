@@ -1,0 +1,24 @@
+test_progressive_credits_are_delta_only (test_sse_formal_reference.ContinuationTests.test_progressive_credits_are_delta_only) ... ok
+test_retraction_and_nonmonotone_updates_rejected (test_sse_formal_reference.ContinuationTests.test_retraction_and_nonmonotone_updates_rejected) ... ok
+test_worst_case_budget_gate (test_sse_formal_reference.ContinuationTests.test_worst_case_budget_gate) ... ok
+test_ack_with_explicit_honesty_assumption_excludes_no_receipt (test_sse_formal_reference.EvidenceSemanticsTests.test_ack_with_explicit_honesty_assumption_excludes_no_receipt) ... ok
+test_certified_failure_plus_ack_yields_F (test_sse_formal_reference.EvidenceSemanticsTests.test_certified_failure_plus_ack_yields_F) ... ok
+test_certified_nonfulfillment_with_assumption_yields_NF (test_sse_formal_reference.EvidenceSemanticsTests.test_certified_nonfulfillment_with_assumption_yields_NF) ... ok
+test_certified_success_yields_S_only_with_soundness_assumption (test_sse_formal_reference.EvidenceSemanticsTests.test_certified_success_yields_S_only_with_soundness_assumption) ... ok
+test_conflicting_qualified_certificates_fail_closed (test_sse_formal_reference.EvidenceSemanticsTests.test_conflicting_qualified_certificates_fail_closed) ... ok
+test_counterexample_forged_ack_excludes_actual_N (test_sse_formal_reference.EvidenceSemanticsTests.test_counterexample_forged_ack_excludes_actual_N) ... ok
+test_counterexample_unsound_failure_exclusion_overrefunds_consumer (test_sse_formal_reference.EvidenceSemanticsTests.test_counterexample_unsound_failure_exclusion_overrefunds_consumer) ... ok
+test_invalid_vote_counter (test_sse_formal_reference.EvidenceSemanticsTests.test_invalid_vote_counter) ... ok
+test_negative_reports_without_attestation_do_not_prove_nonreceipt (test_sse_formal_reference.EvidenceSemanticsTests.test_negative_reports_without_attestation_do_not_prove_nonreceipt) ... ok
+test_signature_proves_attribution_not_fulfillment (test_sse_formal_reference.EvidenceSemanticsTests.test_signature_proves_attribution_not_fulfillment) ... ok
+test_three_failure_votes_and_timeout_do_not_eliminate_success (test_sse_formal_reference.EvidenceSemanticsTests.test_three_failure_votes_and_timeout_do_not_eliminate_success) ... ok
+test_all_seven_admissible_sets (test_sse_formal_reference.FormalBoundsTests.test_all_seven_admissible_sets) ... ok
+test_empty_and_invalid_worlds_fail_closed (test_sse_formal_reference.FormalBoundsTests.test_empty_and_invalid_worlds_fail_closed) ... ok
+test_every_subset_refinement_is_monotone (test_sse_formal_reference.FormalBoundsTests.test_every_subset_refinement_is_monotone) ... ok
+test_exhaustive_safety_conservation_and_maximality (test_sse_formal_reference.FormalBoundsTests.test_exhaustive_safety_conservation_and_maximality) ... ok
+test_randomized_amounts_avoid_float_rounding (test_sse_formal_reference.FormalBoundsTests.test_randomized_amounts_avoid_float_rounding) ... ok
+
+----------------------------------------------------------------------
+Ran 19 tests in 0.006s
+
+OK

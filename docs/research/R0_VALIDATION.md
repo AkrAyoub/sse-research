@@ -83,3 +83,9 @@ Total: **36 individual existing tests passed** in selected subsets (not the enti
 - `R0_PYTHON_HOST_VALIDATION_2026-11-09.md` is absent from the commit listing; add this record in a follow-on documentation commit.
 - New root history does not establish earlier commit ancestry. No remote, CI run or clean-clone test is yet reported.
 - R0 **90% (+10 pp)**; pending reproducibility acceptance.
+
+## User-host independent clean-clone validation (2026-11-09)
+
+The separate `sse-clean` checkout has now successfully installed pinned Python 3.12 dependencies; `pip check` passed; **all 106 Python tests passed**. The same clean clone successfully installed pinned Foundry libraries, compiled **42 files with Solc 0.8.24** (warnings), and **all 35 Foundry tests passed**. See `R0_CLEAN_CLONE_HOST_VALIDATION_2026-11-09.md` for the observed evidence and exclusions.
+
+**R0 now 95% (+5 pp), not accepted.** Hosted CI status is still unverified; the supplied excerpt does not show clean-clone Git SHA/status. Retain security warnings for R2.
