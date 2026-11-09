@@ -1,0 +1,29 @@
+sequenceDiagram
+    autonumber
+    actor Consumer
+    actor Provider
+    participant Board as OpenResourceBoard
+    participant Settle as SSESettlement
+    participant Pool as OpenMonitorCommittee
+    actor Randomness as Trusted randomness source (prototype)
+    participant M as Four selected monitors
+    Consumer->>Board: requestResource(profileHash, slaPolicyHash, maxFee, close)
+    Provider->>Board: placeBid(requestId, epochFee)
+    Note over Consumer,Board: After biddingClose
+    Consumer->>Board: chooseBidAndFundLease(config) + service escrow
+    Board->>Settle: createLeaseFromBoard(terms) + exact service escrow
+    Settle->>Pool: requestAssignment(consumer,provider)
+    Pool-->>Settle: assignmentId, snapshot locks
+    Settle-->>Board: leaseId
+    Board-->>Consumer: funded lease committed
+    opt Phase 4 opt-in fixed incentives
+        Consumer->>Settle: configureIncentives(...) + monitor/executor deposits
+    end
+    Provider->>Settle: acceptLease(leaseId)
+    Randomness->>Pool: fulfillRandomness(assignmentId,seed)
+    Note over Randomness,Pool: Current source trusts seed fairness; not a VRF proof
+    Consumer->>Settle: finalizeMonitorCommittee(leaseId)
+    Settle->>Pool: getCommittee(assignmentId)
+    Pool-->>Settle: four chosen addresses
+    M->>Settle: confirmMonitorAssignment() [each of four]
+    Settle-->>Consumer: CommitteeReady

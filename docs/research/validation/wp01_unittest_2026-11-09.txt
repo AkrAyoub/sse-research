@@ -1,0 +1,351 @@
+test_chain_read (unittest.loader._FailedTest.test_chain_read) ... ERROR
+test_bad_roles_rejected (test_control_auth.ControlAPI.test_bad_roles_rejected) ... ok
+test_health_does_not_claim_deployment (test_control_auth.ControlAPI.test_health_does_not_claim_deployment) ... ok
+test_proposal_only_with_credential (test_control_auth.ControlAPI.test_proposal_only_with_credential) ... ok
+test_unauthorized (test_control_auth.ControlAPI.test_unauthorized) ... ok
+test_duplicate_address_is_rejected (test_control_routes.ControlRoutesTest.test_duplicate_address_is_rejected) ... ok
+test_invalid_deployment_path_and_no_execute (test_control_routes.ControlRoutesTest.test_invalid_deployment_path_and_no_execute) ... ok
+test_local_dashboard_is_served (test_control_routes.ControlRoutesTest.test_local_dashboard_is_served) ... ok
+test_no_authorization_does_not_leak_inventory (test_control_routes.ControlRoutesTest.test_no_authorization_does_not_leak_inventory) ... ok
+test_proposal_approval_remains_offline_and_audited (test_control_routes.ControlRoutesTest.test_proposal_approval_remains_offline_and_audited) ... ok
+test_reader_cannot_propose_or_approve (test_control_routes.ControlRoutesTest.test_reader_cannot_propose_or_approve) ... ok
+test_weak_or_missing_tokens_fail_closed (test_control_routes.ControlRoutesTest.test_weak_or_missing_tokens_fail_closed) ... ok
+test_full_node (test_enrollment.EnrollmentChecks.test_full_node) ... ok
+test_multirole (test_enrollment.EnrollmentChecks.test_multirole) ... ok
+test_no_automatic_active_role (test_enrollment.EnrollmentChecks.test_no_automatic_active_role) ... ok
+test_no_shell_in_ip (test_enrollment.EnrollmentChecks.test_no_shell_in_ip) ... ok
+test_validator_requires_validator_client (test_enrollment.EnrollmentChecks.test_validator_requires_validator_client) ... ok
+test_primary_entrypoints_accept_help_without_starting_services (test_entrypoint_smoke.EntrypointSmokeTests.test_primary_entrypoints_accept_help_without_starting_services) ... 
+  test_primary_entrypoints_accept_help_without_starting_services (test_entrypoint_smoke.EntrypointSmokeTests.test_primary_entrypoints_accept_help_without_starting_services) (entrypoint='services/monitor-agent/monitor_agent.py') ... FAIL
+  test_primary_entrypoints_accept_help_without_starting_services (test_entrypoint_smoke.EntrypointSmokeTests.test_primary_entrypoints_accept_help_without_starting_services) (entrypoint='services/monitor-agent/http_probe.py') ... FAIL
+  test_primary_entrypoints_accept_help_without_starting_services (test_entrypoint_smoke.EntrypointSmokeTests.test_primary_entrypoints_accept_help_without_starting_services) (entrypoint='services/provider-agent/http_service.py') ... FAIL
+  test_primary_entrypoints_accept_help_without_starting_services (test_entrypoint_smoke.EntrypointSmokeTests.test_primary_entrypoints_accept_help_without_starting_services) (entrypoint='services/provider-agent/compute_http_service.py') ... FAIL
+  test_primary_entrypoints_accept_help_without_starting_services (test_entrypoint_smoke.EntrypointSmokeTests.test_primary_entrypoints_accept_help_without_starting_services) (entrypoint='services/provider-agent/resource_profile.py') ... FAIL
+  test_primary_entrypoints_accept_help_without_starting_services (test_entrypoint_smoke.EntrypointSmokeTests.test_primary_entrypoints_accept_help_without_starting_services) (entrypoint='tools/sse_chain_read.py') ... FAIL
+  test_primary_entrypoints_accept_help_without_starting_services (test_entrypoint_smoke.EntrypointSmokeTests.test_primary_entrypoints_accept_help_without_starting_services) (entrypoint='tools/sse_e2e_local.py') ... FAIL
+test_monitor_only (test_gitops.GitOpsTests.test_monitor_only) ... ok
+test_reject_duplicate (test_gitops.GitOpsTests.test_reject_duplicate) ... ok
+test_reject_false_validator (test_gitops.GitOpsTests.test_reject_false_validator) ... ok
+test_sensitive_contract_never_auto (test_gitops.GitOpsTests.test_sensitive_contract_never_auto) ... ok
+test_http_challenge (unittest.loader._FailedTest.test_http_challenge) ... ERROR
+test_m3_evidence_audit (unittest.loader._FailedTest.test_m3_evidence_audit) ... ERROR
+test_expected_submission_structure (test_m3_packaging.PackageTests.test_expected_submission_structure) ... ok
+test_reject_missing_ai_disclosure (test_m3_packaging.PackageTests.test_reject_missing_ai_disclosure) ... ok
+test_reject_over_six_pages (test_m3_packaging.PackageTests.test_reject_over_six_pages) ... ok
+test_monitor_signed_adapter (unittest.loader._FailedTest.test_monitor_signed_adapter) ... ERROR
+test_inventory_only_approved_nodes (test_role_agent.RoleAgentTest.test_inventory_only_approved_nodes) ... ok
+test_local_heartbeat_is_factual (test_role_agent.RoleAgentTest.test_local_heartbeat_is_factual) ... ok
+test_reject_non_loopback (test_role_agent.RoleAgentTest.test_reject_non_loopback) ... ok
+test_validator_role_remains_descriptive (test_role_agent.RoleAgentTest.test_validator_role_remains_descriptive) ... ok
+test_conservation_all_fees (test_settlement_scenarios.SettlementScenariosTest.test_conservation_all_fees) ... ok
+test_mismatched_chain_detectable (test_settlement_scenarios.SettlementScenariosTest.test_mismatched_chain_detectable) ... ok
+test_partial_refund_is_exactly_20 (test_settlement_scenarios.SettlementScenariosTest.test_partial_refund_is_exactly_20) ... ok
+test_rpc_snapshot_tells_truth_about_evidence (test_settlement_scenarios.SettlementScenariosTest.test_rpc_snapshot_tells_truth_about_evidence) ... ok
+test_scenario_response (test_settlement_scenarios.SettlementScenariosTest.test_scenario_response) ... ok
+test_sse_compute_docker (unittest.loader._FailedTest.test_sse_compute_docker) ... ERROR
+test_sse_e2e_local (unittest.loader._FailedTest.test_sse_e2e_local) ... ERROR
+test_invalid_shares_are_refused (test_sse_residual_typed_data.ResidualTypedDataTests.test_invalid_shares_are_refused) ... ok
+test_invalid_uint_and_address_are_refused (test_sse_residual_typed_data.ResidualTypedDataTests.test_invalid_uint_and_address_are_refused) ... ok
+test_schema_matches_contract_and_eip712_domain (test_sse_residual_typed_data.ResidualTypedDataTests.test_schema_matches_contract_and_eip712_domain) ... ok
+test_whole_amount_can_be_allocated_to_either_party (test_sse_residual_typed_data.ResidualTypedDataTests.test_whole_amount_can_be_allocated_to_either_party) ... ok
+
+======================================================================
+ERROR: test_chain_read (unittest.loader._FailedTest.test_chain_read)
+----------------------------------------------------------------------
+ImportError: Failed to import test module: test_chain_read
+Traceback (most recent call last):
+  File "/mnt/data/sse_r0_wp01/tools/sse_challenge.py", line 6, in <module>
+    from Crypto.Hash import keccak
+ModuleNotFoundError: No module named 'Crypto'
+
+The above exception was the direct cause of the following exception:
+
+Traceback (most recent call last):
+  File "/usr/lib/python3.13/unittest/loader.py", line 396, in _find_test_path
+    module = self._get_module_from_name(name)
+  File "/usr/lib/python3.13/unittest/loader.py", line 339, in _get_module_from_name
+    __import__(name)
+    ~~~~~~~~~~^^^^^^
+  File "/mnt/data/sse_r0_wp01/tests/test_chain_read.py", line 10, in <module>
+    from sse_challenge import expected_response_hash, keccak256
+  File "/mnt/data/sse_r0_wp01/tools/sse_challenge.py", line 8, in <module>
+    raise RuntimeError("Missing pycryptodome: run python -m pip install -r requirements.txt") from exc
+RuntimeError: Missing pycryptodome: run python -m pip install -r requirements.txt
+
+
+======================================================================
+ERROR: test_http_challenge (unittest.loader._FailedTest.test_http_challenge)
+----------------------------------------------------------------------
+ImportError: Failed to import test module: test_http_challenge
+Traceback (most recent call last):
+  File "/mnt/data/sse_r0_wp01/tools/sse_challenge.py", line 6, in <module>
+    from Crypto.Hash import keccak
+ModuleNotFoundError: No module named 'Crypto'
+
+The above exception was the direct cause of the following exception:
+
+Traceback (most recent call last):
+  File "/usr/lib/python3.13/unittest/loader.py", line 396, in _find_test_path
+    module = self._get_module_from_name(name)
+  File "/usr/lib/python3.13/unittest/loader.py", line 339, in _get_module_from_name
+    __import__(name)
+    ~~~~~~~~~~^^^^^^
+  File "/mnt/data/sse_r0_wp01/tests/test_http_challenge.py", line 22, in <module>
+    challenge = load("tools/sse_challenge.py", "sse_challenge")
+  File "/mnt/data/sse_r0_wp01/tests/test_http_challenge.py", line 18, in load
+    spec.loader.exec_module(module)
+    ~~~~~~~~~~~~~~~~~~~~~~~^^^^^^^^
+  File "/mnt/data/sse_r0_wp01/tools/sse_challenge.py", line 8, in <module>
+    raise RuntimeError("Missing pycryptodome: run python -m pip install -r requirements.txt") from exc
+RuntimeError: Missing pycryptodome: run python -m pip install -r requirements.txt
+
+
+======================================================================
+ERROR: test_m3_evidence_audit (unittest.loader._FailedTest.test_m3_evidence_audit)
+----------------------------------------------------------------------
+ImportError: Failed to import test module: test_m3_evidence_audit
+Traceback (most recent call last):
+  File "/mnt/data/sse_r0_wp01/tools/sse_challenge.py", line 6, in <module>
+    from Crypto.Hash import keccak
+ModuleNotFoundError: No module named 'Crypto'
+
+The above exception was the direct cause of the following exception:
+
+Traceback (most recent call last):
+  File "/usr/lib/python3.13/unittest/loader.py", line 396, in _find_test_path
+    module = self._get_module_from_name(name)
+  File "/usr/lib/python3.13/unittest/loader.py", line 339, in _get_module_from_name
+    __import__(name)
+    ~~~~~~~~~~^^^^^^
+  File "/mnt/data/sse_r0_wp01/tests/test_m3_evidence_audit.py", line 11, in <module>
+    import m3_evidence_audit as audit
+  File "/mnt/data/sse_r0_wp01/tools/m3_evidence_audit.py", line 22, in <module>
+    from sse_challenge import keccak256
+  File "/mnt/data/sse_r0_wp01/tools/sse_challenge.py", line 8, in <module>
+    raise RuntimeError("Missing pycryptodome: run python -m pip install -r requirements.txt") from exc
+RuntimeError: Missing pycryptodome: run python -m pip install -r requirements.txt
+
+
+======================================================================
+ERROR: test_monitor_signed_adapter (unittest.loader._FailedTest.test_monitor_signed_adapter)
+----------------------------------------------------------------------
+ImportError: Failed to import test module: test_monitor_signed_adapter
+Traceback (most recent call last):
+  File "/usr/lib/python3.13/unittest/loader.py", line 396, in _find_test_path
+    module = self._get_module_from_name(name)
+  File "/usr/lib/python3.13/unittest/loader.py", line 339, in _get_module_from_name
+    __import__(name)
+    ~~~~~~~~~~^^^^^^
+  File "/mnt/data/sse_r0_wp01/tests/test_monitor_signed_adapter.py", line 16, in <module>
+    from eth_account import Account
+ModuleNotFoundError: No module named 'eth_account'
+
+
+======================================================================
+ERROR: test_sse_compute_docker (unittest.loader._FailedTest.test_sse_compute_docker)
+----------------------------------------------------------------------
+ImportError: Failed to import test module: test_sse_compute_docker
+Traceback (most recent call last):
+  File "/mnt/data/sse_r0_wp01/tools/sse_challenge.py", line 6, in <module>
+    from Crypto.Hash import keccak
+ModuleNotFoundError: No module named 'Crypto'
+
+The above exception was the direct cause of the following exception:
+
+Traceback (most recent call last):
+  File "/usr/lib/python3.13/unittest/loader.py", line 396, in _find_test_path
+    module = self._get_module_from_name(name)
+  File "/usr/lib/python3.13/unittest/loader.py", line 339, in _get_module_from_name
+    __import__(name)
+    ~~~~~~~~~~^^^^^^
+  File "/mnt/data/sse_r0_wp01/tests/test_sse_compute_docker.py", line 17, in <module>
+    from resource_profile import example_profile, profile_hash, verify_lease_profile
+  File "/mnt/data/sse_r0_wp01/services/provider-agent/resource_profile.py", line 17, in <module>
+    from sse_challenge import keccak256
+  File "/mnt/data/sse_r0_wp01/tools/sse_challenge.py", line 8, in <module>
+    raise RuntimeError("Missing pycryptodome: run python -m pip install -r requirements.txt") from exc
+RuntimeError: Missing pycryptodome: run python -m pip install -r requirements.txt
+
+
+======================================================================
+ERROR: test_sse_e2e_local (unittest.loader._FailedTest.test_sse_e2e_local)
+----------------------------------------------------------------------
+ImportError: Failed to import test module: test_sse_e2e_local
+Traceback (most recent call last):
+  File "/mnt/data/sse_r0_wp01/tools/sse_challenge.py", line 6, in <module>
+    from Crypto.Hash import keccak
+ModuleNotFoundError: No module named 'Crypto'
+
+The above exception was the direct cause of the following exception:
+
+Traceback (most recent call last):
+  File "/usr/lib/python3.13/unittest/loader.py", line 396, in _find_test_path
+    module = self._get_module_from_name(name)
+  File "/usr/lib/python3.13/unittest/loader.py", line 339, in _get_module_from_name
+    __import__(name)
+    ~~~~~~~~~~^^^^^^
+  File "/mnt/data/sse_r0_wp01/tests/test_sse_e2e_local.py", line 8, in <module>
+    from sse_challenge import keccak256
+  File "/mnt/data/sse_r0_wp01/tools/sse_challenge.py", line 8, in <module>
+    raise RuntimeError("Missing pycryptodome: run python -m pip install -r requirements.txt") from exc
+RuntimeError: Missing pycryptodome: run python -m pip install -r requirements.txt
+
+
+======================================================================
+FAIL: test_primary_entrypoints_accept_help_without_starting_services (test_entrypoint_smoke.EntrypointSmokeTests.test_primary_entrypoints_accept_help_without_starting_services) (entrypoint='services/monitor-agent/monitor_agent.py')
+----------------------------------------------------------------------
+Traceback (most recent call last):
+  File "/mnt/data/sse_r0_wp01/tests/test_entrypoint_smoke.py", line 32, in test_primary_entrypoints_accept_help_without_starting_services
+    self.assertEqual(proc.returncode, 0, proc.stdout + proc.stderr)
+    ~~~~~~~~~~~~~~~~^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+AssertionError: 1 != 0 : Traceback (most recent call last):
+  File "/mnt/data/sse_r0_wp01/tools/sse_challenge.py", line 6, in <module>
+    from Crypto.Hash import keccak
+ModuleNotFoundError: No module named 'Crypto'
+
+The above exception was the direct cause of the following exception:
+
+Traceback (most recent call last):
+  File "/mnt/data/sse_r0_wp01/services/monitor-agent/monitor_agent.py", line 21, in <module>
+    from sse_challenge import expected_response_hash, keccak256
+  File "/mnt/data/sse_r0_wp01/tools/sse_challenge.py", line 8, in <module>
+    raise RuntimeError("Missing pycryptodome: run python -m pip install -r requirements.txt") from exc
+RuntimeError: Missing pycryptodome: run python -m pip install -r requirements.txt
+
+
+======================================================================
+FAIL: test_primary_entrypoints_accept_help_without_starting_services (test_entrypoint_smoke.EntrypointSmokeTests.test_primary_entrypoints_accept_help_without_starting_services) (entrypoint='services/monitor-agent/http_probe.py')
+----------------------------------------------------------------------
+Traceback (most recent call last):
+  File "/mnt/data/sse_r0_wp01/tests/test_entrypoint_smoke.py", line 32, in test_primary_entrypoints_accept_help_without_starting_services
+    self.assertEqual(proc.returncode, 0, proc.stdout + proc.stderr)
+    ~~~~~~~~~~~~~~~~^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+AssertionError: 1 != 0 : Traceback (most recent call last):
+  File "/mnt/data/sse_r0_wp01/tools/sse_challenge.py", line 6, in <module>
+    from Crypto.Hash import keccak
+ModuleNotFoundError: No module named 'Crypto'
+
+The above exception was the direct cause of the following exception:
+
+Traceback (most recent call last):
+  File "/mnt/data/sse_r0_wp01/services/monitor-agent/http_probe.py", line 18, in <module>
+    from sse_challenge import bytes32, expected_response_hash
+  File "/mnt/data/sse_r0_wp01/tools/sse_challenge.py", line 8, in <module>
+    raise RuntimeError("Missing pycryptodome: run python -m pip install -r requirements.txt") from exc
+RuntimeError: Missing pycryptodome: run python -m pip install -r requirements.txt
+
+
+======================================================================
+FAIL: test_primary_entrypoints_accept_help_without_starting_services (test_entrypoint_smoke.EntrypointSmokeTests.test_primary_entrypoints_accept_help_without_starting_services) (entrypoint='services/provider-agent/http_service.py')
+----------------------------------------------------------------------
+Traceback (most recent call last):
+  File "/mnt/data/sse_r0_wp01/tests/test_entrypoint_smoke.py", line 32, in test_primary_entrypoints_accept_help_without_starting_services
+    self.assertEqual(proc.returncode, 0, proc.stdout + proc.stderr)
+    ~~~~~~~~~~~~~~~~^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+AssertionError: 1 != 0 : Traceback (most recent call last):
+  File "/mnt/data/sse_r0_wp01/tools/sse_challenge.py", line 6, in <module>
+    from Crypto.Hash import keccak
+ModuleNotFoundError: No module named 'Crypto'
+
+The above exception was the direct cause of the following exception:
+
+Traceback (most recent call last):
+  File "/mnt/data/sse_r0_wp01/services/provider-agent/http_service.py", line 14, in <module>
+    from sse_challenge import bytes32, expected_response_hash
+  File "/mnt/data/sse_r0_wp01/tools/sse_challenge.py", line 8, in <module>
+    raise RuntimeError("Missing pycryptodome: run python -m pip install -r requirements.txt") from exc
+RuntimeError: Missing pycryptodome: run python -m pip install -r requirements.txt
+
+
+======================================================================
+FAIL: test_primary_entrypoints_accept_help_without_starting_services (test_entrypoint_smoke.EntrypointSmokeTests.test_primary_entrypoints_accept_help_without_starting_services) (entrypoint='services/provider-agent/compute_http_service.py')
+----------------------------------------------------------------------
+Traceback (most recent call last):
+  File "/mnt/data/sse_r0_wp01/tests/test_entrypoint_smoke.py", line 32, in test_primary_entrypoints_accept_help_without_starting_services
+    self.assertEqual(proc.returncode, 0, proc.stdout + proc.stderr)
+    ~~~~~~~~~~~~~~~~^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+AssertionError: 1 != 0 : Traceback (most recent call last):
+  File "/mnt/data/sse_r0_wp01/tools/sse_challenge.py", line 6, in <module>
+    from Crypto.Hash import keccak
+ModuleNotFoundError: No module named 'Crypto'
+
+The above exception was the direct cause of the following exception:
+
+Traceback (most recent call last):
+  File "/mnt/data/sse_r0_wp01/services/provider-agent/compute_http_service.py", line 14, in <module>
+    from sse_challenge import bytes32, expected_response_hash
+  File "/mnt/data/sse_r0_wp01/tools/sse_challenge.py", line 8, in <module>
+    raise RuntimeError("Missing pycryptodome: run python -m pip install -r requirements.txt") from exc
+RuntimeError: Missing pycryptodome: run python -m pip install -r requirements.txt
+
+
+======================================================================
+FAIL: test_primary_entrypoints_accept_help_without_starting_services (test_entrypoint_smoke.EntrypointSmokeTests.test_primary_entrypoints_accept_help_without_starting_services) (entrypoint='services/provider-agent/resource_profile.py')
+----------------------------------------------------------------------
+Traceback (most recent call last):
+  File "/mnt/data/sse_r0_wp01/tests/test_entrypoint_smoke.py", line 32, in test_primary_entrypoints_accept_help_without_starting_services
+    self.assertEqual(proc.returncode, 0, proc.stdout + proc.stderr)
+    ~~~~~~~~~~~~~~~~^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+AssertionError: 1 != 0 : Traceback (most recent call last):
+  File "/mnt/data/sse_r0_wp01/tools/sse_challenge.py", line 6, in <module>
+    from Crypto.Hash import keccak
+ModuleNotFoundError: No module named 'Crypto'
+
+The above exception was the direct cause of the following exception:
+
+Traceback (most recent call last):
+  File "/mnt/data/sse_r0_wp01/services/provider-agent/resource_profile.py", line 17, in <module>
+    from sse_challenge import keccak256
+  File "/mnt/data/sse_r0_wp01/tools/sse_challenge.py", line 8, in <module>
+    raise RuntimeError("Missing pycryptodome: run python -m pip install -r requirements.txt") from exc
+RuntimeError: Missing pycryptodome: run python -m pip install -r requirements.txt
+
+
+======================================================================
+FAIL: test_primary_entrypoints_accept_help_without_starting_services (test_entrypoint_smoke.EntrypointSmokeTests.test_primary_entrypoints_accept_help_without_starting_services) (entrypoint='tools/sse_chain_read.py')
+----------------------------------------------------------------------
+Traceback (most recent call last):
+  File "/mnt/data/sse_r0_wp01/tests/test_entrypoint_smoke.py", line 32, in test_primary_entrypoints_accept_help_without_starting_services
+    self.assertEqual(proc.returncode, 0, proc.stdout + proc.stderr)
+    ~~~~~~~~~~~~~~~~^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+AssertionError: 1 != 0 : Traceback (most recent call last):
+  File "/mnt/data/sse_r0_wp01/tools/sse_challenge.py", line 6, in <module>
+    from Crypto.Hash import keccak
+ModuleNotFoundError: No module named 'Crypto'
+
+The above exception was the direct cause of the following exception:
+
+Traceback (most recent call last):
+  File "/mnt/data/sse_r0_wp01/tools/sse_chain_read.py", line 22, in <module>
+    from sse_challenge import expected_response_hash, keccak256
+  File "/mnt/data/sse_r0_wp01/tools/sse_challenge.py", line 8, in <module>
+    raise RuntimeError("Missing pycryptodome: run python -m pip install -r requirements.txt") from exc
+RuntimeError: Missing pycryptodome: run python -m pip install -r requirements.txt
+
+
+======================================================================
+FAIL: test_primary_entrypoints_accept_help_without_starting_services (test_entrypoint_smoke.EntrypointSmokeTests.test_primary_entrypoints_accept_help_without_starting_services) (entrypoint='tools/sse_e2e_local.py')
+----------------------------------------------------------------------
+Traceback (most recent call last):
+  File "/mnt/data/sse_r0_wp01/tests/test_entrypoint_smoke.py", line 32, in test_primary_entrypoints_accept_help_without_starting_services
+    self.assertEqual(proc.returncode, 0, proc.stdout + proc.stderr)
+    ~~~~~~~~~~~~~~~~^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+AssertionError: 1 != 0 : Traceback (most recent call last):
+  File "/mnt/data/sse_r0_wp01/tools/sse_challenge.py", line 6, in <module>
+    from Crypto.Hash import keccak
+ModuleNotFoundError: No module named 'Crypto'
+
+The above exception was the direct cause of the following exception:
+
+Traceback (most recent call last):
+  File "/mnt/data/sse_r0_wp01/tools/sse_e2e_local.py", line 25, in <module>
+    from sse_challenge import keccak256, bytes32
+  File "/mnt/data/sse_r0_wp01/tools/sse_challenge.py", line 8, in <module>
+    raise RuntimeError("Missing pycryptodome: run python -m pip install -r requirements.txt") from exc
+RuntimeError: Missing pycryptodome: run python -m pip install -r requirements.txt
+
+
+----------------------------------------------------------------------
+Ran 43 tests in 7.644s
+
+FAILED (failures=7, errors=6)

@@ -1,0 +1,24 @@
+[Unit]
+Description=SSE read-only node role agent
+After=network-online.target
+Wants=network-online.target
+[Service]
+Type=simple
+User=sseagent
+Group=sseagent
+WorkingDirectory=/opt/sse/role-agent
+Environment=SSE_NODE_ID={{ inventory_hostname }}
+Environment=SSE_ROLES={{ sse_roles | join(',') }}
+Environment=SSE_AGENT_HOST=127.0.0.1
+Environment=SSE_AGENT_PORT=8765
+Environment=SSE_REVISION={{ sse_revision }}
+ExecStart=/usr/bin/python3 /opt/sse/role-agent/agent.py
+Restart=on-failure
+RestartSec=4
+NoNewPrivileges=yes
+ProtectSystem=strict
+ProtectHome=yes
+PrivateTmp=yes
+CapabilityBoundingSet=
+[Install]
+WantedBy=multi-user.target

@@ -1,0 +1,119 @@
+"""Check local Docker CPU-worker runtime and independently reproduce its job.
+
+Read-only Docker inspect and localhost HTTP probe. This is LOCAL configuration
+observation, NOT remote cloud or trusted-execution attestation.
+"""
+from __future__ import annotations
+import json
+import re
+import subprocess
+import time
+from urllib.parse import urlsplit
+from urllib.request import Request, urlopen
+
+from compute_workload import compute_result
+
+_CONTAINER = re.compile(r'[a-zA-Z0-9][a-zA-Z0-9_.-]{0,127}\Z')
+_IMAGE = re.compile(r'sha256:[0-9a-f]{64}\Z')
+
+
+class ComputeError(ValueError):
+    pass
+
+
+def local_endpoint(endpoint: str) -> int:
+    u = urlsplit(endpoint)
+    try:
+        port = u.port
+    except ValueError as exc:
+        raise ComputeError('invalid endpoint port') from exc
+    if (u.scheme != 'http' or u.hostname != '127.0.0.1' or
+            not isinstance(port, int) or port <= 0 or port > 65535 or
+            u.username is not None or u.password is not None or
+            u.path not in ('','/') or u.query or u.fragment or not endpoint.endswith(str(port))):
+        raise ComputeError('compute endpoint must be http://127.0.0.1:PORT')
+    return port
+
+
+def inspect_container(profile: dict, endpoint: str, container_name: str) -> dict:
+    """Read local Docker config; requires exact image/CPU/memory/port match."""
+    if not isinstance(container_name, str) or not _CONTAINER.fullmatch(container_name):
+        raise ComputeError('invalid container name')
+    port = local_endpoint(endpoint)
+    if profile.get('endpoint') != endpoint:
+        raise ComputeError('profile endpoint differs from requested endpoint')
+    if not isinstance(profile.get('imageId'), str) or not _IMAGE.fullmatch(profile['imageId']):
+        raise ComputeError('profile requires an immutable image ID')
+    try:
+        p = subprocess.run(['docker', 'container', 'inspect', container_name],
+                           capture_output=True, text=True, check=False,
+                           timeout=8, shell=False)
+    except (FileNotFoundError, subprocess.TimeoutExpired, OSError) as exc:
+        raise ComputeError('Docker CLI unavailable or timed out; start Docker Desktop') from exc
+    if p.returncode != 0:
+        raise ComputeError('Docker container not found/running; check docker ps')
+    try:
+        items = json.loads(p.stdout)
+        if not isinstance(items, list) or len(items) != 1 or not isinstance(items[0], dict):
+            raise ValueError('unexpected JSON')
+        d = items[0]
+        state, host = d['State'], d['HostConfig']
+        if state['Running'] is not True or state.get('Paused') is True or state.get('Restarting') is True:
+            raise ComputeError('Docker worker is not in running state')
+        if d['Image'].lower() != profile['imageId']:
+            raise ComputeError('container image ID does not match committed profile')
+        cpu = profile['cpuMilli'] * 1_000_000
+        if type(host.get('NanoCpus')) is not int or host['NanoCpus'] != cpu:
+            raise ComputeError('Docker NanoCpus does not match committed CPU limit')
+        if type(host.get('Memory')) is not int or host['Memory'] != profile['memoryBytes']:
+            raise ComputeError('Docker memory cap does not match committed memory limit')
+        if host.get('ReadonlyRootfs') is not True:
+            raise ComputeError('Docker container must have read-only root filesystem')
+        bindings = host.get('PortBindings', {}).get('8877/tcp')
+        if (not isinstance(bindings, list) or len(bindings) != 1 or
+                bindings[0].get('HostIp') != '127.0.0.1' or bindings[0].get('HostPort') != str(port)):
+            raise ComputeError('Docker worker must publish 8877/tcp only on expected localhost port')
+        if host.get('NetworkMode') == 'host':
+            raise ComputeError('host networking forbidden')
+        if host.get('Privileged') is True:
+            raise ComputeError('privileged Docker workers forbidden')
+        if d.get('Config', {}).get('User') not in ('10001:10001', '10001'):
+            raise ComputeError('worker must run as non-root UID 10001')
+    except (KeyError, TypeError, AttributeError, ValueError) as exc:
+        if isinstance(exc, ComputeError):
+            raise
+        raise ComputeError('malformed Docker inspection record') from exc
+    return {'imageId': d['Image'].lower(), 'cpuMilli': profile['cpuMilli'],
+            'memoryBytes': profile['memoryBytes'], 'hostPort': port,
+            'containerId': d['Id'], 'runtimeReportedRunning': True,
+            'localDockerConfigurationInspected': True, 'trustedHardwareAttestation': False}
+
+
+def run_compute_probe(endpoint: str, lease_id: int, epoch_id: int, request_hash: str) -> dict:
+    local_endpoint(endpoint)
+    expected = compute_result(lease_id, epoch_id, request_hash)
+    req = Request(endpoint.rstrip('/') + '/v1/compute',
+                  data=json.dumps({'leaseId': lease_id, 'epochId': epoch_id,
+                                   'requestHash': request_hash}).encode('utf-8'),
+                  headers={'Content-Type':'application/json'}, method='POST')
+    start = time.perf_counter()
+    try:
+        with urlopen(req, timeout=8) as response:
+            if response.status != 200:
+                raise ComputeError('compute worker returned unexpected HTTP status')
+            data = response.read(4097)
+        if len(data) > 4096:
+            raise ComputeError('compute response too large')
+        parsed = json.loads(data)
+    except (OSError, TimeoutError, UnicodeDecodeError, ValueError) as exc:
+        if isinstance(exc, ComputeError):
+            raise
+        raise ComputeError('compute worker unavailable or malformed response') from exc
+    if parsed != expected:
+        raise ComputeError('nonce-bound compute result did not match independently calculated digest')
+    return {'schema':'sse-local-compute-observation-v1',
+            'leaseId': lease_id, 'epochId': epoch_id, 'requestHash':request_hash.lower(),
+            'resultDigest': expected['resultDigest'], 'rounds':expected['rounds'],
+            'elapsedSecondsLocal':round(time.perf_counter()-start, 6),
+            'workloadResultVerified': True, 'trustedHardwareAttestation':False,
+            'independentMonitorHost':False}

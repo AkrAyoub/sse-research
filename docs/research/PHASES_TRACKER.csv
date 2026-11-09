@@ -1,0 +1,20 @@
+Phase,Track,Name,Status,Exit_Criterion,Evidence_Link,Git_Commit,Last_Updated,Completion_Percent,Change_pp
+R0,Engineering,Reproducible baseline,IN PROGRESS / FOUNDRY PASSED; PYTHON + CI PENDING,"Fresh clone installs, imports, compiles and runs recorded tests",docs/research/R0_FOUNDRY_HOST_VALIDATION_2026-11-09.md,Source patch f31f2b4; user-host tested SHA unverified,2026-11-09,55,15
+R1,Engineering,Formal SSE evidence protocol,PLANNED,Versioned world-sound evidence rules and independent reference model,,,2026-11-09,10,0
+R2,Engineering,Settlement and economics hardening,PLANNED,Conservation/replay/reward/residual invariants pass,,,2026-11-09,20,0
+R3,Engineering,Open verifiable monitoring registry,PLANNED,"Scalable membership, unbiased selection, liveness/release recovery",,,2026-11-09,15,0
+R4,Engineering,Shared signed evidence/SDK,PLANNED,Remote signed canonical records and interoperable verification,,,2026-11-09,10,0
+R5,Engineering,Autonomous role agents,PLANNED,Independent processes transact all supported roles,,,2026-11-09,10,0
+R6,Engineering,Automatic Ubuntu onboarding,PLANNED,New NAT VM joins without static IP/manual peer edits,,,2026-11-09,5,0
+R7,Engineering,Heterogeneous cloud workloads,PLANNED,Compute/storage/OCI/API with verified evidence policies,,,2026-11-09,15,0
+R8,Engineering,Read-only chain observatory,PLANNED,Rebuildable on-chain finance and protected node console,,,2026-11-09,10,0
+R9,Engineering,Independent distributed experiments,PLANNED,Reproducible distributed failure and workload datasets,,,2026-11-09,5,0
+R10,Engineering,Publication-grade evaluation,PLANNED,"Faithful baselines, experimental analysis and proof/claim traceability",,,2026-11-09,0,0
+R11,Engineering,Independent replication/release,PLANNED,External user reproduces representative SSE experiments,,,2026-11-09,0,0
+P0,Research,Systematic novelty analysis,INITIAL SCREENING / NOT COMPLETE,Defensible related-work gap and source-grounded comparison,docs/research/P0_R1_SCIENTIFIC_BOOTSTRAP.md,,2026-11-09,10,0
+P1,Research,Formal problem and assumptions,PLANNED,"Precise physical/admissible histories, evidence interpreter and threat model",,,2026-11-09,10,0
+P2,Research,Theorems and proofs,PLANNED,"Conditional safety, maximality, conservation, monotonicity, budget induction",,,2026-11-09,5,0
+P3,Research,Publishable protocol specification,PLANNED,"Messages, states, on/off-chain architecture and soundness boundaries",,,2026-11-09,10,0
+P4,Research,Pre-registered experiments/baselines,PLANNED,Reproducible scenarios and fairness metrics,,,2026-11-09,5,0
+P5,Research,Original scientific manuscript,PLANNED,New paper grounded in proofs and measurements,,,2026-11-09,0,0
+P6,Research,Publication artifact/reproduction,PLANNED,"Figures, datasets and released reproducibility package",,,2026-11-09,0,0

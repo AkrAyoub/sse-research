@@ -1,0 +1,101 @@
+---
+- name: SSE Ubuntu read-only role agent rollout
+  hosts: sse_managed
+  become: true
+  gather_facts: true
+  serial: 1
+  vars:
+    sse_enable_remote_changes: false
+    sse_revision: "local"
+  pre_tasks:
+    - name: Verify operator explicitly enabled remote changes
+      ansible.builtin.assert:
+        that:
+          - sse_enable_remote_changes | bool
+        fail_msg: "Set sse_enable_remote_changes=true to apply changes"
+    - name: Require Ubuntu
+      ansible.builtin.assert:
+        that:
+          - ansible_facts['distribution'] == 'Ubuntu'
+          - sse_roles is defined
+          - sse_roles | length > 0
+        fail_msg: This playbook supports approved Ubuntu VMs with explicit roles only
+    - name: Validate deployment revision
+      ansible.builtin.assert:
+        that:
+          - sse_revision is match('^[A-Za-z0-9._-]{1,80}$')
+  tasks:
+    - name: Install Python runtime
+      ansible.builtin.apt:
+        name: [python3]
+        update_cache: true
+        state: present
+    - name: Create least-privilege agent system account
+      ansible.builtin.user:
+        name: sseagent
+        system: true
+        create_home: false
+        shell: /usr/sbin/nologin
+    - name: Create agent directory
+      ansible.builtin.file:
+        path: /opt/sse/role-agent
+        state: directory
+        owner: root
+        group: root
+        mode: '0755'
+    - name: Install read-only agent
+      ansible.builtin.copy:
+        src: "{{ playbook_dir }}/../../services/role-agent/agent.py"
+        dest: /opt/sse/role-agent/agent.py
+        owner: root
+        group: root
+        mode: '0644'
+      notify: Restart role agent
+    - name: Install systemd unit
+      ansible.builtin.template:
+        src: templates/sse-role-agent.service.j2
+        dest: /etc/systemd/system/sse-role-agent.service
+        owner: root
+        group: root
+        mode: '0644'
+      notify: Restart role agent
+    - name: Create monitor source directory on monitor nodes
+      ansible.builtin.file:
+        path: /opt/sse/monitor-agent
+        state: directory
+        owner: root
+        mode: '0755'
+      when: "'monitor' in sse_roles"
+    - name: Publish reviewed monitor source to monitor nodes
+      ansible.builtin.copy:
+        src: "{{ playbook_dir }}/../../services/monitor-agent/monitor_agent.py"
+        dest: /opt/sse/monitor-agent/monitor_agent.py
+        owner: root
+        mode: '0644'
+      when: "'monitor' in sse_roles"
+    - name: Create provider source directory on provider nodes
+      ansible.builtin.file:
+        path: /opt/sse/provider-agent
+        state: directory
+        owner: root
+        mode: '0755'
+      when: "'provider' in sse_roles"
+    - name: Publish reviewed compute manifest helper to provider nodes
+      ansible.builtin.copy:
+        src: "{{ playbook_dir }}/../../services/provider-agent/resource_profile.py"
+        dest: /opt/sse/provider-agent/resource_profile.py
+        owner: root
+        mode: '0644'
+      when: "'provider' in sse_roles"
+    - name: Start role agent
+      ansible.builtin.systemd_service:
+        name: sse-role-agent
+        daemon_reload: true
+        enabled: true
+        state: started
+  handlers:
+    - name: Restart role agent
+      ansible.builtin.systemd_service:
+        name: sse-role-agent
+        daemon_reload: true
+        state: restarted

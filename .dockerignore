@@ -1,0 +1,8 @@
+# Minimal build context; never transmit .venv, local evidence, Git data or secrets.
+**
+!tools/
+!tools/sse_challenge.py
+!tools/compute_workload.py
+!services/
+!services/provider-agent/
+!services/provider-agent/compute_http_service.py

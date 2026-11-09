@@ -1,0 +1,52 @@
+digraph SSE {
+  graph [fontname="Helvetica", rankdir=LR, nodesep=0.42, ranksep=0.75, pad=0.16,
+         bgcolor="white", label="SSE | Current Experimental System Architecture", labelloc=t, fontsize=20, fontcolor="#192b42"];
+  node [fontname="Helvetica",fontsize=11,shape=box,style="rounded,filled",color="#93a4b7",penwidth=1.2,fillcolor="white",fontcolor="#192b42",margin="0.16,0.10"];
+  edge [fontname="Helvetica",fontsize=9,arrowsize=0.7,color="#526d8a",fontcolor="#4b647f"];
+
+  subgraph cluster_participants {
+    label="Contract roles (Ethereum addresses)"; fontname="Helvetica";fontsize=12;
+    color="#c9d5e2";style="rounded,filled";fillcolor="#f3f7fb";
+    consumer[label="Consumer",fillcolor="#dceafd"];
+    provider[label="Provider",fillcolor="#e7f4e8"];
+    monitors[label="Bonded monitor\nidentities",fillcolor="#f1e9fc"];
+    random[label="Randomness\nauthority",fillcolor="#fff1d9"];
+  }
+  subgraph cluster_chain {
+    label="On-chain | Anvil Ethereum EVM (31337)";fontname="Helvetica";fontsize=12;
+    color="#a4a3d5";style="rounded,filled";fillcolor="#f5f2fd";
+    board[label="OpenResourceBoard\nrequests / bids",fillcolor="#ebe5fb"];
+    pool[label="OpenMonitorCommittee\nregistration / assignment",fillcolor="#ebe5fb"];
+    settlement[label="SSESettlement\nescrow / epochs / votes / bounds",fillcolor="#ded5f8",penwidth=1.8];
+    chainstate[label="EVM storage\nlease / epoch / credits",shape=cylinder,fillcolor="#fefefe"];
+    board -> settlement[label="funded lease"];
+    settlement -> pool[dir=both,label="assignment"];
+    settlement -> chainstate[label="state updates",constraint=false];
+  }
+  subgraph cluster_runtime {
+    label="Off-chain | Local provider and observations";fontname="Helvetica";fontsize=12;
+    color="#acd6b4";style="rounded,filled";fillcolor="#f2faf3";
+    docker[label="Docker compute\nHTTP worker",fillcolor="#def3e2"];
+    probe[label="HTTP / compute\nprobe",fillcolor="#e6f6ea"];
+    archive[label="Raw evidence\nJSON records",shape=cylinder,fillcolor="#ffffff"];
+    probe -> docker[label="HTTP challenge",dir=both,color="#2e8152"];
+    probe -> archive[label="save record"];
+  }
+  subgraph cluster_control {
+    label="Local experiment harness";fontname="Helvetica";fontsize=12;
+    color="#c9d5e2";style="rounded,filled";fillcolor="#f8fafc";
+    orchestrator[label="sse_e2e_local.py",fillcolor="#e5edf5"];
+    rpc[label="JSON-RPC /\nAnvil accounts",fillcolor="#e5edf5"];
+    orchestrator -> rpc[label="sign / transact"];
+  }
+
+  consumer -> board[label="request / fund"];
+  provider -> board[label="bid"];
+  provider -> settlement[label="accept / ACK"];
+  monitors -> pool[label="register / bond"];
+  random -> pool[label="selection seed"];
+  monitors -> settlement[label="signed votes"];
+  orchestrator -> probe[label="invoke"];
+  rpc -> settlement[label="EVM calls"];
+  archive -> settlement[label="evidence hash",style=dashed,color="#b37b38",constraint=false];
+}
