@@ -1,6 +1,6 @@
 # SSE master engineering tracker — R0 through R11
 
-**Latest checkpoint — 2026-11-09 (clean-clone host verification):** User has reproduced the source in a distinct Windows Git checkout (`/tmp/tmp.khWwr18ca1/sse-clean`). Fresh pinned dependency installation and `pip check` passed, **106/106 Python tests passed**, Foundry installed dependencies and compiled **42 Solidity files with Solc 0.8.24**, and **35/35 Foundry tests passed**, all with zero test failures. Compiler/lint warnings remain for R2 classification. This is meaningful source reproducibility, **not** hosted GitHub Actions CI or independently operated blockchain VMs. The supplied excerpt does not display the clone HEAD/status. **R0 = 95% (+5 pp)**; remaining verified CI (Ubuntu + Windows Python; Ubuntu Solidity) and final acceptance/provenance check. See `R0_CLEAN_CLONE_HOST_VALIDATION_2026-11-09.md`.
+> **CURRENT ACCEPTANCE STATUS (2026-11-09): R0 ACCEPTED — 100%.** Commit `375b6ec0f2af233542f9235179f7e545b9d44279` passed GitHub Actions workflow #1 on `main`: Python Ubuntu, Python Windows, and Solidity Ubuntu (3/3 green, overall Success, 53s), as shown in the user-provided screenshot. A separate fresh clone also passed 106/106 Python and 35/35 Foundry tests, with dependencies installed from scratch. Initial source SHA manifest matched 56/56 entries. R0 is closed under its reproducible-source-baseline acceptance gate; this does **not** validate real distributed execution, evidence world-soundness or audit findings assigned to later phases. GitHub Actions reported nonblocking Node.js 20 deprecation/Ubuntu runner migration notices: handle during CI maintenance. **Next: R1 formal evidence policy and P0 novelty analysis; R2 security review follows evidence assumptions.** Progress: engineering 17%, research 6%, overall 13% (rounded equal-phase means). The dated checkpoints below preserve historical progress and must not be read as current status.
 
 **Source Git checkpoint — 2026-11-09 (user-host evidence):** A Git repository was initialized on branch `main` in the validated working folder and an initial root commit `45689eaeaac0f4f65b16f3e06e60c0133925ab59` was created: `91 files changed, 8038 insertions(+)`. `git rev-parse HEAD` returned that SHA, and the final `git status --short` printed no entries, indicating a clean user-host working tree. The virtual environment `.venv-r0/` was added to `.gitignore`; no Python virtual environment or Foundry `lib/` sources appear in the staged file list. This is a **new snapshot history**, not the recovered historical project commits. No GitHub remote or CI execution has been demonstrated. **R0: 90% (+10 percentage points)**; remaining: clean-clone reproducibility, CI evidence, final gate review. This evidence is a user-provided transcript; it was not independently verified on the host.
 
@@ -8,7 +8,7 @@
 
 | Phase | Status | Work | Exit gate | Evidence to save |
 |---|---|---|---|---|
-| R0 | **IN PROGRESS — CLEAN CLONE TESTED / CI PENDING / NOT COMPLETE (95%)** | Canonical baseline, dependencies, import repair, test CI, source traceability | Fresh clone installs; Python imports/tests and Foundry compile/tests run with recorded results | Git SHA, lockfile, CI transcript, test logs, bytecode hashes |
+| R0 | **ACCEPTED — CLEAN CLONE + 3/3 HOSTED CI PASSED (100%)** | Canonical baseline, dependencies, import repair, test CI, source traceability | Fresh clone installs; Python imports/tests and Foundry compile/tests run with recorded results | Git SHA, lockfile, CI transcript, test logs, bytecode hashes |
 | R1 | NOT COMPLETE | Formal physical histories, world-sound evidence policies, reference evaluator | Versioned spec, independent N/F/S vectors, counterexamples, policy soundness arguments | Proof notes, fixtures, ADR-001/002/003 |
 | R2 | NOT COMPLETE | Settlement, economics, replay/fuzz/invariant, lifecycle, versioned policy | No excess payout; distinct reward pools; exact residual 2-party validation; clean closure | Foundry invariant/fuzz logs, gas metrics, state diagrams |
 | R3 | NOT COMPLETE | Scalable open registry, unbiased selection, fault config, recovery | No 32-lifetime cap; auditable selection; no stranded bonds/confirmation lock | Adversarial committee test logs, proof/selection traces |
@@ -36,7 +36,7 @@
 
 ## Immediate next checkpoint
 
-R0 Work Package 01 in `FIRST_FOUR_WORK_PACKAGES.md`: narrow change to import/package monitor agent, pin dependency setup, actual tests and CI. The full audit's A01–A42 findings must be ingested into issues rather than silently forgotten.
+**R1/P0:** define physical event histories and world-sound evidence interpretation rules, construct an independent financial reference model with counterexamples, and compare closely related mechanisms for novelty. **R2:** review the open Solidity lint/security warnings against code and adversarial tests. The full audit's A01–A42 findings remain tracked, not silently forgotten.
 
 ## Finding-level status tracking
 
