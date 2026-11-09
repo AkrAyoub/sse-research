@@ -1,5 +1,17 @@
 # R0 WP-01 — reproducible validation transcript and status
 
+## FINAL R0 ACCEPTANCE — 2026-11-09
+
+**Status: ACCEPTED (100%).** User-provided GitHub Actions screenshot shows workflow `CI` triggered by push of commit `375b6ec` to `main`, with overall **Success** (duration 53 seconds). All three jobs have green checks: `python (ubuntu-latest)`, `python (windows-latest)`, and `solidity`. This is visual evidence of the hosted run; the raw job logs were not independently re-executed in the assistant runtime.
+
+**Independent clean-clone evidence (user-provided Git Bash transcript):** fresh Python 3.12 dependency installation passed, `pip check` found no broken requirements, all **106 Python tests passed**, and Solidity 0.8.24 compiled 42 files and passed **35 Foundry tests** (zero failures). Initial source provenance check matched 56/56 manifest entries. Local Git root commit `45689eaeaac0f4f65b16f3e06e60c0133925ab59` and documentation commit `375b6ec0f2af233542f9235179f7e545b9d44279` were established before hosted CI.
+
+**Acceptance scope:** reproducible checked-in baseline only. No claim of independent real multi-VM SSE operation, cryptographic proof of physical receipt, end-to-end soundness of evidence policies, formal security proof, or publication-grade evaluation. Security lint warnings and open audit issues remain under R2 and related phases. Hosted CI supplied nonblocking warnings about Node.js 20 deprecation for GitHub Actions versions and the forthcoming `ubuntu-latest` runner migration; review these in CI maintenance.
+
+**Next:** R1 world-sound admissibility model and P0 literature gap assessment; prioritize R2 adversarial economic/security hardening after the formal policy assumptions are established. The original environment limitations and pre-acceptance notes below are retained as historical records, not current blockers.
+
+---
+
 **Date:** 2026-11-09. **Status:** PYTHON + FOUNDRY PASSED ON USER HOST, GIT BASELINE COMMITTED; **R0 GATE NOT YET PASSED**.
 
 ## Provenance
