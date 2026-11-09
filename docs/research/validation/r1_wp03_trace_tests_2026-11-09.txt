@@ -1,0 +1,31 @@
+test_compute_requires_correct_artifact_identity (test_sse_service_trace_reference.ComputeContractTests.test_compute_requires_correct_artifact_identity) ... ok
+test_compute_result_after_deadline_is_F (test_sse_service_trace_reference.ComputeContractTests.test_compute_result_after_deadline_is_F) ... ok
+test_valid_compute_requires_execution_event (test_sse_service_trace_reference.ComputeContractTests.test_valid_compute_requires_execution_event) ... ok
+test_ack_signed_without_receipt_still_N (test_sse_service_trace_reference.EventOntologyTests.test_ack_signed_without_receipt_still_N) ... ok
+test_bad_actor_and_invalid_truth_flag (test_sse_service_trace_reference.EventOntologyTests.test_bad_actor_and_invalid_truth_flag) ... ok
+test_bad_timestamps_and_versions (test_sse_service_trace_reference.EventOntologyTests.test_bad_timestamps_and_versions) ... ok
+test_causal_inconsistency_is_rejected (test_sse_service_trace_reference.EventOntologyTests.test_causal_inconsistency_is_rejected) ... ok
+test_correct_but_late_delivery_is_F (test_sse_service_trace_reference.EventOntologyTests.test_correct_but_late_delivery_is_F) ... ok
+test_deadline_is_inclusive (test_sse_service_trace_reference.EventOntologyTests.test_deadline_is_inclusive) ... ok
+test_invalid_result_is_F_even_when_delivered (test_sse_service_trace_reference.EventOntologyTests.test_invalid_result_is_F_even_when_delivered) ... ok
+test_junk_delivered_is_not_fulfillment (test_sse_service_trace_reference.EventOntologyTests.test_junk_delivered_is_not_fulfillment) ... ok
+test_late_receipt_means_no_qualifying_receipt_in_this_policy (test_sse_service_trace_reference.EventOntologyTests.test_late_receipt_means_no_qualifying_receipt_in_this_policy) ... ok
+test_no_request_sent_is_N (test_sse_service_trace_reference.EventOntologyTests.test_no_request_sent_is_N) ... ok
+test_produced_only_is_S_for_generation_contract (test_sse_service_trace_reference.EventOntologyTests.test_produced_only_is_S_for_generation_contract) ... ok
+test_received_without_result_is_F (test_sse_service_trace_reference.EventOntologyTests.test_received_without_result_is_F) ... ok
+test_reserved_service_kinds_fail_closed (test_sse_service_trace_reference.EventOntologyTests.test_reserved_service_kinds_fail_closed) ... ok
+test_response_signed_but_not_delivered_is_F (test_sse_service_trace_reference.EventOntologyTests.test_response_signed_but_not_delivered_is_F) ... ok
+test_sent_not_received_is_N (test_sse_service_trace_reference.EventOntologyTests.test_sent_not_received_is_N) ... ok
+test_unclosed_window_is_unknown_not_failure (test_sse_service_trace_reference.EventOntologyTests.test_unclosed_window_is_unknown_not_failure) ... ok
+test_valid_generated_and_delivered_on_time_is_S (test_sse_service_trace_reference.EventOntologyTests.test_valid_generated_and_delivered_on_time_is_S) ... ok
+test_monitor_observation_cannot_extend_future (test_sse_service_trace_reference.ObservationSoundnessTests.test_monitor_observation_cannot_extend_future) ... ok
+test_monitor_view_rejects_non_boolean_network (test_sse_service_trace_reference.ObservationSoundnessTests.test_monitor_view_rejects_non_boolean_network) ... ok
+test_network_partition_makes_S_and_F_observationally_identical (test_sse_service_trace_reference.ObservationSoundnessTests.test_network_partition_makes_S_and_F_observationally_identical) ... ok
+test_signed_ACK_may_be_visible_without_physical_receipt (test_sse_service_trace_reference.ObservationSoundnessTests.test_signed_ACK_may_be_visible_without_physical_receipt) ... ok
+test_unreachable_monitor_cannot_claim_saw_signature (test_sse_service_trace_reference.ObservationSoundnessTests.test_unreachable_monitor_cannot_claim_saw_signature) ... ok
+test_visible_response_proves_observation_not_contractual_delivery (test_sse_service_trace_reference.ObservationSoundnessTests.test_visible_response_proves_observation_not_contractual_delivery) ... ok
+
+----------------------------------------------------------------------
+Ran 26 tests in 0.001s
+
+OK

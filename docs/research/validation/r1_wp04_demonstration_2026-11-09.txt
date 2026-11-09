@@ -1,0 +1,27 @@
+
+All monitors partitioned: all histories possible
+  ground truth in simulation: S
+  monitor reports (timeouts/saw response): 4/0
+  finite matching worlds: F,N,S
+  cautious allocation: provider=0, consumer=0, unresolved=25
+  naive quorum worlds: F,N
+  naive excess credits against ground truth: provider=0, consumer=20
+  naive rule world-sound?: False
+
+Three timeouts, one observed response: failure does not follow
+  ground truth in simulation: S
+  monitor reports (timeouts/saw response): 3/1
+  finite matching worlds: F,S
+  cautious allocation: provider=0, consumer=0, unresolved=25
+  naive quorum worlds: F,N
+  naive excess credits against ground truth: provider=0, consumer=20
+  naive rule world-sound?: False
+
+Monitor sees result sent, but delivery is not established
+  ground truth in simulation: F
+  monitor reports (timeouts/saw response): 0/4
+  finite matching worlds: F,S
+  cautious allocation: provider=0, consumer=0, unresolved=25
+  naive quorum worlds: S
+  naive excess credits against ground truth: provider=25, consumer=0
+  naive rule world-sound?: False
