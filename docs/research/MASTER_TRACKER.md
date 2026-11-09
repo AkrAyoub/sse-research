@@ -1,10 +1,12 @@
 # SSE master engineering tracker — R0 through R11
 
-**Snapshot update 2026-11-09 (external Git Bash verification):** WP-01 source repair and original manifest verification remain documented. Foundry 1.9.0 and Anvil 1.9.0 were installed on the user host; Solidity 0.8.24 compiled 42 files successfully and all 35 Solidity tests passed across five suites (including fuzz tests at 256 runs). Python full-suite verification, full clean-clone CI reproduction, and review of compiler lint warnings remain outstanding. R0 estimated 55% (+15 percentage points); no R phase is complete. Mark gates only with reproducible evidence, links/logs and commit hashes. Update this file in each implementation session.
+**Source Git checkpoint — 2026-11-09 (user-host evidence):** A Git repository was initialized on branch `main` in the validated working folder and an initial root commit `45689eaeaac0f4f65b16f3e06e60c0133925ab59` was created: `91 files changed, 8038 insertions(+)`. `git rev-parse HEAD` returned that SHA, and the final `git status --short` printed no entries, indicating a clean user-host working tree. The virtual environment `.venv-r0/` was added to `.gitignore`; no Python virtual environment or Foundry `lib/` sources appear in the staged file list. This is a **new snapshot history**, not the recovered historical project commits. No GitHub remote or CI execution has been demonstrated. **R0: 90% (+10 percentage points)**; remaining: clean-clone reproducibility, CI evidence, final gate review. This evidence is a user-provided transcript; it was not independently verified on the host.
+
+**Previous snapshot update 2026-11-09 (external Python + Foundry host validation):** WP-01 source repair and original manifest verification remain documented. On the user host, Foundry 1.9.0/Anvil 1.9.0 passed Solidity 0.8.24 compilation (42 files) and **35/35 Foundry tests**. Python **3.12.10** with pinned requirements passed `pip check`, `compileall`, and **106/106 Python unittest cases**, including typed-evidence fixtures and CLI smoke. `git rev-parse HEAD` and `git status` initially failed before Git initialization; the newer Git checkpoint above supersedes that outcome. Clean-clone CI reproduction and real blockchain/network end-to-end verification remain outstanding. R0 was previously estimated at **80% (+25 percentage points)**; no R phase is complete. Test evidence is user-supplied, not independently rerun here. Update this file after meaningful increments.
 
 | Phase | Status | Work | Exit gate | Evidence to save |
 |---|---|---|---|---|
-| R0 | **IN PROGRESS — FOUNDRY TESTED / NOT COMPLETE (55%)** | Canonical baseline, dependencies, import repair, test CI, source traceability | Fresh clone installs; Python imports/tests and Foundry compile/tests run with recorded results | Git SHA, lockfile, CI transcript, test logs, bytecode hashes |
+| R0 | **IN PROGRESS — TESTED AND GIT-COMMITTED / NOT COMPLETE (90%)** | Canonical baseline, dependencies, import repair, test CI, source traceability | Fresh clone installs; Python imports/tests and Foundry compile/tests run with recorded results | Git SHA, lockfile, CI transcript, test logs, bytecode hashes |
 | R1 | NOT COMPLETE | Formal physical histories, world-sound evidence policies, reference evaluator | Versioned spec, independent N/F/S vectors, counterexamples, policy soundness arguments | Proof notes, fixtures, ADR-001/002/003 |
 | R2 | NOT COMPLETE | Settlement, economics, replay/fuzz/invariant, lifecycle, versioned policy | No excess payout; distinct reward pools; exact residual 2-party validation; clean closure | Foundry invariant/fuzz logs, gas metrics, state diagrams |
 | R3 | NOT COMPLETE | Scalable open registry, unbiased selection, fault config, recovery | No 32-lifetime cap; auditable selection; no stranded bonds/confirmation lock | Adversarial committee test logs, proof/selection traces |
@@ -48,3 +50,26 @@ See `docs/research/R0_VALIDATION.md` and `docs/research/WP01_CHANGES.md`. Source
 - Record: `docs/research/R0_FOUNDRY_HOST_VALIDATION_2026-11-09.md`. This is **external user-host evidence**, not a test executed in the inspection container; exact host repository commit has not been independently reconciled.
 - Open R0 gates: complete Python 3.12 dependency installation and suite, new signed monitor adapter tests, CLI smoke, CI, clean-clone and dependency resolution provenance. Solidity warnings require R2 review and must not be silently dismissed.
 - Provisional phase estimates (R0-R11, P0-P6) are recorded in `PHASES_TRACKER.csv`; weighted average not implied. Equal-weighted engineering **13%**, research **6%**, whole project **10%**, rounded.
+
+## User-host Python validation update (2026-11-09)
+
+- Python **3.12.10** in `.venv-r0`; all pinned requirements installed; `pip check`: **No broken requirements found**.
+- `python -m compileall -q apps services tools tests`: exited without diagnostic output.
+- `python -m unittest discover -s tests -v`: **Ran 106 tests in 15.890s; OK**. Covers EIP-712 signed monitor adapter, authenticated signed probe, rejection of unsigned/mismatched responses, simulated controller state machine, Docker inspection, and existing utility tests.
+- The `FullControllerFlowTest` uses a **fake chain**, not a real independently operated EVM or VM. No live multi-node or byzantine test can be inferred.
+- `git rev-parse HEAD`, `git status --short`: originally failed before Git initialization; see latest Git checkpoint above for the new root commit. Do not claim clean-clone validation.
+- Full transcript summarized in `R0_PYTHON_HOST_VALIDATION_2026-11-09.md`.
+- Keep `.venv-r0/` excluded from version control (the original `.gitignore` excludes `.venv/` and `.venv-1/` but not `.venv-r0/`). Recover authoritative Git remote/history if present, otherwise initialize a new source snapshot with provenance recorded.
+- Remaining R0 exit gates: source/release provenance, exact clean-clone GitHub CI run, and complete reproducibility under documented dependency tool versions. Review Solidity warnings during R2.
+- Provisional progress: R0 **80%** (+25 pp); engineering **15%**, research **6%**, overall **12%**, with equal-weight arithmetic averages across R0–R11 and P0–P6.
+
+## User-host Git source checkpoint (2026-11-09)
+
+- Initial `find .. -maxdepth 4 -type d -name .git -prune -print`: no `.git` found at inspected depths.
+- `.venv-r0/` added to `.gitignore` before staging.
+- `git init -b main`, then `git add -A`: staged 91 files, including five Solidity contracts, Python apps/services/tests, Foundry tests and project tracking docs; no `.venv-r0/` or `lib/` staged in displayed inventory.
+- `git commit -m "Establish validated SSE R0 source baseline"` succeeded as a new root commit: `45689eaeaac0f4f65b16f3e06e60c0133925ab59`.
+- Final `git status --short` emitted no file entries. LF/CRLF warnings on staging are informational but line-ending normalization should remain consistent.
+- Note: `R0_PYTHON_HOST_VALIDATION_2026-11-09.md` does **not** appear in the 91-file commit listing; this checkpoint documentation package includes it for incorporation into the next repository commit.
+- Next gate: independent clean clone with fresh Python virtual environment, dependency retrieval, complete Python and Foundry tests, saved host logs, then a verified CI run if a remote is configured. Do not mark R0 accepted until then.
+- R0 now **90% (+10 pp)**. Equal-weight engineering **16%**, research **6%**, full project **12%** rounded.

@@ -1,6 +1,6 @@
 # R0 WP-01 — reproducible validation transcript and status
 
-**Date:** 2026-11-09. **Status:** SOURCE PRESENT / PARTIALLY VALIDATED; **R0 GATE NOT PASSED**.
+**Date:** 2026-11-09. **Status:** PYTHON + FOUNDRY PASSED ON USER HOST, GIT BASELINE COMMITTED; **R0 GATE NOT YET PASSED**.
 
 ## Provenance
 
@@ -59,5 +59,27 @@ Total: **36 individual existing tests passed** in selected subsets (not the enti
 - `forge build`: **passed**, compiled **42 files** with **Solc 0.8.24**, with compiler/lint warnings.
 - `forge test -vv`: **35 passed / 0 failed / 0 skipped**, in five suites (4+9+4+11+7). Fuzz tests report 256 runs.
 - These results come from the user workstation, not a new execution in the isolated review container. Exact tested Git HEAD and source equivalence with the WP-01 package have not been verified.
-- Python 3.12 full-suite results, installed dependencies, CI, and clean clone are not yet provided.
-- See `R0_FOUNDRY_HOST_VALIDATION_2026-11-09.md` for detailed warnings and follow-up checks. R0 stays IN PROGRESS (55%).
+- Python 3.12 and full-suite results have since been supplied and passed (see subsequent 2026-11-09 Python host section); CI and clean clone remain outstanding.
+- See `R0_FOUNDRY_HOST_VALIDATION_2026-11-09.md` for detailed warnings and follow-up checks. R0 stays IN PROGRESS (now 80% after subsequent Python host validation).
+
+## External Windows Git Bash Python validation (user-supplied transcript, 2026-11-09)
+
+- Interpreter: Python **3.12.10**, virtual environment `.venv-r0`.
+- Pinned package installation: requirements already satisfied; `pip check` reported **No broken requirements found**.
+- `compileall -q apps services tools tests`: no error reported.
+- `unittest discover -s tests -v`: **106 tests passed / 0 failures / 0 errors** in **15.890s**.
+- New typed monitor/signature and probe fixture tests passed. The controller test ran against a **fake chain**; the result is not proof of live network integration.
+- Git metadata commands both failed: **not a git repository**. Source provenance/commit is therefore not externally verified.
+- Full host evidence record: `docs/research/R0_PYTHON_HOST_VALIDATION_2026-11-09.md`. No tests were rerun in the isolated review environment based on these logs.
+- Later Git initialization succeeded on the same working folder; see the new Git host validation section below. R0 now **90%**, pending clean-clone/CI/gate verification.
+
+
+## User-host Git baseline update (2026-11-09)
+
+- `git init -b main` succeeded; no existing `.git` was found at the searched depth.
+- Initial commit `45689eaeaac0f4f65b16f3e06e60c0133925ab59` (`91 files changed, 8038 insertions(+)`) succeeded.
+- `git status --short` printed no entries after the commit; working tree clean on the user's machine.
+- The staged manifest excludes `.venv-r0/`, `lib/`, `out/` and generated secrets as far as the displayed 91 paths show. This excludes evidence of including those files, not a full audit of ignored/untracked files.
+- `R0_PYTHON_HOST_VALIDATION_2026-11-09.md` is absent from the commit listing; add this record in a follow-on documentation commit.
+- New root history does not establish earlier commit ancestry. No remote, CI run or clean-clone test is yet reported.
+- R0 **90% (+10 pp)**; pending reproducibility acceptance.
