@@ -249,8 +249,13 @@ class ProviderCaptureTests(unittest.TestCase):
             archive=EvidenceArchive(path)
             result=capture_response(self.endpoint,DOMAIN,self.provider,scope(),MKEY,self.context,archive)
             import sqlite3
-            with sqlite3.connect(path) as conn:
-                conn.execute('UPDATE records SET provider_raw=? WHERE evidence_id=?', (b'{}',result.evidence_id))
+            from contextlib import closing
+            # sqlite3.Connection.__exit__ commits/rolls back, but does NOT close.
+            # On Windows, tempfile cannot remove a SQLite file held open by a connection.
+            with closing(sqlite3.connect(path)) as conn:
+                with conn:
+                    conn.execute('UPDATE records SET provider_raw=? WHERE evidence_id=?',
+                                 (b'{}', result.evidence_id))
             with self.assertRaises(EvidenceError):
                 EvidenceArchive(path).load(result.evidence_id,self.context,DOMAIN,self.provider)
 
