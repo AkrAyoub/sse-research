@@ -75,11 +75,11 @@ Testable invariants include: (1) no duplicate join, (2) consumer/provider not se
 
 ## Verification record and interpretation
 
-PR #9 introduced **24 new Foundry cases**, including rosters with **80 and 96** participant identities, 16-at-a-time processing, deterministic top-score ranking, reserve replacement across rounds, authorization checks, ticket conservation/refund and permissionless recovery.
+PR #9 now includes **26 new Foundry cases**, including rosters with **80 and 96** participant identities, 16-at-a-time processing, deterministic top-score ranking, reserve replacement across rounds, authorization checks, ticket conservation/refund and permissionless recovery.
 
 Initial CI: 23/24 new Foundry tests passed; one test harness incorrectly called a read-only getter after `vm.expectRevert`. It was fixed without changing the contract or the intended assertion. Corrected implementation CI:
 - GitHub Actions run https://github.com/AkrAyoub/sse-research/actions/runs/43110731766
-- **Foundry: 76/76 named tests passed**, 24 new and 52 existing, 0 failed, 0 skipped
+- Initial corrected run: **Foundry 76/76**, 24 new and 52 existing; after two further expiry-race regressions, **78/78** on https://github.com/AkrAyoub/sse-research/actions/runs/43111392859 (26 new, 52 existing), 0 failed, 0 skipped.
 - **Python Ubuntu: 337/337 tests passed**, no failures or skips
 - **Python Windows: 337/337 tests passed**, no failures or skips
 
@@ -95,3 +95,7 @@ The R4 WP-08C Python tests (31) remain in a **separate open draft PR #8** and ar
 6. Demonstrate deployment under independent hosts and real partitions.
 
 **Acceptance level:** soundly compiled and adversarial-test-validated *standalone research V2 participation prototype*, NOT verified unbiased production committee selection or physical SLA enforcement.
+
+### Additional liveness regression discovered during review
+
+The first V2 draft permitted `expire(id)` to abort a fully enrolled assignment immediately after enrollment cutoff, before someone called `sealEnrollment(id)`. A third party could front-run roster sealing and cancel an otherwise eligible committee. **Fixed:** `expire` must transition a fully enrolled roster to `WaitingSeed` and emit `EnrollmentSealed`; only an underfilled roster aborts. Two new tests distinguish the eligible-roster and underfilled-roster cases. This is a substantive V2 liveness correction, not a mere test-harness fix. The full 78-case Foundry run passed afterward.
