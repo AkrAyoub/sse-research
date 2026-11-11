@@ -3,7 +3,7 @@ R0,Engineering,Reproducible baseline,ACCEPTED - 106/106 Python + 35/35 Foundry +
 R1,Engineering,Formal SSE evidence protocol,WP07 RESEARCH REFERENCE MERGED MAIN 58E081D; 276/276 LOCAL PYTHON AND 52/52 FOUNDRY; PHYSICAL SOUNDNESS CONDITIONAL,Versioned world-sound evidence rules and independent reference model,,,2026-11-10,62,6
 R2,Engineering,Settlement and economics hardening,WP06 CONTRACT SETTLEMENT VOTES CLOCK AND ACCOUNTING TESTS PASSED; PRODUCTION HARDENING OPEN,Conservation/replay/reward/residual invariants pass,,,2026-11-09,26,6
 R3,Engineering,Open verifiable monitoring registry,WP08 ADR003 SCALABLE MONITOR TARGET DOCUMENTED; 32 LIFETIME CAP AND FIXED FOUR REMAIN,"Scalable membership, unbiased selection, liveness/release recovery",,,2026-11-10,15,0
-R4,Engineering,Shared signed evidence/SDK,WP08A SIGNED OBSERVATION SDK PACKAGED; 18 STRUCTURE TESTS PASS AND 15 CRYPTO TESTS NOT RUN LOCALLY; HOSTED CI PENDING,Remote signed canonical records and interoperable verification,,,2026-11-10,10,0
+R4,Engineering,Shared signed evidence/SDK,WP08A EIP712 OBSERVATION SDK 309/309 PYTHON WINDOWS AND UBUNTU PLUS 52/52 FOUNDRY HOSTED CI; PR6 DRAFT REVIEW OPEN; REAL FACT QUALIFIER UNBUILT,Remote signed canonical records and interoperable verification,,,2026-11-11,15,5
 R5,Engineering,Autonomous role agents,PLANNED,Independent processes transact all supported roles,,,2026-11-09,10,0
 R6,Engineering,Automatic Ubuntu onboarding,PLANNED,New NAT VM joins without static IP/manual peer edits,,,2026-11-09,5,0
 R7,Engineering,Heterogeneous cloud workloads,PLANNED,Compute/storage/OCI/API with verified evidence policies,,,2026-11-09,15,0
@@ -14,7 +14,7 @@ R11,Engineering,Independent replication/release,PLANNED,External user reproduces
 P0,Research,Systematic novelty analysis,WP07 FOCUSED FAILURE-AWARE MONITORING/EIP712/FAIR EXCHANGE DESIGN COMPARISON; SYSTEMATIC NOVELTY OPEN,Defensible related-work gap and source-grounded comparison,docs/research/P0_R1_SCIENTIFIC_BOOTSTRAP.md,,2026-11-10,37,2
 P1,Research,Formal problem and assumptions,WP08 ADR001 HTTP DELIVERY SEMANTICS PROPOSED R=0 FIRST EXPERIMENT; NOT PRODUCTION APPROVED,"Precise physical/admissible histories, evidence interpreter and threat model",,,2026-11-10,55,5
 P2,Research,Theorems and proofs,WP07 FINITE MONOTONE/CONSERVATION AND FALSE-QUALIFIER TESTS; UNIVERSAL PROOFS NOT DONE,"Conditional safety, maximality, conservation, monotonicity, budget induction",,,2026-11-10,29,4
-P3,Research,Publishable protocol specification,WP08 ADR002 RAW SIGNATURE VS QUALIFIED FACT BOUNDARY PROPOSED; ACTUAL PHYSICAL VERIFIER UNBUILT,"Messages, states, on/off-chain architecture and soundness boundaries",,,2026-11-10,39,7
+P3,Research,Publishable protocol specification,WP08A EIP712 RAW OBSERVATION SCHEMA 33/33 NEW TESTS INCLUDED IN FULL CI; QUALIFIED PHYSICAL VERIFIER UNBUILT,"Messages, states, on/off-chain architecture and soundness boundaries",,,2026-11-10,39,7
 P4,Research,Pre-registered experiments/baselines,WP07 REPRODUCIBLE 50-TEST POLICY COMPARISON + 7 SCENARIO DEMO; INDEPENDENT MULTIHOST EVALUATION PENDING,Reproducible scenarios and fairness metrics,,,2026-11-10,20,2
 P5,Research,Original scientific manuscript,PLANNED,New paper grounded in proofs and measurements,,,2026-11-09,0,0
 P6,Research,Publication artifact/reproduction,PLANNED,"Figures, datasets and released reproducibility package",,,2026-11-09,0,0
