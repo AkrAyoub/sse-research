@@ -3,8 +3,8 @@ R0,Engineering,Reproducible baseline,ACCEPTED - 106/106 Python + 35/35 Foundry +
 R1,Engineering,Formal SSE evidence protocol,WP07 RESEARCH REFERENCE MERGED MAIN 58E081D; 276/276 LOCAL PYTHON AND 52/52 FOUNDRY; PHYSICAL SOUNDNESS CONDITIONAL,Versioned world-sound evidence rules and independent reference model,,,2026-11-10,62,6
 R2,Engineering,Settlement and economics hardening,WP06 CONTRACT SETTLEMENT VOTES CLOCK AND ACCOUNTING TESTS PASSED; PRODUCTION HARDENING OPEN,Conservation/replay/reward/residual invariants pass,,,2026-11-09,26,6
 R3,Engineering,Open verifiable monitoring registry,WP08 ADR003 SCALABLE MONITOR TARGET DOCUMENTED; 32 LIFETIME CAP AND FIXED FOUR REMAIN,"Scalable membership, unbiased selection, liveness/release recovery",,,2026-11-10,15,0
-R4,Engineering,Shared signed evidence/SDK,WP08A EIP712 OBSERVATION SDK 309/309 PYTHON WINDOWS AND UBUNTU PLUS 52/52 FOUNDRY HOSTED CI; PR6 DRAFT REVIEW OPEN; REAL FACT QUALIFIER UNBUILT,Remote signed canonical records and interoperable verification,,,2026-11-11,15,5
-R5,Engineering,Autonomous role agents,PLANNED,Independent processes transact all supported roles,,,2026-11-09,10,0
+R4,Engineering,Shared signed evidence/SDK,WP08A MERGED AND HOSTED 309/309 PYTHON 52/52 FOUNDRY; WP08B SIGNED HTTP SQLITE PROTOTYPE PACKAGED 28 TESTS HOST CI NOT RUN,Remote signed canonical records and interoperable verification,,,2026-11-11,15,5
+R5,Engineering,Autonomous role agents,WP08B INDEPENDENT PROVIDER MONITOR SUBPROCESS TEST AUTHORED; NOT EXECUTED WITH CRYPTO YET,Independent processes transact all supported roles,,,2026-11-09,10,0
 R6,Engineering,Automatic Ubuntu onboarding,PLANNED,New NAT VM joins without static IP/manual peer edits,,,2026-11-09,5,0
 R7,Engineering,Heterogeneous cloud workloads,PLANNED,Compute/storage/OCI/API with verified evidence policies,,,2026-11-09,15,0
 R8,Engineering,Read-only chain observatory,PLANNED,Rebuildable on-chain finance and protected node console,,,2026-11-09,10,0
