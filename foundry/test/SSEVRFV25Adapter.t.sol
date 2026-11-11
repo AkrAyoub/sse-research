@@ -47,6 +47,32 @@ contract WP11PoolController {
         external returns (uint256) { return pool.requestAssignment(t); }
 }
 
+/// @dev Deliberately misconfigured: coordinator is also the request operator.
+/// Attempts to initiate an extra billable request synchronously.
+contract WP11ReentrantCoordinator is IVRFV25CoordinatorSSE {
+    SSEVRFV25Adapter public adapter;
+    uint256 public assignmentId;
+    uint256 public count;
+    bool public secondRequestSucceeded;
+
+    function configure(SSEVRFV25Adapter target, uint256 assignment) external {
+        adapter = target;
+        assignmentId = assignment;
+    }
+    function start() external returns (uint256) {
+        return adapter.requestRandomness(assignmentId);
+    }
+    function requestRandomWords(RandomWordsRequest calldata) external returns (uint256) {
+        ++count;
+        if (count == 1) {
+            try adapter.requestRandomness(assignmentId) returns (uint256) {
+                secondRequestSucceeded = true;
+            } catch {}
+        }
+        return 800 + count;
+    }
+}
+
 contract SSEVRFV25AdapterTest is Test {
     WP11MockCoordinator coordinator;
     WP11PoolController requester;
@@ -298,6 +324,34 @@ contract SSEVRFV25AdapterTest is Test {
         (, ,bytes32 seed1,,,) = adapter.requests(firstId);
         (, ,bytes32 seed2,,,) = adapter.requests(secondId);
         assertTrue(seed1 != seed2);
+    }
+
+    function testRequestIsCommittedBeforeExternalCoordinatorCall() public {
+        WP11ReentrantCoordinator hostile = new WP11ReentrantCoordinator();
+        SSEVRFV25Adapter localAdapter = new SSEVRFV25Adapter(
+            address(hostile), address(hostile), KEY_HASH, 987, 3, 300_000, false);
+        ScalableMonitorCommitteeV2 localPool = new ScalableMonitorCommitteeV2(
+            address(localAdapter), address(localAdapter), 1 ether, 0.1 ether, 1 days);
+        localAdapter.bindPool(address(localPool));
+        localPool.bindController(address(requester));
+        uint256 assignment = requester.open(localPool, params());
+        for (uint256 i; i < 5; ++i) {
+            address who = address(uint160(0xB000 + i));
+            vm.deal(who, 2 ether);
+            vm.startPrank(who);
+            localPool.register{value: 1 ether}();
+            localPool.join{value: 0.1 ether}(assignment);
+            vm.stopPrank();
+        }
+        vm.warp(localPool.enrollmentDeadline(assignment) + 1);
+        localPool.sealEnrollment(assignment);
+        hostile.configure(localAdapter, assignment);
+        uint256 id = hostile.start();
+        assertEq(id, 801);
+        assertEq(hostile.count(), 1);
+        assertFalse(hostile.secondRequestSucceeded());
+        assertTrue(localAdapter.requestStarted(assignment));
+        assertEq(localAdapter.requestForAssignment(assignment), 801);
     }
 
     function testConstructorRejectsInvalidCoordinatorOrGas() public {
