@@ -36,3 +36,15 @@ forge test -vv
 ```
 
 The full Python count is expected to grow from 276 to 309 if all 33 cases are discoverable; confirm observed counts rather than presuming success. Hosted CI on Ubuntu and Windows is required.
+
+## Hosted CI after actual EIP-712 execution
+
+**Acceptance evidence for the research-only observation SDK (not for physical SLA truth):** In PR #6, GitHub Actions run https://github.com/AkrAyoub/sse-research/actions/runs/43079326699 executed at corrected commit `ec7be1df444bfeed4195d5069a53b36d591f2553`:
+
+- Python on **ubuntu-latest**: **309 tests passed**; the `SigningTests.test_malformed_signature_rejected` case executed and passed; **no skips reported**.
+- Python on **windows-latest**: **309 tests passed**; the same malformed-signature case executed and passed; **no skips reported**.
+- Foundry on Ubuntu: **52 tests passed**, no failures or skips.
+
+The first Ubuntu test run failed because `eth-keys` raised `BadSignature` from malformed ECDSA recovery, which was not translated into the SDK's `AuthenticationError`. The verifier now explicitly catches `eth_keys.exceptions.BadSignature`; **the existing test detected the issue and passed unchanged after the fix**. This corrects error handling, not observation truth or external authorization.
+
+**Still pending:** manual review/merge of PR #6, user's local Windows retest of the final commit, durable replay state, verified committee/lease state, remote provider-signed messages, preserved raw evidence, and physical SLA evidence qualification. The success of CI does **not** justify production escrow releases or prove `QualifiedFact` soundness.
