@@ -22,3 +22,11 @@
 5. R2/R3: independent policy-version and scalable-monitor redesign after threat model and soundness review.
 
 **Provisional unchanged phase percentages:** R0 100, R1 62, R2 26, R3 15, R4 10, R5 10, R6 5, R7 15, R8 10, R9 5, R10 0, R11 0, P0 37, P1 55, P2 29, P3 39, P4 20, P5 0, P6 0. Equal-phase rounded engineering 22%, research 26%, overall 23%. New work is documented but not counted as accepted until integrated validation.
+
+## WP-08A hosted CI milestone (research branch only)
+
+Draft PR #6: https://github.com/AkrAyoub/sse-research/pull/6 . The `BadSignature` recovery failure was fixed without weakening the test. At commit `ec7be1d`, Ubuntu Python **309/309**, Windows Python **309/309**, and Ubuntu Foundry **52/52** passed in Actions run https://github.com/AkrAyoub/sse-research/actions/runs/43079326699 . All 15 additional signing and replay tests ran; no skips were reported in either Python job. Later commits are documentation/tracker only and must also pass their own CI checks.
+
+**Provisional research-branch progress:** R4 advances **10% → 15% (+5pp)** for canonical signing and portable verification tests. This does not indicate an approved physical certificate verifier. R1 62%, R3 15%, P1 55%, P3 39% unchanged. Equal-weight averages: engineering **22%**, research **26%**, overall **23%**. The `main` branch tracker does not receive this update until PR #6 is merged.
+
+**Remaining acceptance gates:** host retest against final commit; PR review/merge; independently authenticated chain committee/lease context; durable replay and raw-evidence storage; provider-signed challenge response; monitor/process integration; physical certificate qualification; on-chain policy versioning and proper R3 monitor scaling.
