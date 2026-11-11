@@ -286,6 +286,25 @@ contract ScalableMonitorCommitteeV2Test is Test {
         pool.settleTicket(id,actor(1));
         assertEq(pool.withdrawable(actor(0)),0.1 ether);
     }
+    function testOutsiderExpiryCannotAbortAdequatelyFilledEnrollment() public {
+        uint256 id=joined(5,4,3,1);
+        vm.warp(pool.enrollmentDeadline(id)+1);
+        vm.prank(address(0xDEAD));
+        pool.expire(id);
+        assertEq(uint8(pool.status(id)),uint8(ScalableMonitorCommitteeV2.Status.WaitingSeed));
+        pool.supplyRandomness(id,SEED,abi.encode(keccak256(abi.encode(pool.assignmentCommitment(id),SEED))));
+        assertEq(uint8(pool.status(id)),uint8(ScalableMonitorCommitteeV2.Status.Selecting));
+    }
+    function testOutsiderExpiryAbortsOnlyUnderfilledEnrollment() public {
+        uint256 id=joined(2,4,3,0);
+        vm.warp(pool.enrollmentDeadline(id)+1);
+        vm.prank(address(0xDEAD));
+        pool.expire(id);
+        assertEq(uint8(pool.status(id)),uint8(ScalableMonitorCommitteeV2.Status.Aborted));
+        pool.settleTicket(id,actor(0));
+        assertEq(pool.withdrawable(actor(0)),0.1 ether);
+    }
+
     function testMissingRandomnessDoesNotLockCandidatesForever() public {
         uint256 id=joined(5,4,3,1);
         vm.warp(pool.enrollmentDeadline(id)+1);
