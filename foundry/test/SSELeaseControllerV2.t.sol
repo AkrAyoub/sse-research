@@ -118,10 +118,6 @@ contract SSELeaseControllerV2Test is Test {
                 a.providerShare,a.consumerShare,a.nonce,a.expiry
             ))));
     }
-    function sign(uint256 key, bytes32 digest) internal pure returns (bytes memory) {
-        // Foundry's vm.sign is non-pure in the interface: actual helper below.
-        key; digest; return "";
-    }
     function signature(uint256 key, bytes32 digest) internal returns(bytes memory) {
         (uint8 v, bytes32 r, bytes32 s)=vm.sign(key, digest);
         return abi.encodePacked(r,s,v);
@@ -236,10 +232,11 @@ contract SSELeaseControllerV2Test is Test {
         admit(id,keccak256("req"));
         SSELeaseControllerV2.Allocation memory a=allocation(id,0,70,30);
         (bytes memory c,bytes memory p)=signatures(a);
+        bytes memory wrong=signature(WRONG_KEY,digestFor(controller,a));
         vm.expectRevert(SSELeaseControllerV2.InvalidSignatures.selector);
-        controller.allocateEpoch(a,c,signature(WRONG_KEY,digestFor(controller,a)));
+        controller.allocateEpoch(a,c,wrong);
         vm.expectRevert(SSELeaseControllerV2.InvalidSignatures.selector);
-        controller.allocateEpoch(a,signature(WRONG_KEY,digestFor(controller,a)),p);
+        controller.allocateEpoch(a,wrong,p);
         assertEq(controller.getLease(id).pending,100);
     }
     function testTamperedAllocationCannotReuseSignatures() public {
@@ -257,8 +254,9 @@ contract SSELeaseControllerV2Test is Test {
         admit(id,keccak256("req"));
         SSELeaseControllerV2.Allocation memory a=allocation(id,0,70,30);
         allocate(a);
+        (bytes memory c,bytes memory p)=signatures(a);
         vm.expectRevert(SSELeaseControllerV2.InvalidArgument.selector);
-        allocate(a);
+        controller.allocateEpoch(a,c,p);
         assertEq(controller.getEpoch(id,0).nonce,1);
     }
     function testExpiredAndOverAllocatedSignaturesRejected() public {
