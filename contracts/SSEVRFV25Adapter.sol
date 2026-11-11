@@ -49,6 +49,9 @@ contract SSEVRFV25Adapter is IVerifiedMonitorRandomnessV2 {
     ScalableMonitorCommitteeV2 public pool;
 
     mapping(uint256 => uint256) public requestForAssignment;
+    // Set BEFORE calling the coordinator. Prevents a malicious or misconfigured
+    // requestOperator/coordinator pair from reentering and buying extra draws.
+    mapping(uint256 => bool) public requestStarted;
     mapping(uint256 => Request) public requests;
 
     error InvalidInput();
@@ -103,9 +106,10 @@ contract SSEVRFV25Adapter is IVerifiedMonitorRandomnessV2 {
         if (address(target) == address(0) ||
             target.status(assignmentId) != ScalableMonitorCommitteeV2.Status.WaitingSeed ||
             block.timestamp > target.seedDeadline(assignmentId) ||
-            requestForAssignment[assignmentId] != 0) revert InvalidState();
+            requestStarted[assignmentId]) revert InvalidState();
 
         bytes32 commitment = target.assignmentCommitment(assignmentId);
+        requestStarted[assignmentId] = true; // rolls back if the coordinator call fails
         bytes memory extra = abi.encodeWithSelector(EXTRA_ARGS_V1_TAG, nativePayment);
         requestId = coordinator.requestRandomWords(IVRFV25CoordinatorSSE.RandomWordsRequest({
             keyHash: keyHash,
