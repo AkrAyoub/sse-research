@@ -285,10 +285,13 @@ def verify_observation(envelope: object, context: VerificationContext) -> Verifi
     if type(signature) is not str or not SIG.fullmatch(signature):
         raise AuthenticationError('invalid recoverable EIP-712 signature format')
     Account, encode = _eth_api()
+    # eth-account delegates ECDSA recovery to eth-keys, which raises
+    # BadSignature (not ValueError) for malformed but correctly sized signatures.
+    from eth_keys.exceptions import BadSignature
     try:
         recovered = Account.recover_message(encode(full_message=typed_data(record)),
                                             signature=signature)
-    except (ValueError, TypeError, OverflowError) as exc:
+    except (ValueError, TypeError, OverflowError, BadSignature) as exc:
         raise AuthenticationError('unrecoverable EIP-712 signature') from exc
     if recovered.lower() != signer:
         raise AuthenticationError('signature not produced by claimed monitor')
