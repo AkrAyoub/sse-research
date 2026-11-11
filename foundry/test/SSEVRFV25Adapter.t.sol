@@ -336,7 +336,8 @@ contract SSEVRFV25AdapterTest is Test {
         localPool.bindController(address(requester));
         uint256 assignment = requester.open(localPool, params());
         for (uint256 i; i < 5; ++i) {
-            address who = address(uint160(0xB000 + i));
+            // Distinct from configured provider address(0xB002).
+            address who = address(uint160(0xE000 + i));
             vm.deal(who, 2 ether);
             vm.startPrank(who);
             localPool.register{value: 1 ether}();
