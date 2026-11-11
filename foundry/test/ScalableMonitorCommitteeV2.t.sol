@@ -362,8 +362,9 @@ contract ScalableMonitorCommitteeV2Test is Test {
         address spare=pool.rankedAt(id,4);
         pool.settleTicket(id,spare);
         assertEq(pool.withdrawable(spare),0.1 ether);
+        address stillSelected = pool.seatAt(id,0);
         vm.expectRevert(ScalableMonitorCommitteeV2.InvalidPhase.selector);
-        pool.settleTicket(id,pool.seatAt(id,0));
+        pool.settleTicket(id,stillSelected);
     }
     function testMaxFinalistsDoesNotLimitEnrollment() public {
         uint256 id=joined(80,8,6,8);
