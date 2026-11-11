@@ -12,7 +12,7 @@ sys.path.insert(0, str(Path(__file__).resolve().parents[1] / "tools"))
 sys.path.insert(0, str(Path(__file__).resolve().parents[1] / "services" / "monitor-agent"))
 
 from sse_challenge import keccak256, expected_response_hash
-from sse_chain_read import _function_call, _domain_separator, LEASE_FIELDS, EPOCH_FIELDS
+from sse_chain_read import ChainReadError, _function_call, _domain_separator, LEASE_FIELDS, EPOCH_FIELDS
 from sse_chain_authority_v1 import (
     AuthoritySpec, ChainAuthorityError, read_chain_authority,
     verify_against_chain, capture_with_chain_authority,
