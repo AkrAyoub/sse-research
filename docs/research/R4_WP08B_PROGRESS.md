@@ -28,3 +28,13 @@
 5. R3: replace lifetime 32-identity cap and fixed committee constraints with scalable Sybil-aware registry, unbiased selection and no-show recovery; this remains on the roadmap.
 
 **No increase to numeric phase completion is justified yet.** R4 remains 15%; engineering 22%, research 26%, overall 23% (rounded equal-weight phase averages).
+
+## Hosted validation checkpoint (later update)
+
+- PR #7: https://github.com/AkrAyoub/sse-research/pull/7 (draft at this checkpoint).
+- The initial hosted run https://github.com/AkrAyoub/sse-research/actions/runs/43086907371 passed Python Ubuntu **337/337** and Foundry **52/52**, but Windows had **one test-cleanup error**: `with sqlite3.connect(path)` commits/rolls back but does not close the connection, and Windows refused temporary database deletion. This was **not** a cryptographic validity or on-chain test failure.
+- Commit `458c1caf0a437fdc33e3bcfe649564c5c6c103af` corrected that test using `contextlib.closing(sqlite3.connect(path))`, preserving transaction semantics and the tamper-detection assertion.
+- Corrected hosted CI run https://github.com/AkrAyoub/sse-research/actions/runs/43087187187: **Python Ubuntu 337/337 passed, Python Windows 337/337 passed, Foundry 52/52 passed**; both the SQLite tampering test and two-process integration test executed. No failed or skipped tests were reported by the jobs.
+- Source remains **research-only**: provider/monitor keys are experimental; addresses and authorization context are supplied by the caller; only numeric loopback HTTP is supported; SQLite is a local archive; neither signature establishes consumer-side physical delivery nor a sound `QualifiedFact`. The main chain payout code was not modified.
+- **Phase estimate on this research branch:** R4 now **20% (+5 percentage points for WP-08B)**, subject to PR review and merge. Other percentages unchanged. Equal-weight totals: engineering `268/12 = 22.33%` → **22%**, research `180/7 = 25.71%` → **26%**, overall `448/19 = 23.58%` → **24%**. These are planning estimates, **not measured percentage of security correctness**.
+- Remaining gates: review PR and merge; user host retest after pulling the final merged version; derive authorization from a trusted canonical chain view; replicate/archive evidence independently; handle remote TLS and source/RPC trust; define sound service-specific delivery certificates and future versioned monetary settlement; continue scalable open-monitor R3 design.
