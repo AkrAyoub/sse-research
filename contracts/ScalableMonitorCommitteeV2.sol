@@ -340,7 +340,14 @@ contract ScalableMonitorCommitteeV2 {
     function expire(uint256 id) external {
         Assignment storage r = assignments[id];
         if (r.status == Status.Enrollment && block.timestamp > r.enrollmentEnd) {
-            _abort(id);
+            // Anyone may end enrollment, but cannot censor a full roster.
+            // Empty/underfilled rosters abort; eligible ones advance to the seed stage.
+            if (r.entrants.length < r.size) {
+                _abort(id);
+            } else {
+                r.status = Status.WaitingSeed;
+                emit EnrollmentSealed(id, r.entrants.length, assignmentCommitment(id));
+            }
         } else if (r.status == Status.WaitingSeed && block.timestamp > r.randomnessEnd) {
             _abort(id);
         } else if (r.status == Status.Selecting && block.timestamp > r.selectionEnd) {
