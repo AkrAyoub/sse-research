@@ -309,6 +309,35 @@ class V2AuthorityTests(unittest.TestCase):
         self.rpc.assignment["size"] = 17
         self.rejects()
 
+    def test_eight_member_variable_committee_is_authorized(self):
+        members = ["0x" + f"{200+i:040x}" for i in range(8)]
+        self.rpc.members = members
+        self.rpc.assignment.update(size=8, quorum=5, reserves=4)
+        self.rpc.selected_count = 8
+        self.rpc.confirmed_count = 8
+        self.rpc.tickets = {
+            m: dict(joined=True, paid=True, everSelected=True,
+                    confirmed=True, noShow=False) for m in members
+        }
+        snap = read_v2_authority(self.rpc, self.config)
+        self.assertEqual(len(snap.monitors), 8)
+        self.assertEqual(snap.quorum, 5)
+        self.assertEqual(snap.reserves, 4)
+        self.assertEqual(snap.context().authorized_monitors, frozenset(members))
+
+    def test_current_standby_replacement_excludes_previous_seat(self):
+        absent = self.rpc.members[2]
+        substitute = "0x" + f"{299:040x}"
+        self.rpc.members[2] = substitute
+        self.rpc.tickets[absent]["noShow"] = True
+        self.rpc.tickets[substitute] = dict(
+            joined=True, paid=True, everSelected=True,
+            confirmed=True, noShow=False)
+        snap = read_v2_authority(self.rpc, self.config)
+        self.assertIn(substitute, snap.monitors)
+        self.assertNotIn(absent, snap.monitors)
+        self.assertNotIn(absent, snap.context().authorized_monitors)
+
     def test_not_all_monitors_confirmed_rejected(self):
         self.rpc.confirmed_count = 3
         self.rejects()
