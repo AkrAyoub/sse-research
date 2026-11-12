@@ -10,6 +10,8 @@ from __future__ import annotations
 import argparse
 import json
 from pathlib import Path
+from contextlib import closing
+import sqlite3
 import socket
 import sys
 import tempfile
@@ -25,7 +27,7 @@ from eth_abi import encode
 
 from sse_challenge import keccak256
 from sse_chain_read import LocalRPC, _call, _words, decode_struct
-from sse_evidence_wire_v1 import EvidenceScope
+from sse_evidence_wire_v1 import EvidenceScope, AuthenticationError, EvidenceError
 from sse_v2_chain_authority_v1 import (
     V2AuthoritySpec, V2AuthorityError, V2_LEASE_FIELDS,
     V2_EPOCH_FIELDS, read_v2_authority,
@@ -251,6 +253,15 @@ def run(url: str, out: Path) -> dict:
             verified = archive.load_verified(anvil.rpc, spec, saved.entry_id)
             if verified.provider_bytes != saved.provider_bytes:
                 raise AssertionError("provider payload changed on retrieval")
+            outsider_key = "0x" + bytes(anvil.accounts[10].key).hex()
+            try:
+                archive.capture(anvil.rpc, spec, outsider_key)
+            except AuthenticationError:
+                pass
+            else:
+                raise AssertionError("non-selected monitor accepted by actual on-chain roster")
+            if archive.count() != 1:
+                raise AssertionError("unauthorized monitor modified archive")
 
             # Current-epoch provenance stops being admissible after the chain
             # state changes, but the ORIGINAL block remains verifiable.
@@ -272,7 +283,27 @@ def run(url: str, out: Path) -> dict:
                 raise AssertionError("raw evidence caused an unauthorized provider payout")
             if anvil.read_uint(pool, "status(uint256)", (assignment,)) != 7:
                 raise AssertionError("monitor assignment was not Released")
-            fields = historic.monitor_envelope
+
+            # Real Anvil RPC + deliberately corrupted SQLite provider bytes.
+            # Restore them afterward and require the original history to verify.
+            with closing(sqlite3.connect(archive.path)) as db:
+                with db:
+                    db.execute("UPDATE v2_observations SET provider_bytes=? WHERE entry_id=?",
+                               (b"{}", saved.entry_id))
+            try:
+                archive.load_verified(anvil.rpc, spec, saved.entry_id)
+            except EvidenceError:
+                pass
+            else:
+                raise AssertionError("tampered HTTP provider bytes authenticated")
+            with closing(sqlite3.connect(archive.path)) as db:
+                with db:
+                    db.execute("UPDATE v2_observations SET provider_bytes=? WHERE entry_id=?",
+                               (saved.provider_bytes, saved.entry_id))
+            restored = archive.load_verified(anvil.rpc, spec, saved.entry_id)
+            if restored.provider_bytes != saved.provider_bytes:
+                raise AssertionError("restored signed bytes could not authenticate")
+
             report = {
                 "schema": "sse-wp15-real-anvil-evidence-v1",
                 "chainId": CHAIN_ID, "rpcMode": "latest-explicitly-unfinalized",
@@ -289,6 +320,8 @@ def run(url: str, out: Path) -> dict:
                 "authorityBlockHash": historic.block_hash,
                 "authorityCommitment": historic.reference_commitment,
                 "providerCreditFromRawEvidence": 0,
+                "outsiderMonitorRejectedByRealChainState": True,
+                "archiveTamperedBytesRejectedByRealChainState": True,
                 "providerSignatureBytes": len(saved.provider_bytes),
                 "receiptCount": len(anvil.receipts), "txReceipts": anvil.receipts,
                 "testNotice": "isolated Anvil, public lab mnemonic, mock VRF; no physical SLA conclusion",
