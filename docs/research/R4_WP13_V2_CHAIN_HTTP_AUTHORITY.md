@@ -78,21 +78,21 @@ The selected block hash and contract code hashes are included in a portable snap
 
 ## Verification and what it does not mean
 
-`tests/test_sse_v2_chain_authority_v1.py` adds **35** scenarios using an explicit **synthetic RPC**. They cover:
+`tests/test_sse_v2_chain_authority_v1.py` adds **37** scenarios using an explicit **synthetic RPC**. They cover:
 
 - correct 19-field V2 lease, eight-field epoch and five-field ticket decoding;
 - strict block-hash pinning, code hashes, controller domain, both bindings and visible reorgs;
 - funded escrow conservation and exposure budget;
 - numeric localhost endpoint commitment and malformed endpoint rejection;
-- variable K/Q/R selected monitor membership, all on-chain ticket confirmations, duplicate and interested seats;
+- variable K/Q/R selected monitor membership including a positive 8-of-8 committee, authenticated standby replacement excluding the previous seat, all on-chain ticket confirmations, duplicate and interested seats;
 - wrong, resolved, expired or previously unadmitted epochs;
 - unsupported RPC pinning, explicit weaker block-tag opt-in, no transaction submission;
 - bridge argument binding to the existing capture API;
 - selected EIP-712 monitor signature acceptance and outsider rejection.
 
 Initial hosted PR #13 run: https://github.com/AkrAyoub/sse-research/actions/runs/43192903482
-- Python Ubuntu **372/372** (337 inherited + 35 new), no failures/skips;
-- Python Windows **372/372**, no failures/skips;
+- Python Ubuntu **374/374** (337 inherited + 37 new), no failures/skips;
+- Python Windows **374/374**, no failures/skips;
 - Foundry **124/124** (unchanged cumulative V2 suite), no failures/skips.
 
 A URL mismatch was found during review before CI: `validate_endpoint` returns the `/v1/challenge` URL, not the canonical service root. The implementation was corrected to check the root separately and never compare the request URL to the on-chain root commitment.
@@ -122,4 +122,4 @@ forge test -q
 ./.venv-r0/Scripts/python.exe tools/sse_v2_chain_authority_cli.py --help
 ```
 
-Expected on this cumulative branch: 35 WP-13 Python tests; 372 Python total, 124 Foundry. For a live local Anvil inspection, a V2 controller+pool pair must actually be deployed with a **Live** lease and admitted unresolved epoch, and trusted runtime hashes must be supplied explicitly. Some RPCs do not support EIP-1898 for `eth_getCode`: those must fail closed, not be treated as a test failure to hide with a fallback.
+Expected on this cumulative branch: 37 WP-13 Python tests; 374 Python total, 124 Foundry. For a live local Anvil inspection, a V2 controller+pool pair must actually be deployed with a **Live** lease and admitted unresolved epoch, and trusted runtime hashes must be supplied explicitly. Some RPCs do not support EIP-1898 for `eth_getCode`: those must fail closed, not be treated as a test failure to hide with a fallback.
