@@ -231,8 +231,9 @@ def run(url: str, out: Path) -> dict:
     if anvil.read_uint(controller, "withdrawable(address)", (int(provider, 16),)) != 0:
         raise AssertionError("provider unexpectedly paid before consent")
 
-    provider_key = "0x" + anvil.accounts[1].key.hex()
-    monitor_key = "0x" + anvil.accounts[anvil.addresses.index(selected[0])].key.hex()
+    # bytes(...).hex() never carries a HexBytes 0x prefix.
+    provider_key = "0x" + bytes(anvil.accounts[1].key).hex()
+    monitor_key = "0x" + bytes(anvil.accounts[anvil.addresses.index(selected[0])].key).hex()
     server = make_server(port, provider_key, Domain(CHAIN_ID, controller),
                          lease_id, 0, REQUEST)
     thread = Thread(target=server.serve_forever, daemon=True)
