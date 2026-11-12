@@ -99,7 +99,8 @@ def _monitor_case(manifest_path: Path, archive_path: Path, anvil: LiveAnvil,
                 f"monitor child returned no JSON for {case}; rc={done.returncode}; "
                 f"stderr={done.stderr[-700:]}") from exc
 
-        if (done.returncode != (0 if expected == "success" else 2) or
+        success_expected = expected == "RAW_OBSERVATION_ARCHIVED_NOT_QUALIFIED"
+        if (done.returncode != (0 if success_expected else 2) or
                 response.get("status") != expected or
                 (expected_error is not None and response.get("errorClass") != expected_error)):
             raise AssertionError(
