@@ -150,7 +150,7 @@ def _unused_port() -> int:
         return s.getsockname()[1]
 
 
-def run(url: str, out: Path) -> dict:
+def run(url: str, out: Path, *, prepare_only: bool = False) -> dict:
     anvil = LiveAnvil(url)
     anvil.require_lab()
     consumer, provider = anvil.addresses[:2]
@@ -234,6 +234,35 @@ def run(url: str, out: Path) -> dict:
         raise AssertionError("actual EIP-1898 seat reconstruction mismatch")
     if anvil.read_uint(controller, "withdrawable(address)", (int(provider, 16),)) != 0:
         raise AssertionError("provider unexpectedly paid before consent")
+
+    if prepare_only:
+        # WP-16 handoff: return live chain and independently scoped deployment
+        # inputs, NOT private keys. The separate monitor process recomputes
+        # authorization from actual Anvil RPC, not these asserted seat values.
+        prepared = {
+            "schema": "sse-wp16-anvil-prepared-lease-v1",
+            "chainId": CHAIN_ID, "rpcUrl": url,
+            "controller": controller, "pool": pool, "adapter": adapter,
+            "mockCoordinator": coordinator,
+            "consumer": consumer, "provider": provider,
+            "leaseId": lease_id, "epochId": 0, "assignmentId": assignment,
+            "serviceRoot": root, "slaPolicyHash": SLA,
+            "resourceProfileHash": PROFILE, "requestHash": REQUEST,
+            "controllerCodeHash": spec.controller_code_hash,
+            "poolCodeHash": spec.pool_code_hash,
+            "blockTag": "latest", "allowUnfinalized": True,
+            "selectedMonitors": selected,
+            "authorityBlockNumber": snapshot.block_number,
+            "authorityBlockHash": snapshot.block_hash,
+            "consumerDeliveryProven": False,
+            "vrfProofVerified": False, "realConsensusProof": False,
+            "testOnly": True,
+            "txReceipts": anvil.receipts,
+        }
+        out.parent.mkdir(parents=True, exist_ok=True)
+        out.write_text(json.dumps(prepared, indent=2, sort_keys=True) + "\n",
+                       encoding="utf-8")
+        return prepared
 
     # bytes(...).hex() never carries a HexBytes 0x prefix.
     provider_key = "0x" + bytes(anvil.accounts[1].key).hex()
