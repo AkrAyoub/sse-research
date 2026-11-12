@@ -148,11 +148,18 @@ class V2AuthoritySpec:
         if type(self.endpoint) is not str or not self.endpoint.startswith("http://127.0.0.1:"):
             raise V2AuthorityError("WP13 only accepts an exact numeric IPv4 loopback endpoint")
         from signed_probe import validate_endpoint
+        from urllib.parse import urlsplit
         try:
-            if validate_endpoint(self.endpoint) != self.endpoint:
-                raise V2AuthorityError("noncanonical endpoint spelling")
-        except ValueError as exc:
-            raise V2AuthorityError("invalid loopback endpoint") from exc
+            # validate_endpoint returns the actual /v1/challenge request URL,
+            # whereas the funded lease commits to the canonical service ROOT.
+            validate_endpoint(self.endpoint)
+            parsed = urlsplit(self.endpoint)
+            if (parsed.scheme != "http" or parsed.hostname != "127.0.0.1" or
+                    parsed.netloc != f"127.0.0.1:{parsed.port}" or
+                    parsed.path != "" or parsed.query or parsed.fragment):
+                raise V2AuthorityError("noncanonical numeric loopback service root")
+        except (ValueError, TypeError) as exc:
+            raise V2AuthorityError("invalid loopback service root") from exc
         if type(self.allow_unfinalized) is not bool or self.block_tag not in ("finalized", "safe", "latest"):
             raise V2AuthorityError("invalid chain block tag or opt-in")
         if self.block_tag != "finalized" and not self.allow_unfinalized:
