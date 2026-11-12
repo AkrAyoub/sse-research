@@ -170,10 +170,12 @@ def run(url: str, out: Path) -> dict:
     committee_types = "(address,address,uint8,uint8,uint8,uint64,uint64,uint64,uint64,uint64)"
     lease_terms = (
         provider, keccak256(root.encode("utf-8")), _bytes32(PROFILE),
-        _bytes32(SLA), FEE, 3, FEE, 120, 8)
+        _bytes32(SLA), FEE, 3, FEE, 300, 60)
+    # On real Anvil each eth_sendTransaction mines a block, unlike a Foundry
+    # unit test's internal calls. Give 16+ enrollment transactions ample time.
     committee_terms = (
         consumer, provider, 4, 3, 2,
-        15, 60, 60, 60, 600)
+        120, 120, 120, 120, 1800)
     anvil.send(0, controller,
         f"createLease({lease_types},{committee_types})",
         [lease_types, committee_types], [lease_terms, committee_terms],
