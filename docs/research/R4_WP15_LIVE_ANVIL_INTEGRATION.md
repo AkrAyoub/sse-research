@@ -45,7 +45,7 @@ GitHub Actions Ubuntu job
        └─ assert zero provider credited merely from observation
              |
              v
-       upload sanitized JSON trace and local Anvil log (no private keys)
+       upload sanitized JSON trace only (never raw Anvil startup logs)
 ```
 
 The full sequence exercises real contract deployment/transaction receipts and **actual Anvil EIP-1898 block-hash-pinned reads**, not mocked state dictionaries. The URI and provider are **numeric IPv4 loopback only**.
@@ -69,7 +69,7 @@ The full sequence exercises real contract deployment/transaction receipts and **
   - The real JSON-RPC block hash, deployed runtime and V2 ABI were accepted by the strict WP-13 reader.
   - The real signed HTTP response was archived with the block reference and reverified after deadline/lease state changes.
   - The provider's withdrawable allocation remained **zero**.
-  - The workflow uploaded a sanitized transaction trace: https://github.com/AkrAyoub/sse-research/actions/runs/43213469626/artifacts/13941778427
+  - The initial workflow uploaded a transaction trace and Anvil log: https://github.com/AkrAyoub/sse-research/actions/runs/43213469626/artifacts/13941778427 . **Use the later hardened workflow artifacts** for sharing: raw Anvil startup logs may print publicly known lab keys and are now excluded from uploads.
 - Hardened run: https://github.com/AkrAyoub/sse-research/actions/runs/43213885798
   - Confirmed that **unselected account #10 cannot capture** as an authorized monitor using actual Anvil state.
   - Confirmed an actual Anvil historical verification **rejects tampered archived provider bytes**, and accepts the restored original signed bytes.
