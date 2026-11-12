@@ -221,11 +221,15 @@ class V2AuthoritySnapshot:
         return "0x" + keccak256(b"SSE_V2_AUTHORITY_REFERENCE_V1\x00" + self.canonical_bytes()).hex()
 
 
-def read_v2_authority(rpc, spec: V2AuthoritySpec) -> V2AuthoritySnapshot:
-    """Reconstruct a LIVE V2 epoch and selected, confirmed committee at ONE block.
+def read_v2_authority(rpc, spec: V2AuthoritySpec, *,
+                      historical_anchor: tuple[int, str] | None = None) -> V2AuthoritySnapshot:
+    """Reconstruct a LIVE V2 epoch and selected committee at ONE block.
 
-    Requires caller-trusted RPC and independently supplied code hashes.
-    Every contract read uses EIP-1898 {blockHash, requireCanonical:true}.
+    The optional historical anchor permits re-verifying an archived observation
+    after a committee changes or an epoch closes. It must still be canonical
+    according to the caller-trusted RPC, and no more recent than its claimed
+    finalized/safe/latest head. This is NOT a consensus state proof.
+    Every contract read uses EIP-1898 {blockHash,requireCanonical:true}.
     """
     if not isinstance(spec, V2AuthoritySpec):
         raise V2AuthorityError("expected explicit V2 authority specification")
@@ -238,9 +242,28 @@ def read_v2_authority(rpc, spec: V2AuthoritySpec) -> V2AuthoritySnapshot:
     chain_id = _hex_integer(_rpc(rpc, "eth_chainId", []))
     if chain_id != s.chain_id:
         raise V2AuthorityError("wrong chain ID for signed observation scope")
-    block = _rpc(rpc, "eth_getBlockByNumber", [spec.block_tag, False])
-    if type(block) is not dict:
-        raise V2AuthorityError("missing selected block")
+    tagged = _rpc(rpc, "eth_getBlockByNumber", [spec.block_tag, False])
+    if type(tagged) is not dict:
+        raise V2AuthorityError("missing selected finality-tagged block")
+    tagged_number = _hex_integer(tagged.get("number"))
+    tagged_hash = _canonical_hash(tagged.get("hash"), "tagged block hash")
+    if historical_anchor is None:
+        block = tagged
+    else:
+        if (type(historical_anchor) is not tuple or len(historical_anchor) != 2 or
+                type(historical_anchor[0]) is not int or historical_anchor[0] < 1):
+            raise V2AuthorityError("historical anchor requires exact positive height and block hash")
+        historical_number, historical_hash = historical_anchor
+        historical_hash = _canonical_hash(historical_hash, "historical block hash")
+        if historical_number > tagged_number:
+            raise V2AuthorityError("archived block is newer than permitted chain finality tag")
+        block = _rpc(rpc, "eth_getBlockByNumber", [hex(historical_number), False])
+        if (type(block) is not dict or
+                _hex_integer(block.get("number")) != historical_number or
+                _canonical_hash(block.get("hash"), "historical chain block") != historical_hash):
+            raise V2AuthorityError("archived block is missing or no longer canonical")
+        if historical_number == tagged_number and historical_hash != tagged_hash:
+            raise V2AuthorityError("historical anchor conflicts with selected tagged head")
     block_hash = _canonical_hash(block.get("hash"), "block hash")
     number = _hex_integer(block.get("number"))
     timestamp = _hex_integer(block.get("timestamp"))

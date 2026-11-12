@@ -3,11 +3,11 @@ R0,Engineering,Reproducible baseline,ACCEPTED - 106/106 Python + 35/35 Foundry +
 R1,Engineering,Formal SSE evidence protocol,WP07 RESEARCH REFERENCE MERGED MAIN 58E081D; 276/276 LOCAL PYTHON AND 52/52 FOUNDRY; PHYSICAL SOUNDNESS CONDITIONAL,Versioned world-sound evidence rules and independent reference model,,,2026-11-10,62,6
 R2,Engineering,Settlement and economics hardening,WP10 FUNDED V2 BILATERAL ESCROW PLUS WP12 INTEGRATED VRF MOCK AND EPOCH LIFECYCLE 124/124 FOUNDRY; PHYSICAL DELIVERY AND DISPUTE LIVENESS OPEN,Conservation/replay/reward/residual invariants pass,,,2026-11-12,34,2
 R3,Engineering,Open verifiable monitoring registry,WP09 V2 POOL PLUS WP11 VRF V25 CALLBACK ADAPTER PLUS WP12 EVM FUNDING INTEGRATION; 124/124 FOUNDRY; LIVE PROOF STILL PENDING,"Scalable membership, unbiased selection, liveness/release recovery",,,2026-11-12,33,5
-R4,Engineering,Shared signed evidence/SDK,WP13 V2 CHAIN-BOUND VARIABLE COMMITTEE AUTHORITY AND HTTP SIGNATURE BRIDGE; 374/374 PYTHON AND 124/124 FOUNDRY CI; TRUSTED RPC/PHYSICAL QUALIFICATION OPEN,Remote signed canonical records and interoperable verification,,,2026-11-12,25,5
+R4,Engineering,Shared signed evidence/SDK,WP14 HISTORICAL-BLOCK VERIFIED V2 PROVIDER+MONITOR ATOMIC SQLITE PROVENANCE 410/410 PYTHON AND 124/124 FOUNDRY CI; PHYSICAL PROOF OPEN,Remote signed canonical records and interoperable verification,,,2026-11-12,30,5
 R5,Engineering,Autonomous role agents,WP08B REAL TWO PROCESS LOCAL HTTP SIGNED EVIDENCE TEST PASSES CI; INDEPENDENT MULTIHOST AUTONOMY OPEN,Independent processes transact all supported roles,,,2026-11-09,10,0
 R6,Engineering,Automatic Ubuntu onboarding,PLANNED,New NAT VM joins without static IP/manual peer edits,,,2026-11-09,5,0
 R7,Engineering,Heterogeneous cloud workloads,PLANNED,Compute/storage/OCI/API with verified evidence policies,,,2026-11-09,15,0
-R8,Engineering,Read-only chain observatory,PLANNED,Rebuildable on-chain finance and protected node console,,,2026-11-09,10,0
+R8,Engineering,Read-only chain observatory,WP14 ATOMIC OFFCHAIN AUTHORITY+EVIDENCE ARCHIVE AND REVALIDATION PROTOTYPE; CHAIN FINANCE CONSOLE AND PUBLIC AVAILABILITY UNBUILT,Rebuildable on-chain finance and protected node console,,,2026-11-12,12,2
 R9,Engineering,Independent distributed experiments,PLANNED,Reproducible distributed failure and workload datasets,,,2026-11-09,5,0
 R10,Engineering,Publication-grade evaluation,PLANNED,"Faithful baselines, experimental analysis and proof/claim traceability",,,2026-11-09,0,0
 R11,Engineering,Independent replication/release,PLANNED,External user reproduces representative SSE experiments,,,2026-11-09,0,0
