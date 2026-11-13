@@ -295,6 +295,74 @@ class ProviderCaptureTests(unittest.TestCase):
                 archive.insert(env,raw+b' ',self.context,DOMAIN,self.provider)
             self.assertEqual(archive.count(),0)
 
+    def test_block_anchor_is_atomic_with_verified_raw_payload(self):
+        from sse_wp08c_chain_binding import ChainCaptureBinding
+        from sse_wp08d_provenance import SnapshotReorganized, ProvenanceError
+        from contextlib import closing
+        import sqlite3
+
+        blockhash = '0x'+'ab'*32
+
+        class ChainRPC:
+            block = blockhash
+
+            def request(self, method, params):
+                if method not in ('eth_getBlockByNumber', 'eth_getBlockByHash'):
+                    raise AssertionError('unexpected RPC method')
+                return {'hash': self.block, 'number': hex(50), 'timestamp': hex(1000)}
+
+        rpc = ChainRPC()
+        bound = ChainCaptureBinding(self.context, self.provider, 50, 1000, blockhash)
+        with tempfile.TemporaryDirectory() as folder:
+            dbpath = Path(folder) / 'archive.sqlite'
+            archive = EvidenceArchive(dbpath)
+            saved = capture_response(self.endpoint, DOMAIN, self.provider, scope(), MKEY,
+                                     self.context, archive, nonce='0x'+'a1'*32,
+                                     chain_binding=bound, rpc=rpc)
+            envelope, raw, pinned = EvidenceArchive(dbpath).load_anchored(
+                saved.evidence_id, self.context, DOMAIN, self.provider, rpc)
+            self.assertEqual(raw, saved.raw_bytes)
+            self.assertEqual(pinned.evidence_id, saved.evidence_id)
+            self.assertEqual(pinned.block_hash, blockhash)
+            with closing(sqlite3.connect(dbpath)) as conn:
+                self.assertEqual(conn.execute('SELECT COUNT(*) FROM chain_anchors').fetchone()[0], 1)
+                # Tampering the separately signed snapshot cannot keep attribution.
+                with conn:
+                    conn.execute('UPDATE chain_anchors SET anchor_envelope=? WHERE evidence_id=?',
+                                 ('{}', saved.evidence_id))
+            with self.assertRaises(ProvenanceError):
+                EvidenceArchive(dbpath).load_anchored(
+                    saved.evidence_id, self.context, DOMAIN, self.provider, rpc)
+            self.assertEqual(archive.count(), 1)
+
+    def test_legacy_unsigned_snapshot_does_not_get_provenance_implicitly(self):
+        from sse_wp08d_provenance import ProvenanceError
+        with tempfile.TemporaryDirectory() as folder:
+            archive = EvidenceArchive(Path(folder) / 'archive.sqlite')
+            saved = capture_response(self.endpoint, DOMAIN, self.provider, scope(), MKEY,
+                                     self.context, archive)
+            with self.assertRaisesRegex(ProvenanceError, 'no signed'):
+                archive.load_anchored(saved.evidence_id, self.context,
+                                      DOMAIN, self.provider, object())
+
+    def test_reorg_prevents_atomic_capture_insert(self):
+        from sse_wp08c_chain_binding import ChainCaptureBinding
+        from sse_wp08d_provenance import SnapshotReorganized
+
+        class ReorgRPC:
+            def request(self, method, params):
+                return None
+
+        bound = ChainCaptureBinding(self.context, self.provider, 50, 1000,
+                                    '0x'+'ab'*32)
+        with tempfile.TemporaryDirectory() as folder:
+            archive = EvidenceArchive(Path(folder) / 'archive.sqlite')
+            with self.assertRaises(SnapshotReorganized):
+                capture_response(self.endpoint, DOMAIN, self.provider, scope(), MKEY,
+                                 self.context, archive, chain_binding=bound,
+                                 rpc=ReorgRPC())
+            self.assertEqual(archive.count(), 0)
+
     def test_direct_signing_key_is_never_present_in_http_body(self):
         raw=fetch_provider_payload(self.endpoint,scope())
         self.assertNotIn(PKEY.encode(),raw)
