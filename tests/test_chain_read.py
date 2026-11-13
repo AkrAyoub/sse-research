@@ -70,6 +70,8 @@ class FakeRPC:
             'monitoringSealed': False, 'evidenceClosed': False, 'outcome': 0,
         })
         self.calls = []
+        self.block_hash = '0x' + 'b1' * 32
+        self.second_block_hash = None
 
     def request(self, method, params):
         self.calls.append((method, params))
@@ -79,12 +81,14 @@ class FakeRPC:
             return '0x10'
         if method == 'eth_getBlockByNumber':
             assert params == ['0x10', False]
-            return {'number': '0x10', 'timestamp': '0x3e0'}
+            num_same = sum(method == 'eth_getBlockByNumber' for method, _ in self.calls)
+            block_hash = self.second_block_hash if num_same > 1 and self.second_block_hash else self.block_hash
+            return {'number': '0x10', 'timestamp': '0x3e0', 'hash': block_hash}
         if method == 'eth_getCode':
-            assert params[1] == '0x10'
+            assert params[1] in ('0x10', {'blockHash': self.block_hash, 'requireCanonical': True})
             return self.code
         if method == 'eth_call':
-            assert params[1] == '0x10'
+            assert params[1] in ('0x10', {'blockHash': self.block_hash, 'requireCanonical': True})
             data = params[0]['data']
             if data == reader._function_call('domainSeparator()'):
                 return self.domain
@@ -123,6 +127,28 @@ class ChainReadTest(unittest.TestCase):
         self.assertEqual(result['status'], 'NO_EPOCH_ADMITTED')
         self.assertIsNone(result['epoch'])
         self.assertFalse(result['chainDeadlineRead'])
+
+    def test_block_hash_pin_used_for_all_contract_reads(self):
+        rpc = FakeRPC()
+        view = self.inspect(rpc, endpoint=ENDPOINT, pin_block_hash=True)
+        self.assertEqual(view['blockHash'], rpc.block_hash)
+        self.assertTrue(view['blockHashPinned'])
+        for method, params in rpc.calls:
+            if method in ('eth_call', 'eth_getCode'):
+                self.assertEqual(params[1], {'blockHash': rpc.block_hash, 'requireCanonical': True})
+        self.assertEqual([method for method, _ in rpc.calls].count('eth_getBlockByNumber'), 2)
+
+    def test_pinned_block_replacement_is_rejected(self):
+        rpc = FakeRPC()
+        rpc.second_block_hash = '0x' + 'f1'*32
+        with self.assertRaisesRegex(reader.ChainReadError, 'reorged'):
+            self.inspect(rpc, pin_block_hash=True)
+
+    def test_missing_block_hash_fails_closed_when_requested(self):
+        rpc = FakeRPC()
+        rpc.block_hash = None
+        with self.assertRaisesRegex(reader.ChainReadError, 'missing canonical block hash'):
+            self.inspect(rpc, pin_block_hash=True)
 
     def test_wrong_chain_rejected(self):
         rpc = FakeRPC()
