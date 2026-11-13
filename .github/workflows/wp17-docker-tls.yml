@@ -1,0 +1,55 @@
+name: WP17 Docker TLS container-isolation research
+on:
+  push:
+  pull_request:
+permissions:
+  contents: read
+
+jobs:
+  docker-tls-lab:
+    runs-on: ubuntu-latest
+    timeout-minutes: 25
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+      - uses: foundry-rs/foundry-toolchain@v1
+      - name: Install contract and Python dependencies
+        run: |
+          python -m pip install -r requirements.txt
+          python -m pip check
+          bash scripts/install-contract-deps.sh
+          forge build
+          python -m compileall -q scripts tools services
+      - name: Build immutable-for-this-run lab-only agent image
+        run: |
+          docker info > /dev/null
+          docker build -f infra/wp17/Dockerfile -t sse-wp17-lab .
+      - name: Run funded V2 lease with distinct Docker namespaces and TLS fault matrix
+        shell: bash
+        run: |
+          set -euo pipefail
+          # The Anvil mnemonic is PUBLIC and this is an ephemeral GitHub runner.
+          # 0.0.0.0 is required only so Docker bridge clients can reach the
+          # otherwise trusted local laboratory JSON-RPC via host-gateway.
+          # Never repeat this exposure pattern on a non-isolated machine.
+          anvil --host 0.0.0.0 --port 8545 --chain-id 31337 --accounts 12 \
+            --mnemonic 'test test test test test test test test test test test junk' \
+            > "${RUNNER_TEMP}/wp17-private-anvil.log" 2>&1 &
+          ANVIL_PID=$!
+          trap 'kill "${ANVIL_PID}" 2>/dev/null || true' EXIT
+          for i in $(seq 1 60); do
+            if cast chain-id --rpc-url http://127.0.0.1:8545 >/dev/null 2>&1; then break; fi
+            sleep 0.25
+          done
+          python scripts/wp17_docker_tls_lab.py \
+            --output "${RUNNER_TEMP}/wp17-docker-tls-lab.json"
+      - uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: wp17-docker-tls-isolated-trace
+          # No Docker inspect, private TLS keys or Anvil logs uploaded.
+          path: ${{ runner.temp }}/wp17-docker-tls-lab.json
+          if-no-files-found: warn
+          retention-days: 14
