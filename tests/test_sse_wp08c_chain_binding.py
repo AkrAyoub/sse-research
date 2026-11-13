@@ -44,6 +44,7 @@ def snapshot():
         'chainId': 31337, 'settlementAddress': SETTLEMENT,
         'leaseId': 4, 'epochId': 2,
         'blockNumber': 50, 'blockTimestamp': 1000,
+        'blockHash': '0x'+'98'*32, 'blockHashPinned': True,
         'lease': {
             'consumer': CONSUMER, 'provider': PROVIDER,
             'slaPolicyHash': SLA, 'resourceProfileHash': RESOURCE,
@@ -199,6 +200,8 @@ class CLIChainBindingTests(unittest.TestCase):
                 self.assertIn(signer, context.authorized_monitors)
                 self.assertEqual(len(context.authorized_monitors), 4)
                 self.assertIn('not finality proof', stdout.getvalue())
+                self.assertTrue(captured.call_args.kwargs['chain_binding'].block_hash)
+                self.assertIsNotNone(captured.call_args.kwargs['rpc'])
 
     def test_cli_invalid_chain_context_does_not_capture_or_fallback(self):
         import evidence_capture
