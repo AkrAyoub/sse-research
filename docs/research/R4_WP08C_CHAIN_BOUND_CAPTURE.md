@@ -1,6 +1,6 @@
 # WP-08C — Read-only chain-bound evidence-capture context
 
-**Status (2026-11-13): implementation branch; CI and review pending.**
+**Status (2026-11-13): PR #18 draft; all three hosted CI jobs passed. Local Anvil integration and security review still pending.**
 **Scope:** R4/R5 integration slice, no production contract, ABI, settlement, or reward changes.
 
 ## Goal
@@ -69,6 +69,8 @@ The WP-08C tests inject structured results from the existing chain inspector;
 they exercise the authorization boundary and refusal matrix. The independent
 existing `test_sse_chain_read.py` exercises the RPC/ABI inspector. **The new
 tests are not a live end-to-end Anvil/HTTP integration test.**
+
+**Hosted CI evidence:** [run 43410654263](https://github.com/AkrAyoub/sse-research/actions/runs/43410654263) passed 347/347 Python tests on Ubuntu, 347/347 on Windows, and 52/52 Foundry tests on Ubuntu (0 failed). New tests inject a chain-inspector snapshot and mock the HTTP capture at the CLI boundary; there is still **no live marketplace-funded Anvil capture test** in this increment.
 
 ## Explicit nonclaims and remaining work
 
