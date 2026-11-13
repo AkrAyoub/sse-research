@@ -3,14 +3,17 @@
 The imported chain inspector already has separate RPC/ABI tests; these tests
 inject its structured result to exercise the capture authorization boundary.
 """
-import copy
+import io
 import sys
+import tempfile
 import unittest
+from contextlib import redirect_stdout
 from pathlib import Path
 from unittest.mock import patch
 
 ROOT = Path(__file__).resolve().parents[1]
 sys.path.insert(0, str(ROOT / 'tools'))
+sys.path.insert(0, str(ROOT / 'services' / 'monitor-agent'))
 
 from sse_challenge import expected_response_hash
 from sse_chain_read import ChainReadError
@@ -159,6 +162,56 @@ class ChainBoundContextTests(unittest.TestCase):
             with self.assertRaises(ChainBindingError):
                 bind_capture_to_chain(object(), scope(), '', PROVIDER)
             call.assert_not_called()
+
+
+class CLIChainBindingTests(unittest.TestCase):
+    """Exercise the real CLI wiring; mock only the inspector and HTTP capture."""
+
+    def command(self, archive):
+        return [
+            'evidence_capture.py', '--endpoint', ENDPOINT,
+            '--chain-id', '31337', '--settlement', SETTLEMENT,
+            '--lease-id', '4', '--epoch-id', '2', '--sla-policy-hash', SLA,
+            '--resource-profile-hash', RESOURCE, '--request-hash', REQ,
+            '--provider', PROVIDER, '--archive', str(archive),
+            '--rpc-url', 'http://127.0.0.1:8545',
+        ]
+
+    def test_cli_uses_selected_committee_not_operator_supplied_set(self):
+        import evidence_capture
+        from eth_account import Account
+        from unittest.mock import Mock
+        key = '0x' + '22' * 32
+        signer = Account.from_key(key).address.lower()
+        d = snapshot()
+        d['lease']['monitors'][0] = signer
+        with tempfile.TemporaryDirectory() as folder:
+            with (patch('sys.argv', self.command(Path(folder) / 'test.sqlite')),
+                  patch.dict('os.environ', {'SSE_WP08B_MONITOR_KEY': key}),
+                  patch('sse_wp08c_chain_binding.inspect_chain', return_value=d),
+                  patch('evidence_capture.capture_response',
+                        return_value=Mock(evidence_id='0x' + '44'*32, stored_new=True)) as captured,
+                  redirect_stdout(io.StringIO()) as stdout):
+                evidence_capture.main()
+                captured.assert_called_once()
+                self.assertEqual(captured.call_args.args[2], PROVIDER)
+                context = captured.call_args.args[5]
+                self.assertIn(signer, context.authorized_monitors)
+                self.assertEqual(len(context.authorized_monitors), 4)
+                self.assertIn('not finality proof', stdout.getvalue())
+
+    def test_cli_invalid_chain_context_does_not_capture_or_fallback(self):
+        import evidence_capture
+        key = '0x' + '22'*32
+        with tempfile.TemporaryDirectory() as folder:
+            with (patch('sys.argv', self.command(Path(folder) / 'test.sqlite')),
+                  patch.dict('os.environ', {'SSE_WP08B_MONITOR_KEY': key}),
+                  patch('sse_wp08c_chain_binding.inspect_chain',
+                        side_effect=ChainReadError('wrong chain')),
+                  patch('evidence_capture.capture_response') as captured):
+                with self.assertRaisesRegex(ChainReadError, 'wrong chain'):
+                    evidence_capture.main()
+                captured.assert_not_called()
 
 
 if __name__ == '__main__':
