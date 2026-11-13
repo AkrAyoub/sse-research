@@ -246,7 +246,10 @@ def run(output_dir: Path) -> dict:
 
         scope = EvidenceScope(CHAIN_ID, settlement, 1, 0, policy_hash,
                               profile_hash, request_hash)
-        bound = bind_capture_to_chain(rpc, scope, endpoint, provider)
+        before_fork = rpc.request('evm_snapshot', [])
+        rpc.request('evm_mine', [])
+        bound = bind_capture_to_chain(rpc, scope, endpoint, provider,
+                                      pin_block_hash=True)
         if bound.context.authorized_monitors != frozenset(assigned):
             raise AssertionError('chain-selected monitors were not derived correctly')
 
@@ -274,7 +277,7 @@ def run(output_dir: Path) -> dict:
         first_monitor = assigned[0]
         good_env = {**os.environ, 'SSE_WP08B_MONITOR_KEY': '0x' + key_for[first_monitor]}
         output = _run_cli(capture_cli, good_env, should_succeed=True)
-        if 'Chain-bound context read' not in output:
+        if 'Monitor-signed RPC block anchor' not in output:
             raise AssertionError('capture was not executed in the chain-bound mode')
         archive = EvidenceArchive(archive_path)
         if archive.count() != 1:
@@ -282,8 +285,10 @@ def run(output_dir: Path) -> dict:
         from contextlib import closing
         with closing(archive._db()) as db:
             evidence_id = db.execute('SELECT evidence_id FROM records').fetchone()[0]
-        envelope, raw_bytes = archive.load(
-            evidence_id, bound.context, Domain(CHAIN_ID, settlement), provider)
+        envelope, raw_bytes, pinned = archive.load_anchored(
+            evidence_id, bound.context, Domain(CHAIN_ID, settlement), provider, rpc)
+        if pinned.block_hash != bound.block_hash or pinned.block_number != bound.block_number:
+            raise AssertionError('stored monitor-signed snapshot differs from observed chain')
         verified = verify_observation(envelope, bound.context)
         if (verified.signer != first_monitor or
                 verified.record.kind != ObservationKind.RESPONSE_SEEN or
@@ -301,6 +306,20 @@ def run(output_dir: Path) -> dict:
                 epoch['unresolvedExposure'] != 25 or epoch['monitoringSealed']):
             raise AssertionError('raw capture unexpectedly authorized a vote or payout')
 
+        # Local explicit chain rewind models losing an unfinalized block.
+        # The archived monitor signature remains valid, but the snapshot is
+        # no longer canonical; strict retrieval MUST reject it.
+        from sse_wp08d_provenance import SnapshotReorganized
+        if rpc.request('evm_revert', [before_fork]) is not True:
+            raise AssertionError('Anvil did not revert the planned block snapshot')
+        try:
+            archive.load_anchored(evidence_id, bound.context,
+                                  Domain(CHAIN_ID, settlement), provider, rpc)
+        except SnapshotReorganized:
+            pass
+        else:
+            raise AssertionError('reorged evidence snapshot was not rejected')
+
         summary = {
             'schema': 'sse-wp08c-live-marketplace-v1', 'status': 'PASS',
             'localAnvilOnly': True, 'chainId': CHAIN_ID,
@@ -310,6 +329,9 @@ def run(output_dir: Path) -> dict:
             'selectedMonitors': assigned, 'captureMonitor': first_monitor,
             'provider': provider, 'evidenceId': evidence_id,
             'providerAndMonitorSignaturesVerified': True,
+            'monitorSignedBlockHash': pinned.block_hash,
+            'monitorSignedBlockNumber': pinned.block_number,
+            'reorgInvalidatesAnchoredRetrieval': True,
             'authorizationReadFromChainSnapshot': True,
             'independentOperatingSystems': False, 'separateLocalProcesses': True,
             'proofOfFinality': False, 'consumerDeliveryProven': False,
