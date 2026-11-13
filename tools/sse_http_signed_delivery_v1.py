@@ -171,6 +171,10 @@ class EvidenceArchive:
                     monitor_envelope TEXT NOT NULL,
                     UNIQUE(chain_id, settlement, lease_id, epoch_id, monitor, nonce)
                 );
+                CREATE TABLE IF NOT EXISTS chain_anchors (
+                    evidence_id TEXT PRIMARY KEY REFERENCES records(evidence_id),
+                    anchor_envelope TEXT NOT NULL
+                );
             ''')
 
     def _db(self) -> sqlite3.Connection:
@@ -180,7 +184,8 @@ class EvidenceArchive:
         return db
 
     def insert(self, envelope: dict, raw_payload: bytes, context: VerificationContext,
-               domain, expected_provider: str) -> tuple[str, bool]:
+               domain, expected_provider: str, *,
+               anchor_envelope: dict | None = None) -> tuple[str, bool]:
         """Re-authenticate BOTH provider and monitor before committing the bytes."""
         item = verify_observation(envelope, context)
         if not verify_payload(item.record, raw_payload):
@@ -194,6 +199,12 @@ class EvidenceArchive:
         key = (str(scope.chain_id), scope.settlement.lower(), str(scope.lease_id),
                str(scope.epoch_id), item.signer.lower(), item.record.nonce)
         serialized = json.dumps(envelope, sort_keys=True, separators=(',', ':'), ensure_ascii=True)
+        anchor_json = None
+        if anchor_envelope is not None:
+            from sse_wp08d_provenance import verify_anchor
+            verify_anchor(anchor_envelope, context, item.evidence_id, item.signer)
+            anchor_json = json.dumps(anchor_envelope, sort_keys=True,
+                                     separators=(',', ':'), ensure_ascii=True)
         with closing(self._db()) as db:
             try:
                 db.execute('BEGIN IMMEDIATE')
@@ -203,11 +214,20 @@ class EvidenceArchive:
                 if old is not None:
                     if old != (item.evidence_id, raw_payload, serialized):
                         raise EvidenceReplay('nonce reused with different committed evidence')
+                    if anchor_json is not None:
+                        previous = db.execute(
+                            'SELECT anchor_envelope FROM chain_anchors WHERE evidence_id=?',
+                            (item.evidence_id,)).fetchone()
+                        if previous != (anchor_json,):
+                            raise EvidenceReplay('duplicate evidence has different/missing snapshot anchor')
                     db.execute('COMMIT')
                     return item.evidence_id, False
                 db.execute('''INSERT INTO records(evidence_id,chain_id,settlement,lease_id,
                               epoch_id,monitor,nonce,provider_raw,monitor_envelope)
                               VALUES(?,?,?,?,?,?,?,?,?)''', (item.evidence_id, *key, raw_payload, serialized))
+                if anchor_json is not None:
+                    db.execute('INSERT INTO chain_anchors(evidence_id,anchor_envelope) VALUES(?,?)',
+                               (item.evidence_id, anchor_json))
                 db.execute('COMMIT')
                 return item.evidence_id, True
             except Exception:
@@ -231,6 +251,30 @@ class EvidenceArchive:
             raise EvidenceError('archived provider and monitor response hashes disagree')
         return envelope, row[1]
 
+    def load_anchored(self, evidence_id: str, context: VerificationContext,
+                      domain, expected_provider: str, rpc) -> tuple[dict, bytes, object]:
+        """Reverify three signatures (provider, observation, snapshot) and RPC chain.
+
+        Strict: old WP08B archive rows without a signed anchor are rejected.
+        A local trusted RPC can fabricate history; this is not a finality proof.
+        """
+        from sse_wp08d_provenance import (verify_anchor, check_canonical_snapshot,
+                                          ProvenanceError)
+        envelope, raw = self.load(evidence_id, context, domain, expected_provider)
+        verified = verify_observation(envelope, context)
+        with closing(self._db()) as db:
+            row = db.execute('SELECT anchor_envelope FROM chain_anchors WHERE evidence_id=?',
+                             (evidence_id,)).fetchone()
+        if row is None:
+            raise ProvenanceError('evidence has no signed block-snapshot anchor')
+        try:
+            anchor_envelope = json.loads(row[0])
+        except (TypeError, ValueError) as exc:
+            raise ProvenanceError('invalid stored anchor JSON') from exc
+        anchor = verify_anchor(anchor_envelope, context, evidence_id, verified.signer)
+        check_canonical_snapshot(rpc, anchor)
+        return envelope, raw, anchor
+
     def count(self) -> int:
         with closing(self._db()) as db:
             return int(db.execute('SELECT COUNT(*) FROM records').fetchone()[0])
@@ -239,7 +283,7 @@ class EvidenceArchive:
 def capture_response(endpoint: str, domain, expected_provider: str, scope: EvidenceScope,
                      monitor_private_key: str, context: VerificationContext,
                      archive: EvidenceArchive, *, nonce: str | None = None,
-                     timeout: float = 2.0) -> CaptureResult:
+                     timeout: float = 2.0, chain_binding=None, rpc=None) -> CaptureResult:
     """Signed provider response -> signed raw monitor observation -> archive.
 
     No conversion to QualifiedFact and no on-chain vote/submission.
@@ -261,6 +305,26 @@ def capture_response(endpoint: str, domain, expected_provider: str, scope: Evide
         event_time_lower=lower, event_time_upper=upper, nonce=chosen_nonce,
     )
     envelope = sign_observation(observation, monitor_private_key)
-    evidence_id, stored_new = archive.insert(envelope, raw, context, domain, expected_provider)
+    anchor_env = None
+    if chain_binding is not None:
+        from sse_wp08c_chain_binding import ChainCaptureBinding
+        from sse_wp08d_provenance import (BlockAnchor, valid_block_hash, sign_anchor,
+                                          check_canonical_snapshot)
+        from sse_evidence_wire_v1 import record_hash
+        if (rpc is None or not isinstance(chain_binding, ChainCaptureBinding) or
+                chain_binding.context != context or
+                chain_binding.provider != expected_provider.lower() or
+                not valid_block_hash(chain_binding.block_hash)):
+            raise AuthenticationError('validated hash-pinned chain binding required')
+        anchor = BlockAnchor(scope.chain_id, scope.settlement.lower(),
+                             scope.lease_id, scope.epoch_id,
+                             record_hash(observation), chain_binding.block_number,
+                             chain_binding.block_hash, chain_binding.block_timestamp)
+        # Prevent archiving stale observations after an observed local reorg.
+        check_canonical_snapshot(rpc, anchor)
+        anchor_env = sign_anchor(anchor, monitor_private_key)
+    evidence_id, stored_new = archive.insert(
+        envelope, raw, context, domain, expected_provider,
+        anchor_envelope=anchor_env)
     return CaptureResult(evidence_id, sender, expected_provider.lower(),
                          verified_provider['responseHash'], stored_new, raw)
