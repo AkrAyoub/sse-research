@@ -1,6 +1,6 @@
 # WP-08C — Read-only chain-bound evidence-capture context
 
-**Status (2026-11-13): PR #18 draft; all three hosted CI jobs passed. Local Anvil integration and security review still pending.**
+**Status (2026-11-13): draft PR #18; 4/4 hosted CI jobs passed, including a real, fresh local Anvil marketplace + signed HTTP integration. Independent chain finality, physical evidence soundness, and external security review remain open.**
 **Scope:** R4/R5 integration slice, no production contract, ABI, settlement, or reward changes.
 
 ## Goal
@@ -65,12 +65,44 @@ forge build
 forge test -vv
 ```
 
-The WP-08C tests inject structured results from the existing chain inspector;
+The WP-08C unit tests inject structured results from the existing chain inspector;
 they exercise the authorization boundary and refusal matrix. The independent
-existing `test_sse_chain_read.py` exercises the RPC/ABI inspector. **The new
-tests are not a live end-to-end Anvil/HTTP integration test.**
+existing `test_chain_read.py` exercises the RPC/ABI inspector. A **separate live
+integration runner** now tests actual Anvil transactions and HTTP subprocesses.
 
-**Hosted CI evidence:** [run 43410654263](https://github.com/AkrAyoub/sse-research/actions/runs/43410654263) passed 347/347 Python tests on Ubuntu, 347/347 on Windows, and 52/52 Foundry tests on Ubuntu (0 failed). New tests inject a chain-inspector snapshot and mock the HTTP capture at the CLI boundary; there is still **no live marketplace-funded Anvil capture test** in this increment.
+**Hosted CI evidence:** [run 43412029509](https://github.com/AkrAyoub/sse-research/actions/runs/43412029509) passed **four jobs**: 347/347 Python tests on Ubuntu, 347/347 on Windows, 52/52 Foundry tests on Ubuntu, and a separate fresh **Anvil + marketplace-funded lease + signed provider/monitor two-process capture** job. The live job reported `"status": "PASS"`, `"usesMarketplaceFundedLease": true`, `"providerAndMonitorSignaturesVerified": true`, `"onChainMonitorVotes": 0`, and `"servicePayoutsAuthorized": false`. GitHub Actions artifact `wp08c-live-anvil-evidence` retains `evidence.sqlite` and `run.json` (14-day retention); no private key is intentionally persisted.
+
+## Fresh marketplace-funded integration (CI + local)
+
+Run the existing unit/Foundry suite first and then:
+
+```bash
+forge build
+python tools/sse_wp08c_live_marketplace.py
+```
+
+This runner launches its **own ephemeral Anvil** on numeric loopback, deriving only
+the published Anvil development wallet from a fixed lab mnemonic; no existing
+Anvil instance, contract address or funded production key is used. It deploys
+`OpenMonitorCommittee`, `SSESettlement`, and `OpenResourceBoard`, performs
+one-time binding, registers five bonded candidates, creates a real request/bid,
+funds the chosen lease, selects and confirms the four-person committee, and
+admits an epoch. A provider HTTP process signs the pinned request, and a
+separate monitor capture process performs WP-08C chain validation and archives
+the raw bytes plus signature envelope. The runner independently reloads and
+verifies the archive and rejects an unselected monitor. It confirms on-chain
+vote counters are zero and escrow remains unresolved (raw evidence does not
+authorize payment). A separate local Anvil test with deterministic, public
+credentials is **not a distributed, permissionless, or adversarial experiment**.
+
+Evidence is saved under `.local/wp08c-live/`. The runner refuses to replace
+a nonempty existing artifact folder. Do not reuse the published lab mnemonic
+or any keys it derives outside disposable Anvil experiments.
+
+**Outcome:** This closes the WP-08C *local marketplace/HTTP integration
+test* gate. It does not close R4 overall because trustworthy finalized-chain
+provenance, distributed monitor independence, physical delivery qualification
+and evidence retention/replication are not implemented.
 
 ## Explicit nonclaims and remaining work
 
@@ -91,8 +123,8 @@ tests are not a live end-to-end Anvil/HTTP integration test.**
 - The `monitorConfirmations == 4` requirement exposes SSE V1's no-show
   availability limitation; changing committee size/reassignment is **R3**.
 
-**Next WP-08C/D gate:** bind to authenticated finalized chain state and its
-header/hash provenance; persist block identity with records; add an actual
-marketplace-funded Anvil + independently started monitor integration test; then
-review any future physical-evidence qualification policy under R1/P1 before
-allowing money-releasing behavior.
+**Next WP-08D gate:** bind to independently authenticated finalized chain
+state and its header/hash provenance; persist block identity with signed
+records; design archive availability and verification across hosts; review
+any physical-evidence qualification policy under R1/P1 before money-releasing
+behavior.
