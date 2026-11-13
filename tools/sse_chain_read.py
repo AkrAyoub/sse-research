@@ -172,7 +172,7 @@ def _domain_separator(chain_id: int, contract: str) -> str:
 
 def inspect_chain(rpc, settlement: str, lease_id: int, epoch_id: int,
                   expected_chain_id: int = 31337, endpoint: str | None = None,
-                  now: float | None = None) -> dict:
+                  now: float | None = None, *, pin_block_hash: bool = False) -> dict:
     """Inspect a single consistent block; do not produce a monitoring certificate."""
     contract = _address(settlement)
     if type(lease_id) is not int or lease_id < 1 or type(epoch_id) is not int or epoch_id < 0:
@@ -189,17 +189,30 @@ def inspect_chain(rpc, settlement: str, lease_id: int, epoch_id: int,
     if not isinstance(block, dict) or _hex_integer(block.get("number")) != block_number:
         raise ChainReadError("inconsistent block snapshot")
     block_timestamp = _hex_integer(block.get("timestamp"))
-    code = rpc.request("eth_getCode", [contract, block_tag])
+    # WP08D opt-in: use EIP-1898 blockHash for ALL contract-state reads.
+    # A node that cannot honor block-hash selectors must fail, not silently
+    # substitute its latest state or a matching numeric height.
+    block_hash = block.get("hash")
+    if pin_block_hash:
+        if (type(block_hash) is not str or
+                re.fullmatch(r"0x[0-9a-fA-F]{64}", block_hash) is None or
+                int(block_hash, 16) == 0):
+            raise ChainReadError("missing canonical block hash for pinned inspection")
+        block_hash = block_hash.lower()
+        state_tag = {"blockHash": block_hash, "requireCanonical": True}
+    else:
+        state_tag = block_tag
+    code = rpc.request("eth_getCode", [contract, state_tag])
     if not isinstance(code, str) or not HEX.fullmatch(code) or len(code) < 4:
         raise ChainReadError("no deployed settlement bytecode at configured address")
 
-    onchain_domain = _call(rpc, contract, "domainSeparator()", (), block_tag)
+    onchain_domain = _call(rpc, contract, "domainSeparator()", (), state_tag)
     if _words(onchain_domain, 1)[0] != _domain_separator(chain_id, contract)[2:]:
         raise ChainReadError("EIP-712 domain does not match SSESettlement v1, chain and address")
-    next_lease_id = int(_words(_call(rpc, contract, "nextLeaseId()", (), block_tag), 1)[0], 16)
+    next_lease_id = int(_words(_call(rpc, contract, "nextLeaseId()", (), state_tag), 1)[0], 16)
     if lease_id >= next_lease_id:
         raise ChainReadError(f"lease {lease_id} not allocated (nextLeaseId={next_lease_id})")
-    lease = decode_struct(_call(rpc, contract, "getLease(uint256)", (lease_id,), block_tag), LEASE_FIELDS)
+    lease = decode_struct(_call(rpc, contract, "getLease(uint256)", (lease_id,), state_tag), LEASE_FIELDS)
     if lease["consumer"] == ZERO_ADDR or lease["provider"] == ZERO_ADDR:
         raise ChainReadError("allocated lease has a zero consumer/provider")
     if lease["state"] >= len(LEASE_STATES) or lease["monitorConfirmations"] > 4:
@@ -225,7 +238,7 @@ def inspect_chain(rpc, settlement: str, lease_id: int, epoch_id: int,
         status = "NO_EPOCH_ADMITTED"
     else:
         epoch = decode_struct(_call(rpc, contract, "getEpoch(uint256,uint256)",
-                                          (lease_id, epoch_id), block_tag), EPOCH_FIELDS)
+                                          (lease_id, epoch_id), state_tag), EPOCH_FIELDS)
         if not epoch["exists"]:
             raise ChainReadError("epoch missing despite nextEpochId indicating admission")
         if epoch["outcome"] >= len(OUTCOMES):
@@ -240,11 +253,21 @@ def inspect_chain(rpc, settlement: str, lease_id: int, epoch_id: int,
             epoch[name + "Utc"] = _utc(epoch[name])
         status = "EPOCH_FOUND"
 
+    if pin_block_hash:
+        # Detect a fork that replaced the numeric block while calls executed.
+        repeat = rpc.request("eth_getBlockByNumber", [block_tag, False])
+        if (type(repeat) is not dict or
+                type(repeat.get("hash")) is not str or
+                repeat["hash"].lower() != block_hash or
+                _hex_integer(repeat.get("number")) != block_number):
+            raise ChainReadError("pinned block reorged during chain inspection")
+
     now = time.time() if now is None else now
     return {
         "schema": "sse-onchain-inspection-v1", "status": status,
         "chainId": chain_id, "settlementAddress": contract,
-        "blockNumber": block_number, "blockTimestamp": block_timestamp,
+        "blockNumber": block_number, "blockHash": block_hash.lower() if pin_block_hash else None,
+        "blockHashPinned": bool(pin_block_hash), "blockTimestamp": block_timestamp,
         "blockTimestampUtc": _utc(block_timestamp), "localUnixTime": now,
         "localMinusBlockSeconds": round(now - block_timestamp, 3),
         "domainSeparatorMatches": True, "nextLeaseId": next_lease_id,
