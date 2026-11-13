@@ -24,10 +24,12 @@ class ChainCaptureBinding:
     provider: str
     block_number: int
     block_timestamp: int
+    block_hash: str | None = None
 
 
 def bind_capture_to_chain(rpc, scope: EvidenceScope, endpoint: str,
-                          expected_provider: str) -> ChainCaptureBinding:
+                          expected_provider: str, *,
+                          pin_block_hash: bool = False) -> ChainCaptureBinding:
     """Derive capture authorization from a read-only, same-block chain view.
 
     The caller MUST supply a trusted LocalRPC. A dishonest RPC can fabricate
@@ -46,10 +48,11 @@ def bind_capture_to_chain(rpc, scope: EvidenceScope, endpoint: str,
         raise ChainBindingError('expected provider address required')
 
     s = scope.normalized()
-    snapshot = inspect_chain(
-        rpc, s.settlement, s.lease_id, s.epoch_id,
-        expected_chain_id=s.chain_id, endpoint=endpoint,
-    )
+    inspection_kwargs = {"expected_chain_id": s.chain_id, "endpoint": endpoint}
+    if pin_block_hash:
+        inspection_kwargs["pin_block_hash"] = True
+    snapshot = inspect_chain(rpc, s.settlement, s.lease_id, s.epoch_id,
+                             **inspection_kwargs)
     if (type(snapshot) is not dict or
             snapshot.get('schema') != 'sse-onchain-inspection-v1' or
             snapshot.get('status') != 'EPOCH_FOUND' or
@@ -102,6 +105,13 @@ def bind_capture_to_chain(rpc, scope: EvidenceScope, endpoint: str,
             lease['provider'].lower() in allowed):
         raise ChainBindingError('committee includes duplicate or counterparty')
 
+    block_hash = snapshot.get('blockHash')
+    if pin_block_hash:
+        from sse_wp08d_provenance import valid_block_hash
+        if (snapshot.get('blockHashPinned') is not True or
+                not valid_block_hash(block_hash)):
+            raise ChainBindingError('missing canonical pinned block-hash provenance')
     return ChainCaptureBinding(VerificationContext(s, allowed),
                                lease['provider'].lower(),
-                               snapshot['blockNumber'], snapshot['blockTimestamp'])
+                               snapshot['blockNumber'], snapshot['blockTimestamp'],
+                               block_hash if pin_block_hash else None)
