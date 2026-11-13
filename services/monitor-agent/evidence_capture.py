@@ -43,18 +43,22 @@ def main() -> None:
     if args.rpc_url:
         from sse_chain_read import LocalRPC
         from sse_wp08c_chain_binding import bind_capture_to_chain
-        bound = bind_capture_to_chain(LocalRPC(args.rpc_url), scope, args.endpoint, args.provider)
+        rpc = LocalRPC(args.rpc_url)
+        bound = bind_capture_to_chain(rpc, scope, args.endpoint, args.provider,
+                                      pin_block_hash=True)
         context = bound.context
         provider = bound.provider
     else:
         context = VerificationContext(scope, frozenset({monitor}))
         provider = args.provider
+    archive = EvidenceArchive(args.archive)
+    extra = {'chain_binding': bound, 'rpc': rpc} if args.rpc_url else {}
     saved = capture_response(args.endpoint, Domain(args.chain_id, args.settlement),
                              provider, scope, monitor_key, context,
-                             EvidenceArchive(args.archive), timeout=args.timeout)
+                             archive, timeout=args.timeout, **extra)
     print(f'RAW observation captured: {saved.evidence_id} (new={saved.stored_new})')
     if args.rpc_url:
-        print(f'Chain-bound context read at block {bound.block_number}; trusted RPC, not finality proof.')
+        print(f'Monitor-signed RPC block anchor {bound.block_number} / {bound.block_hash}; not finality proof.')
     else:
         print('WARNING: authorization remains operator-supplied; use --rpc-url for chain binding.')
     print('Signed provider/monitor records verified; physical consumer delivery NOT proven.')
