@@ -170,7 +170,7 @@ def run(output_dir: Path) -> dict:
                 MNEMONIC, account_path=f"m/44'/60'/0'/0/{i}")
             if account.address.lower() != address:
                 raise AssertionError('Anvil account and test mnemonic disagree')
-            key_for[address] = account.key.hex()
+            key_for[address] = bytes(account.key).hex()
         consumer, provider = accounts[:2]
         candidates = accounts[2:7]
         outsider = accounts[7]
