@@ -2,6 +2,8 @@
 pragma solidity ^0.8.24;
 
 import {RSA2048EntropyVerifier} from "./RSA2048EntropyVerifier.sol";
+import {GlobalRosterMerkle} from "./GlobalRosterMerkle.sol";
+import {GlobalRosterSampler} from "./GlobalRosterSampler.sol";
 
 
 
@@ -12,6 +14,8 @@ contract OpenMonitorCommittee {
     // uniform sampling claim. Enrollment is permissionless but not Sybil-safe.
     uint256 public constant MAX_SNAPSHOT_SCAN = 64;
     uint256 public constant COMMITTEE_SIZE = 4;
+    uint256 public constant GLOBAL_SAMPLE_LIMIT = 10;
+    uint256 public constant GLOBAL_MERKLE_CAPACITY = 1 << 20;
     uint256 public constant DELAYED_ENTROPY_BLOCKS = 4;
     bytes32 public constant DELAYED_ENTROPY_DOMAIN = keccak256("SSEDelayedBlockEntropyV1");
     bytes32 public constant RSA_ENTROPY_DOMAIN = keccak256("SSERSAProofEntropyV1");
@@ -46,6 +50,9 @@ contract OpenMonitorCommittee {
     // A mutually exclusive, opt-in deterministic proof-verification mode.
     // The verifier is DEPLOYED by this pool, never arbitrary external code.
     RSA2048EntropyVerifier public rsaEntropyVerifier;
+    // Independent opt-in for global indexed election, compatible with any
+    // ONE entropy mode. Must be enabled before any candidate is registered.
+    bool public globalMerkleElectionEnabled;
     bool private entered;
 
     // Dense ACTIVE roster. Exited addresses are removed by swap-and-pop,
@@ -62,6 +69,12 @@ contract OpenMonitorCommittee {
     mapping(uint256 => uint256) private nextStandbyIndex;
     mapping(uint256 => uint256) public assignmentRequestedBlock;
     mapping(uint256 => bytes32) public snapshotCommitment;
+    // Updates are bounded to 20 levels, even for large active populations.
+    mapping(uint256 => bytes32) private globalTree;
+    mapping(uint256 => bytes32) public globalSnapshotRoot;
+    mapping(uint256 => uint256) public globalSnapshotCount;
+    mapping(uint256 => uint256) public pendingGlobalSeed;
+    mapping(uint256 => bool) public pendingGlobalSeedReady;
 
     error InvalidInput();
     error InvalidPhase();
@@ -69,6 +82,7 @@ contract OpenMonitorCommittee {
     error InsufficientCandidates();
     error TransferFailed();
     error InvalidEntropyProof();
+    error InvalidGlobalProof();
     event CandidateRegistered(address indexed account, uint256 bond);
     event ActiveCandidateRemoved(address indexed account, uint256 activeRemaining);
     event SnapshotWindowUsed(uint256 indexed requestId, uint256 startIndex,
@@ -78,6 +92,14 @@ contract OpenMonitorCommittee {
     event SettlementBound(address indexed settlement);
     event DelayedEntropyModeEnabled();
     event RSAProofEntropyModeEnabled(address indexed verifier, bytes32 modulusHash);
+    event GlobalMerkleElectionEnabled();
+    event GlobalRosterLeafUpdated(uint256 indexed index, address indexed account);
+    event GlobalRosterRootUpdated(bytes32 root, uint256 activeCount);
+    event GlobalEligibilityCommitted(uint256 indexed requestId, bytes32 root,
+                                     uint256 count, bytes32 requestCommitment);
+    event GlobalEntropySeedReady(uint256 indexed requestId, bytes32 seedHash);
+    event GlobalCommitteeProved(uint256 indexed requestId, bytes32 frozenRoot,
+                                uint256 sampled, uint256 validCandidates);
     event RSARequestCommitted(uint256 indexed requestId, bytes32 requestDigest,
                               bytes32 snapshotHash);
     event RSAProofEntropyApplied(uint256 indexed requestId, bytes32 requestDigest,
@@ -136,6 +158,21 @@ contract OpenMonitorCommittee {
         emit RSAProofEntropyModeEnabled(address(verifier), keccak256(publicModulus));
     }
 
+    /// @notice One-way global indexed election requires an initially empty
+    /// roster and a pre-binding choice; no retroactive, untracked balances.
+    /// @dev Merkle root is global, frozen per request; NOT proof of fair entropy.
+    function enableGlobalMerkleElection() external {
+        if (msg.sender != bootstrapper || settlement != address(0) ||
+            globalMerkleElectionEnabled || activeCandidates.length != 0)
+            revert Unauthorized();
+        globalMerkleElectionEnabled = true;
+        emit GlobalMerkleElectionEnabled();
+    }
+
+    function globalRosterRoot() external view returns (bytes32) {
+        return globalTree[1];
+    }
+
     modifier onlySettlement() {
         if (msg.sender != settlement || settlement == address(0)) revert Unauthorized();
         _;
@@ -149,8 +186,14 @@ contract OpenMonitorCommittee {
             c.everRegistered = true;
             ++totalRegistrations;
         }
+        if (globalMerkleElectionEnabled &&
+            activeCandidates.length >= GLOBAL_MERKLE_CAPACITY) revert InvalidInput();
         activeCandidates.push(msg.sender);
         activeIndexPlusOne[msg.sender] = activeCandidates.length;
+        if (globalMerkleElectionEnabled) {
+            _updateGlobalLeaf(activeCandidates.length - 1, msg.sender);
+            emit GlobalRosterRootUpdated(globalTree[1], activeCandidates.length);
+        }
         c.bond = msg.value;
         c.active = true;
         c.exitRequestedAt = 0;
@@ -186,9 +229,19 @@ contract OpenMonitorCommittee {
         }
         activeCandidates.pop();
         delete activeIndexPlusOne[account];
+        if (globalMerkleElectionEnabled) {
+            if (index != last) _updateGlobalLeaf(index, activeCandidates[index]);
+            _updateGlobalLeaf(last, address(0));
+            emit GlobalRosterRootUpdated(globalTree[1], activeCandidates.length);
+        }
         if (activeCandidates.length == 0 ||
             nextSnapshotCursor >= activeCandidates.length) nextSnapshotCursor = 0;
         emit ActiveCandidateRemoved(account, activeCandidates.length);
+    }
+
+    function _updateGlobalLeaf(uint256 index, address account) internal {
+        GlobalRosterMerkle.write(globalTree, index, account);
+        emit GlobalRosterLeafUpdated(index, account);
     }
 
     function withdrawBond() external {
@@ -216,6 +269,26 @@ contract OpenMonitorCommittee {
         r.status = RequestStatus.AwaitingRandomness;
         uint256 count = activeCandidates.length;
         if (count < COMMITTEE_SIZE) revert InsufficientCandidates();
+        if (globalMerkleElectionEnabled) {
+            // Exclude the two lease parties in O(1). Both are in the global
+            // registry at most once each and never count as eligible.
+            uint256 eligible = count;
+            if (activeIndexPlusOne[consumer] != 0) --eligible;
+            if (activeIndexPlusOne[provider] != 0) --eligible;
+            if (eligible < COMMITTEE_SIZE) revert InsufficientCandidates();
+            bytes32 root = globalTree[1];
+            if (root == bytes32(0)) revert InvalidPhase();
+            assignmentRequestedBlock[id] = block.number;
+            globalSnapshotRoot[id] = root;
+            globalSnapshotCount[id] = count;
+            bytes32 commitment = keccak256(abi.encode(
+                block.chainid, address(this), id, block.number, root, count
+            ));
+            snapshotCommitment[id] = commitment;
+            emit GlobalEligibilityCommitted(id, root, count, commitment);
+            emit AssignmentRequested(id, consumer, provider, count);
+            return id;
+        }
         uint256 scanned = count < MAX_SNAPSHOT_SCAN ? count : MAX_SNAPSHOT_SCAN;
         uint256 start = nextSnapshotCursor % count;
         for (uint256 i; i < scanned; ++i) {
@@ -313,6 +386,13 @@ contract OpenMonitorCommittee {
         Assignment storage r = assignments[id];
         if (r.status != RequestStatus.AwaitingRandomness ||
             block.timestamp > uint256(r.requestedAt) + randomnessTimeout) revert InvalidPhase();
+        if (globalMerkleElectionEnabled) {
+            if (pendingGlobalSeedReady[id]) revert InvalidPhase();
+            pendingGlobalSeed[id] = seed;
+            pendingGlobalSeedReady[id] = true;
+            emit GlobalEntropySeedReady(id, keccak256(abi.encode(seed)));
+            return;
+        }
         address[] memory roster = snapshots[id];
         uint256 length = roster.length;
         
@@ -334,11 +414,72 @@ contract OpenMonitorCommittee {
         emit CommitteeSelected(id, r.committee);
     }
 
+    /// @notice After seed fulfillment, anyone can prove the first at most ten
+    /// GLOBAL indexes from a deterministic partial Fisher-Yates permutation.
+    /// @dev The caller supplies EVERY drawn leaf in the exact derived order;
+    /// skipping an unfavorable result or substituting a candidate fails.
+    /// Post-request exits can reduce liveness; such candidates are skipped,
+    /// and <4 currently bonded active candidates fails closed.
+    function finalizeGlobalCommittee(
+        uint256 id, address[] calldata accounts, bytes32[][] calldata siblingPaths
+    ) external {
+        if (!globalMerkleElectionEnabled || !pendingGlobalSeedReady[id])
+            revert InvalidPhase();
+        Assignment storage r = assignments[id];
+        if (r.status != RequestStatus.AwaitingRandomness ||
+            block.timestamp > uint256(r.requestedAt) + randomnessTimeout)
+            revert InvalidPhase();
+        uint256 count = globalSnapshotCount[id];
+        uint256 drawCount = count < GLOBAL_SAMPLE_LIMIT ? count : GLOBAL_SAMPLE_LIMIT;
+        if (drawCount < COMMITTEE_SIZE || accounts.length != drawCount ||
+            siblingPaths.length != drawCount) revert InvalidInput();
+        uint256[] memory indexes = GlobalRosterSampler.draw(
+            pendingGlobalSeed[id], id, count, drawCount
+        );
+        bytes32 root = globalSnapshotRoot[id];
+        uint256 valid;
+        for (uint256 i; i < drawCount; ++i) {
+            address account = accounts[i];
+            if (!GlobalRosterMerkle.verify(root, indexes[i], account, siblingPaths[i]))
+                revert InvalidGlobalProof();
+            Candidate storage c = candidates[account];
+            // The historical root proves prior enrollment; current bond and
+            // activity must still hold before a candidate can be assigned.
+            if (account == r.consumer || account == r.provider ||
+                !c.active || c.bond < minimumBond) continue;
+            if (valid < COMMITTEE_SIZE) r.committee[valid] = account;
+            else standbyRosters[id].push(account);
+            ++valid;
+        }
+        if (valid < COMMITTEE_SIZE) revert InsufficientCandidates();
+        for (uint256 i; i < COMMITTEE_SIZE; ++i) {
+            ++candidates[r.committee[i]].activeAssignments;
+        }
+        r.status = RequestStatus.Assigned;
+        delete pendingGlobalSeedReady[id];
+        delete pendingGlobalSeed[id];
+        emit GlobalCommitteeProved(id, root, drawCount, valid);
+        emit CommitteeSelected(id, r.committee);
+    }
+
+    /// @notice Publish the first at most ten sampled indices for independent
+    /// indexer replay, without a caller-controlled choose-a-member option.
+    function globalDrawIndexes(uint256 id) external view returns (uint256[] memory) {
+        if (!globalMerkleElectionEnabled || !pendingGlobalSeedReady[id] ||
+            assignments[id].status != RequestStatus.AwaitingRandomness)
+            revert InvalidPhase();
+        uint256 n = globalSnapshotCount[id];
+        uint256 k = n < GLOBAL_SAMPLE_LIMIT ? n : GLOBAL_SAMPLE_LIMIT;
+        return GlobalRosterSampler.draw(pendingGlobalSeed[id], id, n, k);
+    }
+
     function expire(uint256 id) external {
         Assignment storage r = assignments[id];
         if (r.status != RequestStatus.AwaitingRandomness ||
             block.timestamp <= uint256(r.requestedAt) + randomnessTimeout) revert InvalidPhase();
-        _unlockSnapshot(id);
+        if (!globalMerkleElectionEnabled) _unlockSnapshot(id);
+        delete pendingGlobalSeedReady[id];
+        delete pendingGlobalSeed[id];
         r.status = RequestStatus.Expired;
         emit AssignmentExpired(id);
     }
