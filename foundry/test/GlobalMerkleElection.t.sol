@@ -272,5 +272,15 @@ contract GlobalMerkleElectionTest is Test {
         another.register{value: BOND}();
         vm.expectRevert(OpenMonitorCommittee.Unauthorized.selector);
         another.enableGlobalMerkleElection();
+        vm.prank(outsider);
+        another.requestExit();
+        vm.warp(block.timestamp + another.exitDelay() + 1);
+        vm.prank(outsider);
+        another.withdrawBond();
+        assertEq(another.candidateCount(), 0);
+        // Even after every candidate withdraws, enrollment history means
+        // the global tree has not tracked the complete prior mutation log.
+        vm.expectRevert(OpenMonitorCommittee.Unauthorized.selector);
+        another.enableGlobalMerkleElection();
     }
 }
