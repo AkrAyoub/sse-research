@@ -333,6 +333,25 @@ class EvidenceArchive:
         signers = verify_witnesses(witnesses, anchor, context, expected_provider, policy)
         return envelope, raw, anchor, witnesses, signers
 
+    def load_beacon_reported(self, evidence_id: str, context: VerificationContext,
+                             domain, expected_provider: str, rpc, policy,
+                             beacon, *, second_rpc=None):
+        """Fail-closed trusted Beacon REST view vs signed, witnessed raw evidence.
+
+        Beacon API flags are NOT an independently verified PoS finality proof.
+        A dishonest consensus REST server can lie; this never authorizes payout.
+        """
+        from sse_wp08f_beacon_finality import (LoopbackBeaconREST,
+                cross_check_reported_finality, BeaconFinalityError)
+        if not isinstance(beacon, LoopbackBeaconREST):
+            raise BeaconFinalityError('explicit loopback Beacon API verifier required')
+        envelope, raw, anchor, witnesses, signers = self.load_witnessed(
+            evidence_id, context, domain, expected_provider, rpc, policy)
+        checkpoint = beacon.get_reported_finalized_execution()
+        result = cross_check_reported_finality(
+            anchor, checkpoint, rpc, second_rpc=second_rpc)
+        return envelope, raw, anchor, witnesses, signers, result
+
     def export_witnessed(self, evidence_id: str, context: VerificationContext,
                          domain, expected_provider: str, rpc, policy) -> bytes:
         """Portable bounded source archive; authenticated by signatures, not disk."""
