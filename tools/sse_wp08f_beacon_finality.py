@@ -195,7 +195,8 @@ def cross_check_reported_finality(anchor: BlockAnchor,
         raise BeaconFinalityError("finalized-claim ancestry distance exceeds safety limit")
     if second_rpc is not None and (
             second_rpc is rpc or
-            getattr(second_rpc, "url", None) == getattr(rpc, "url", None)):
+            (getattr(second_rpc, "url", None) is not None and
+             getattr(second_rpc, "url", None) == getattr(rpc, "url", None))):
         raise BeaconFinalityError("second execution view must use a different RPC endpoint")
 
     for node in ((rpc,) if second_rpc is None else (rpc, second_rpc)):
