@@ -10,6 +10,9 @@ contract SSESettlement is EIP712 {
     uint8 private constant COMMITTEE_SIZE = 4;
     uint8 private constant QUORUM = 3;
     uint256 private constant MAX_EPOCHS = 64;
+    // Fixed pre-epoch confirmation window. Never shorten a replacement's
+    // opportunity to confirm via repeated permissionless rotation calls.
+    uint64 public constant MONITOR_CONFIRMATION_TIMEOUT = 1 hours;
 
     // Bits for N (no receipt), F (received but failed), S (fulfilled)
     uint8 private constant HISTORY_N = 1;
@@ -123,6 +126,7 @@ contract SSESettlement is EIP712 {
     mapping(uint256 => Lease) private leases;
     mapping(uint256 => mapping(uint256 => Epoch)) private epochs;
     mapping(uint256 => mapping(address => bool)) private confirmedMonitor;
+    mapping(uint256 => uint64) public monitorConfirmationDeadline;
     mapping(uint256 => mapping(uint256 => mapping(address => bool))) private voted;
     mapping(uint256 => mapping(bytes32 => bool)) private usedRequestHash;
     mapping(address => uint256) public withdrawable;
@@ -137,6 +141,8 @@ contract SSESettlement is EIP712 {
     event CommitteeAssignmentRequested(uint256 indexed leaseId, uint256 indexed assignmentId);
     event CommitteeAssigned(uint256 indexed leaseId, uint256 indexed assignmentId);
     event CommitteeBondsReleased(uint256 indexed leaseId);
+    event CommitteeSeatRotated(uint256 indexed leaseId, address indexed missing,
+                               address indexed replacement, uint64 nextDeadline);
     event LeaseCreated(uint256 indexed leaseId, address indexed consumer, address indexed provider, uint256 escrow);
     event ComputeProfileCommitted(uint256 indexed leaseId, bytes32 indexed profileHash);
     event LeaseAccepted(uint256 indexed leaseId);
@@ -297,6 +303,7 @@ contract SSESettlement is EIP712 {
         Lease storage lease = leases[leaseId];
         if (lease.state != LeaseState.Accepted || lease.monitors[0] != address(0)) revert InvalidState();
         lease.monitors = committeePool.getCommittee(lease.assignmentId);
+        _resetMonitorConfirmationDeadline(leaseId);
         emit CommitteeAssigned(leaseId, lease.assignmentId);
     }
 
@@ -315,6 +322,42 @@ contract SSESettlement is EIP712 {
             lease.state = LeaseState.Ready;
             emit CommitteeReady(leaseId);
         }
+    }
+
+    /// @notice Recover a pre-epoch lease if a selected monitor never confirms.
+    /// @dev Permissionless after one full confirmation window; replaces only the
+    /// first unconfirmed seat with the next eligible pre-shuffled standby.
+    /// Existing confirmation signatures and lease funds are untouched. This
+    /// cannot be invoked once the committee is Ready or an epoch has started.
+    function replaceNoShowMonitor(uint256 leaseId) external {
+        Lease storage lease = leases[leaseId];
+        if (lease.state != LeaseState.Accepted || lease.monitors[0] == address(0) ||
+            lease.nextEpochId != 0 || lease.monitorConfirmations >= COMMITTEE_SIZE)
+            revert InvalidState();
+        if (monitorConfirmationDeadline[leaseId] == 0 ||
+            block.timestamp <= monitorConfirmationDeadline[leaseId]) revert OutsideWindow();
+
+        for (uint256 i; i < COMMITTEE_SIZE; ++i) {
+            address missing = lease.monitors[i];
+            if (confirmedMonitor[leaseId][missing]) continue;
+            // Pool requires its original seed-determined standby order and
+            // enforces active-bond eligibility; never authorize arbitrary seats.
+            address replacement = committeePool.replaceUnconfirmed(lease.assignmentId, missing);
+            if (replacement == address(0) || confirmedMonitor[leaseId][replacement])
+                revert InvalidState();
+            lease.monitors[i] = replacement;
+            _resetMonitorConfirmationDeadline(leaseId);
+            emit CommitteeSeatRotated(leaseId, missing, replacement,
+                                      monitorConfirmationDeadline[leaseId]);
+            return;
+        }
+        revert InvalidState();
+    }
+
+    function _resetMonitorConfirmationDeadline(uint256 leaseId) internal {
+        uint256 deadline = block.timestamp + MONITOR_CONFIRMATION_TIMEOUT;
+        if (deadline > type(uint64).max) revert InvalidArgument();
+        monitorConfirmationDeadline[leaseId] = uint64(deadline);
     }
 
     function admitEpoch(uint256 leaseId, bytes32 requestHash)
