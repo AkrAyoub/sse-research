@@ -163,8 +163,8 @@ contract OpenMonitorCommittee {
     /// @dev Merkle root is global, frozen per request; NOT proof of fair entropy.
     function enableGlobalMerkleElection() external {
         if (msg.sender != bootstrapper || settlement != address(0) ||
-            globalMerkleElectionEnabled || activeCandidates.length != 0)
-            revert Unauthorized();
+            globalMerkleElectionEnabled || totalRegistrations != 0 ||
+            activeCandidates.length != 0) revert Unauthorized();
         globalMerkleElectionEnabled = true;
         emit GlobalMerkleElectionEnabled();
     }
