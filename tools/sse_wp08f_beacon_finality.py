@@ -213,9 +213,10 @@ def cross_check_reported_finality(anchor: BlockAnchor,
             expected_number = claimed.execution_block_number - step
             if hash_a != current_hash or number != expected_number:
                 raise BeaconFinalityError("execution header ancestry or block height mismatch")
-            height_hash, _, height_number, height_time = _rpc_header(
+            height_hash, height_parent, height_number, height_time = _rpc_header(
                 node, "eth_getBlockByNumber", [hex(expected_number), False])
-            if (height_hash != hash_a or height_number != number or height_time != ts):
+            if (height_hash != hash_a or height_parent != parent_hash or
+                    height_number != number or height_time != ts):
                 raise BeaconFinalityError("execution block not canonical at numeric height")
             if step == 0 and ts != claimed.execution_timestamp:
                 raise BeaconFinalityError("beacon-reported execution timestamp mismatch")
