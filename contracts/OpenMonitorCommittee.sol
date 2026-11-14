@@ -1,6 +1,8 @@
 // SPDX-License-Identifier: MIT
 pragma solidity ^0.8.24;
 
+import {RSA2048EntropyVerifier} from "./RSA2048EntropyVerifier.sol";
+
 
 
 
@@ -12,6 +14,7 @@ contract OpenMonitorCommittee {
     uint256 public constant COMMITTEE_SIZE = 4;
     uint256 public constant DELAYED_ENTROPY_BLOCKS = 4;
     bytes32 public constant DELAYED_ENTROPY_DOMAIN = keccak256("SSEDelayedBlockEntropyV1");
+    bytes32 public constant RSA_ENTROPY_DOMAIN = keccak256("SSERSAProofEntropyV1");
 
     enum RequestStatus { None, AwaitingRandomness, Assigned, Expired, Released }
     struct Candidate {
@@ -40,6 +43,9 @@ contract OpenMonitorCommittee {
     // Opt-in only before settlement binding: blocks the legacy source callback
     // and uses a future block hash. This is NOT an Ethereum VRF/finality proof.
     bool public delayedBlockEntropyEnabled;
+    // A mutually exclusive, opt-in deterministic proof-verification mode.
+    // The verifier is DEPLOYED by this pool, never arbitrary external code.
+    RSA2048EntropyVerifier public rsaEntropyVerifier;
     bool private entered;
 
     // Dense ACTIVE roster. Exited addresses are removed by swap-and-pop,
@@ -62,6 +68,7 @@ contract OpenMonitorCommittee {
     error Unauthorized();
     error InsufficientCandidates();
     error TransferFailed();
+    error InvalidEntropyProof();
     event CandidateRegistered(address indexed account, uint256 bond);
     event ActiveCandidateRemoved(address indexed account, uint256 activeRemaining);
     event SnapshotWindowUsed(uint256 indexed requestId, uint256 startIndex,
@@ -70,6 +77,11 @@ contract OpenMonitorCommittee {
     event BondWithdrawn(address indexed account, uint256 amount);
     event SettlementBound(address indexed settlement);
     event DelayedEntropyModeEnabled();
+    event RSAProofEntropyModeEnabled(address indexed verifier, bytes32 modulusHash);
+    event RSARequestCommitted(uint256 indexed requestId, bytes32 requestDigest,
+                              bytes32 snapshotHash);
+    event RSAProofEntropyApplied(uint256 indexed requestId, bytes32 requestDigest,
+                                bytes32 proofHash, uint256 derivedSeed);
     event EligibilitySnapshotCommitted(uint256 indexed requestId, bytes32 commitment,
                                        uint256 requestBlock, uint256 entropyBlock);
     event DelayedEntropyApplied(uint256 indexed requestId, uint256 entropyBlock,
@@ -106,9 +118,22 @@ contract OpenMonitorCommittee {
     /// VRF or other independent entropy for production global elections.
     function enableDelayedBlockEntropy() external {
         if (msg.sender != bootstrapper || settlement != address(0) ||
-            delayedBlockEntropyEnabled) revert Unauthorized();
+            delayedBlockEntropyEnabled || address(rsaEntropyVerifier) != address(0))
+            revert Unauthorized();
         delayedBlockEntropyEnabled = true;
         emit DelayedEntropyModeEnabled();
+    }
+
+    /// @notice One-way experimental RSA-root-verified mode, prior to wiring.
+    /// @dev RSA key setup, signer withholding, and global-window fairness are
+    /// NOT proven. Use only a vetted genuine RSA-2048 public modulus.
+    function enableRSAProofEntropy(bytes calldata publicModulus) external {
+        if (msg.sender != bootstrapper || settlement != address(0) ||
+            delayedBlockEntropyEnabled || address(rsaEntropyVerifier) != address(0))
+            revert Unauthorized();
+        RSA2048EntropyVerifier verifier = new RSA2048EntropyVerifier(publicModulus);
+        rsaEntropyVerifier = verifier;
+        emit RSAProofEntropyModeEnabled(address(verifier), keccak256(publicModulus));
     }
 
     modifier onlySettlement() {
@@ -212,16 +237,50 @@ contract OpenMonitorCommittee {
             emit EligibilitySnapshotCommitted(id, commitment, block.number,
                                               block.number + DELAYED_ENTROPY_BLOCKS);
         }
+        if (address(rsaEntropyVerifier) != address(0)) {
+            emit RSARequestCommitted(id, rsaRequestDigest(id), commitment);
+        }
         nextSnapshotCursor = (start + scanned) % count;
         emit SnapshotWindowUsed(id, start, scanned, count, snapshots[id].length);
         emit AssignmentRequested(id, consumer, provider, snapshots[id].length);
     }
 
-    /// @notice Legacy source-controlled path; disabled under delayed mode.
+    /// @notice Legacy source-controlled path; disabled in both proof modes.
     function fulfillRandomness(uint256 id, uint256 seed) external {
-        if (delayedBlockEntropyEnabled || msg.sender != randomnessSource)
-            revert Unauthorized();
+        if (delayedBlockEntropyEnabled || address(rsaEntropyVerifier) != address(0) ||
+            msg.sender != randomnessSource) revert Unauthorized();
         _selectSeededCommittee(id, seed);
+    }
+
+    /// @notice Domain-bound hash of the frozen eligible window for an RSA
+    /// proof operator. No Ethereum PoS finality or physical SLA attestation.
+    function rsaRequestDigest(uint256 id) public view returns (bytes32) {
+        bytes32 commitment = snapshotCommitment[id];
+        if (commitment == bytes32(0)) revert InvalidPhase();
+        return keccak256(abi.encode(
+            RSA_ENTROPY_DOMAIN, block.chainid, address(this), id,
+            assignmentRequestedBlock[id], commitment
+        ));
+    }
+
+    /// @notice Any relayer can submit a canonical RSA exponentiation proof.
+    /// @dev Excludes arbitrary-seed substitution and alternate proof encodings,
+    /// but private-key operator can withhold, with no deterministic liveness.
+    function fulfillRSAProofEntropy(uint256 id, bytes calldata proof) external {
+        RSA2048EntropyVerifier verifier = rsaEntropyVerifier;
+        if (address(verifier) == address(0)) revert InvalidPhase();
+        Assignment storage r = assignments[id];
+        if (r.status != RequestStatus.AwaitingRandomness ||
+            block.timestamp > uint256(r.requestedAt) + randomnessTimeout)
+            revert InvalidPhase();
+        bytes32 digest = rsaRequestDigest(id);
+        if (!verifier.verify(digest, proof)) revert InvalidEntropyProof();
+        bytes32 proofHash = keccak256(proof);
+        uint256 seed = uint256(keccak256(abi.encode(
+            RSA_ENTROPY_DOMAIN, digest, proofHash
+        )));
+        _selectSeededCommittee(id, seed);
+        emit RSAProofEntropyApplied(id, digest, proofHash, seed);
     }
 
     /// @notice Anyone may finalize once the FUTURE target block has been mined.
