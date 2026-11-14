@@ -103,10 +103,9 @@ class WitnessValidationTests(unittest.TestCase):
             signed = [self.signed()[0], sign_witness(self.a, key, self.rpc)]
             with self.assertRaises(WitnessError):
                 verify_witnesses(signed, self.a, self.ctx, PROVIDER, self.policy)
+        wrong_policy = WitnessPolicy(frozenset({MONITOR, WITNESSES[0]}), 2)
         with self.assertRaises(WitnessError):
-            WitnessPolicy(frozenset({MONITOR, WITNESSES[0]}), 2) if False else verify_witnesses(
-                self.signed(), self.a, self.ctx, PROVIDER,
-                WitnessPolicy(frozenset({MONITOR, WITNESSES[0]}), 2))
+            verify_witnesses(self.signed(), self.a, self.ctx, PROVIDER, wrong_policy)
 
     def test_checkpoint_tampering_or_conflicting_hash_rejected(self):
         signed = self.signed()
