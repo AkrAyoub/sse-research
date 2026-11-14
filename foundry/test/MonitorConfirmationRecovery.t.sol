@@ -43,7 +43,7 @@ contract MonitorConfirmationRecoveryTest is Test {
         pool.fulfillRandomness(1, 0xC0FFEE);
         settlement.finalizeMonitorCommittee(leaseId);
         selected = pool.getCommittee(1);
-        assertEq(pool.standbyRemaining(1), 1);
+        assertEq(pool.standbyRemaining(1), pool.candidateCount() - 4);
         assertEq(settlement.monitorConfirmationDeadline(leaseId),
                  block.timestamp + settlement.MONITOR_CONFIRMATION_TIMEOUT());
     }
@@ -194,6 +194,43 @@ contract MonitorConfirmationRecoveryTest is Test {
         settlement.withdraw();
         assertEq(consumer.balance, balanceBefore + 25);
         assertEq(address(settlement).balance, 0);
+    }
+
+    function testFirstInactiveStandbyIsSkippedByFixedSeedOrder() public {
+        address[] memory seededRoster = new address[](7);
+        for (uint256 i; i < 5; ++i) seededRoster[i] = candidates[i];
+        for (uint256 i = 5; i < 7; ++i) {
+            address monitor = address(uint160(0xC100 + i));
+            seededRoster[i] = monitor;
+            vm.deal(monitor, 2 ether);
+            vm.prank(monitor);
+            pool.register{value: MIN_BOND}();
+        }
+        (uint256 leaseId, address[4] memory selected) = _fundAndAssign();
+        _confirmThree(leaseId, selected);
+
+        // Mirror the immutable public-seed Fisher-Yates ordering. We do NOT
+        // permit a caller to pick the standby candidate it prefers.
+        for (uint256 i; i < seededRoster.length; ++i) {
+            uint256 j = i + uint256(keccak256(abi.encode(uint256(0xC0FFEE), uint256(1), i)))
+                % (seededRoster.length - i);
+            (seededRoster[i], seededRoster[j]) = (seededRoster[j], seededRoster[i]);
+        }
+        for (uint256 i; i < 4; ++i) assertEq(selected[i], seededRoster[i]);
+        address firstStandby = seededRoster[4];
+        address secondStandby = seededRoster[5];
+        vm.prank(firstStandby);
+        pool.requestExit();
+        vm.warp(settlement.monitorConfirmationDeadline(leaseId) + 1);
+        settlement.replaceNoShowMonitor(leaseId);
+        SSESettlement.Lease memory recovered = settlement.getLease(leaseId);
+        assertEq(recovered.monitors[3], secondStandby);
+        assertEq(recovered.monitorConfirmations, 3);
+        assertEq(pool.standbyRemaining(1), 1);
+        vm.prank(secondStandby);
+        settlement.confirmMonitorAssignment(leaseId);
+        assertEq(uint8(settlement.getLease(leaseId).state),
+                 uint8(SSESettlement.LeaseState.Ready));
     }
 
     function testPostRecoveryReleasesExactlyCurrentFourBonds() public {
