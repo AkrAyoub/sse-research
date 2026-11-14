@@ -4,7 +4,7 @@
 
 ## Crucial separation
 
-`n` eligible bonded identities across the network need **not** equal `k` monitors selected for a particular lease. Nor does `q` votes out of `k` establish physical truth by itself. The current implementation has a lifetime `MAX_IDENTITIES=32`, fixed `k=4`, `q=3`, and an authorized randomness source. This is a *reproducible prototype baseline*, not the final permissionless/scalable solution.
+`n` eligible bonded identities across the network need **not** equal `k` monitors selected for a particular lease. Nor does `q` votes out of `k` establish physical truth by itself. The **original WP-08 baseline** had lifetime `MAX_IDENTITIES=32`, fixed `k=4`, `q=3` and an authorized randomness source. The later **draft WP-09B** implementation (stacked PR #23, not merged) replaces that lifetime cap with an O(1)-removable active roster and a bounded 64-entry rotating candidate window. This is a gas-bounded *window-sampling* research prototype, **not** globally uniformly random selection, Sybil-resistant membership or final trusted-VRF election. `k=4`, `q=3` and the original authorized randomness source remain. The older baseline is retained as research history.
 
 ## R3 target requirements and acceptance measurements
 
@@ -16,6 +16,13 @@
 6. **Correlated partitions and Byzantine behavior**: randomized and adversarial experiments where multiple monitors observe the same incorrect or missing network information. Distinct addresses are not assumed independent organizations.
 7. **Reward mechanism**: avoid rewarding truthful-looking but false physical assertions as if objective fulfillment were proven. Pay for verifiably submitted observations and/or defined duties, with incentive claims clearly separated from fact truth.
 8. **Scalability measurements**: candidate count, gas for register/exit/select, active leases, assignment latency, nonresponse rate, distribution of monitor selections and failure recovery time; compare with fixed 4-of-3 baseline.
+
+## WP-09B incremental implementation (draft, 2026-11-14)
+
+- Implemented: no 32-identity lifetime cap, dense active set with swap-and-pop exit, rejoin after delayed withdrawal, O(64) bounded rolling assignment snapshots and gas-bounded seed fulfillment, while preserving four selected monitors and WP09A no-show recovery.
+- Explicitly **not implemented**: globally uniform randomness across all active candidates, independent VRF/consensus entropy, immutable global eligibility commitments, anti-Sybil guarantees, dynamic k/q or independent third-party operators. Membership churn and front-running can predictably change which candidates are in a rolling window.
+- Client API migration: `candidateCount()` and `candidateAt()` now enumerate only **currently active** entries; historical distinct-account count is `totalRegistrations()` and historical identities can be reconstructed from event logs.
+- Evidence: [stacked draft PR #23](https://github.com/AkrAyoub/sse-research/pull/23) and `R3_WP09B_BOUNDED_ACTIVE_REGISTRY.md`. Acceptance remains conditional on GitHub CI plus subsequent fairness/adversarial experiments.
 
 ## Dependencies retained elsewhere
 
