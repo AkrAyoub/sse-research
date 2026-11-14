@@ -23,13 +23,13 @@ Previously, if three selected monitors confirmed and the fourth did not, the lea
 - **Before epoch admission:** `monitorConfirmations == 4` is still required, even if the selected remaining three agree with each other.
 - **No payment via recovery:** rotation does not admit an epoch, create a monitor vote, validate a provider response, change escrow, transfer ETH or authorize a penalty/reward.
 - **No early or repeated forced rotation:** the deadline must expire for each seat being replaced; a newly substituted monitor receives a full confirmation chance.
-- **No third-party seat selection:** only the original seed permutation determines replacement order. The settlement chooses the first *unconfirmed* seat, never a confirmed monitor.
+- **No third-party seat selection:** only the original seed permutation determines replacement order. The settlement chooses the next *unconfirmed* seat in round-robin order, never a confirmed monitor.
 - **Bond conservation:** every selected member holds one active assignment lock; removed no-shows lose that assignment lock, new members gain it, and a finalized release decrements current locks once.
 - **No downgrade of monitoring quorum or SLA truth:** this is a pre-epoch availability mechanism, not a proof that a physical workload succeeded.
 
 ## Reproduction and tests
 
-`foundry/test/MonitorConfirmationRecovery.t.sol` covers the 3-of-4-to-4-of-4 recovery flow, exact deadline boundary and unauthorized direct pool calls; restored epoch eligibility; re-confirmation requirements; full renewed deadline; exhausted and inactive standbys; deterministic skipping of an exited standby among seven candidates; consumer abort/refund and bond lock cleanup.
+`foundry/test/MonitorConfirmationRecovery.t.sol` covers the 3-of-4-to-4-of-4 recovery flow, exact deadline boundary and unauthorized direct pool calls; restored epoch eligibility; re-confirmation requirements; full renewed deadline; exhausted and inactive standbys; deterministic skipping of an exited standby among seven candidates; round-robin replacement of two different missing seats; consumer abort/refund and bond lock cleanup.
 
 The existing real Anvil marketplace integration `tools/sse_wp08c_live_marketplace.py` now follows the same flow: request marketplace resource → fund lease → select 4 → only 3 confirm → verify Accepted/not Ready → wait 1 hour of **simulated Anvil chain time** → replace missing seat with original seeded standby via outsider → replacement confirms → admit epoch → provider/monitor signed HTTP capture → block anchor/witnesses/replica → fork/finality-report negative tests. The Anvil clock is not an honest wall-clock oracle.
 
