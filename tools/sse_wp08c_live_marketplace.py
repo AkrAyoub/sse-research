@@ -344,6 +344,40 @@ def run(output_dir: Path) -> dict:
         if replicated_raw != raw_bytes or set(replica_signers) != set(signers):
             raise AssertionError('replicated archive cannot independently reverify evidence')
 
+        # WP08F: Anvil has no consensus client. Simulate a trusted REST
+        # "finalized" claim from the current Anvil head to exercise REAL EL
+        # ancestry walks; this is NOT a validated beacon consensus proof.
+        from sse_wp08f_beacon_finality import (
+            BeaconReportedFinalizedExecution, BeaconFinalityError,
+            cross_check_reported_finality)
+        rpc.request('evm_mine', [])
+        el_head = rpc.request('eth_getBlockByNumber', ['latest', False])
+        simulated_claim = BeaconReportedFinalizedExecution(
+            '0x' + 'b1' * 32, 1024, int(el_head['number'], 16),
+            el_head['hash'].lower(), int(el_head['timestamp'], 16))
+        finality_guard = cross_check_reported_finality(pinned, simulated_claim, rpc)
+        if finality_guard.ancestry_depth < 1 or finality_guard.pos_finality_proven:
+            raise AssertionError('Anvil ancestry test accidentally asserted consensus finality')
+
+        class MalformedPeer:
+            # Not a second node: a synthetic RPC fork-disagreement injector.
+            url = 'http://127.0.0.1:65000'
+
+            def request(self, method, params):
+                result = rpc.request(method, params)
+                if (method == 'eth_getBlockByNumber' and
+                        params[0] == hex(pinned.block_number)):
+                    return {**result, 'hash': '0x' + 'ff' * 32}
+                return result
+
+        try:
+            cross_check_reported_finality(
+                pinned, simulated_claim, rpc, second_rpc=MalformedPeer())
+        except BeaconFinalityError:
+            pass
+        else:
+            raise AssertionError('divergent execution RPC was incorrectly accepted')
+
         bad_env = {**os.environ, 'SSE_WP08B_MONITOR_KEY': '0x' + key_for[outsider]}
         _run_cli(capture_cli, bad_env, should_succeed=False)
         if archive.count() != 1:
@@ -376,6 +410,12 @@ def run(output_dir: Path) -> dict:
                 pass
             else:
                 raise AssertionError('witness quorum incorrectly overrode a chain reorg')
+        try:
+            cross_check_reported_finality(pinned, simulated_claim, rpc)
+        except BeaconFinalityError:
+            pass
+        else:
+            raise AssertionError('consensus-claim simulation accepted a reverted execution chain')
 
         summary = {
             'schema': 'sse-wp08c-live-marketplace-v1', 'status': 'PASS',
@@ -394,6 +434,10 @@ def run(output_dir: Path) -> dict:
             'signedBundleReplicaVerified': True,
             'witnessRPCIndependenceProven': False,
             'consensusFinalityProven': False,
+            'mockBeaconExecutionAncestryChecked': True,
+            'mockConflictingExecutionPeerRejected': True,
+            'simulatedBeaconFinalityOnly': True,
+            'beaconBlsFinalityVerified': False,
             'remoteReplicaValidated': False,
             'authorizationReadFromChainSnapshot': True,
             'independentOperatingSystems': False, 'separateLocalProcesses': True,
