@@ -180,6 +180,10 @@ def run(output_dir: Path) -> dict:
                        min_bond, 86400, 3600)
         settlement = _deploy(rpc, consumer, 'SSESettlement', pool)
         board = _deploy(rpc, consumer, 'OpenResourceBoard')
+        # R3 WP09C: one-way opt-in must precede the binding of settlement.
+        tx_hashes.append(_send(
+            rpc, consumer, pool, _calldata('enableDelayedBlockEntropy()')
+        )['transactionHash'])
         for contract, data in (
             (pool, _calldata('bindSettlement(address)', settlement)),
             (settlement, _calldata('bindResourceBoard(address)', board)),
@@ -230,9 +234,34 @@ def run(output_dir: Path) -> dict:
 
         tx_hashes.append(_send(rpc, provider, settlement,
                                _calldata('acceptLease(uint256)', 1))['transactionHash'])
+        # The eligible roster is already committed by the pool BEFORE the
+        # future entropy block exists; anyone can later fulfill the request.
+        # Anvil is a LOCAL test chain: its mined block hash is not secure VRF
+        # entropy, PoS finality, or independent proposer unpredictability.
+        assignment_id = lease['assignmentId']
+        assignment_block_hex = rpc.request('eth_call', [
+            {'to': pool,
+             'data': _calldata('assignmentRequestedBlock(uint256)', assignment_id)},
+            'latest'])
+        assignment_block = int(assignment_block_hex, 16)
+        snapshot_hash = rpc.request('eth_call', [
+            {'to': pool,
+             'data': _calldata('snapshotCommitment(uint256)', assignment_id)},
+            'latest'])
+        if snapshot_hash == '0x' + '00' * 32:
+            raise AssertionError('eligible snapshot was not committed before entropy')
+        entropy_target = assignment_block + 4
+        current_block = int(rpc.request('eth_blockNumber', []), 16)
+        for _ in range(max(0, entropy_target + 1 - current_block)):
+            rpc.request('evm_mine', [])
+        future_block = rpc.request('eth_getBlockByNumber',
+                                   [hex(entropy_target), False])
+        if not future_block or int(future_block['number'], 16) != entropy_target:
+            raise AssertionError('future entropy block is unavailable')
         tx_hashes.append(_send(
-            rpc, consumer, pool, _calldata('fulfillRandomness(uint256,uint256)',
-                                          lease['assignmentId'], 0xC0FFEE))['transactionHash'])
+            rpc, outsider, pool,
+            _calldata('fulfillDelayedBlockEntropy(uint256)', assignment_id)
+        )['transactionHash'])
         tx_hashes.append(_send(rpc, consumer, settlement,
                                _calldata('finalizeMonitorCommittee(uint256)', 1))['transactionHash'])
         assigned = inspect_chain(rpc, settlement, 1, 0, endpoint=endpoint)['lease']['monitors']
@@ -455,6 +484,11 @@ def run(output_dir: Path) -> dict:
             'selectedMonitors': assigned, 'captureMonitor': first_monitor,
             'originalNoShowMonitor': no_show_monitor,
             'noShowReplacedAfterTimeout': True,
+            'futureBlockEntropyApplied': True,
+            'snapshotHashCommittedBeforeEntropy': snapshot_hash,
+            'entropyBlockNumber': entropy_target,
+            'futureBlockProposerBiasUnresolved': True,
+            'globalSelectionUniformityProven': False,
             'threeOfFourStillBlocksEpochAdmission': True,
             'replacementNeededFreshMonitorConfirmation': True,
             'provider': provider, 'evidenceId': evidence_id,
