@@ -296,6 +296,54 @@ def run(output_dir: Path) -> dict:
                 not raw_bytes):
             raise AssertionError('stored HTTP response/monitor signatures or raw mapping mismatch')
 
+        # WP08E: TWO OTHER signing keys witness the same historical block in
+        # separate CLI processes. Both currently query one lab Anvil RPC;
+        # key separation is proven, independent consensus finality is NOT.
+        from sse_wp08e_witness import WitnessPolicy, WitnessError
+        witness_addresses = accounts[8:10]
+        policy = WitnessPolicy(frozenset(witness_addresses), 2)
+        anchor_file = output_dir / 'snapshot_anchor.json'
+        anchor_file.write_text(json.dumps(pinned.fields(), sort_keys=True) + '\\n',
+                               encoding='ascii')
+        witness_envelopes = []
+        for witness_index, witness_address in enumerate(witness_addresses, start=1):
+            witness_file = output_dir / f'witness_{witness_index}.json'
+            witness_env = {**os.environ,
+                           'SSE_WP08E_WITNESS_KEY': '0x' + key_for[witness_address]}
+            witness_output = _run_cli(
+                [sys.executable,
+                 str(ROOT / 'services/witness-agent/checkpoint_witness.py'),
+                 '--rpc-url', rpc.url, '--anchor', str(anchor_file),
+                 '--output', str(witness_file)],
+                witness_env, should_succeed=True)
+            if 'Not verified Ethereum consensus finality' not in witness_output:
+                raise AssertionError('independent witness CLI did not disclaim finality')
+            witness_envelopes.append(json.loads(witness_file.read_text(encoding='ascii')))
+        if not archive.store_witnesses(evidence_id, bound.context,
+                                       Domain(CHAIN_ID, settlement), provider,
+                                       rpc, policy, witness_envelopes):
+            raise AssertionError('expected new independent checkpoint signatures')
+        _, raw_verified, _, stored_witnesses, signers = archive.load_witnessed(
+            evidence_id, bound.context, Domain(CHAIN_ID, settlement), provider,
+            rpc, policy)
+        if (raw_verified != raw_bytes or len(stored_witnesses) != 2 or
+                set(signers) != set(witness_addresses)):
+            raise AssertionError('witness quorum did not bind the actual raw HTTP evidence')
+        bundle = archive.export_witnessed(
+            evidence_id, bound.context, Domain(CHAIN_ID, settlement), provider,
+            rpc, policy)
+        (output_dir / 'portable_evidence_bundle.json').write_bytes(bundle)
+        replica = EvidenceArchive(output_dir / 'replica_evidence.sqlite')
+        if not replica.import_witnessed(
+                bundle, bound.context, Domain(CHAIN_ID, settlement), provider,
+                rpc, policy):
+            raise AssertionError('verified replica import was not new')
+        _, replicated_raw, _, _, replica_signers = replica.load_witnessed(
+            evidence_id, bound.context, Domain(CHAIN_ID, settlement), provider,
+            rpc, policy)
+        if replicated_raw != raw_bytes or set(replica_signers) != set(signers):
+            raise AssertionError('replicated archive cannot independently reverify evidence')
+
         bad_env = {**os.environ, 'SSE_WP08B_MONITOR_KEY': '0x' + key_for[outsider]}
         _run_cli(capture_cli, bad_env, should_succeed=False)
         if archive.count() != 1:
@@ -319,6 +367,15 @@ def run(output_dir: Path) -> dict:
             pass
         else:
             raise AssertionError('reorged evidence snapshot was not rejected')
+        for local_archive in (archive, replica):
+            try:
+                local_archive.load_witnessed(evidence_id, bound.context,
+                                             Domain(CHAIN_ID, settlement),
+                                             provider, rpc, policy)
+            except SnapshotReorganized:
+                pass
+            else:
+                raise AssertionError('witness quorum incorrectly overrode a chain reorg')
 
         summary = {
             'schema': 'sse-wp08c-live-marketplace-v1', 'status': 'PASS',
@@ -332,6 +389,12 @@ def run(output_dir: Path) -> dict:
             'monitorSignedBlockHash': pinned.block_hash,
             'monitorSignedBlockNumber': pinned.block_number,
             'reorgInvalidatesAnchoredRetrieval': True,
+            'witnessSigners': list(signers), 'witnessQuorum': 2,
+            'externalCheckpointSignaturesVerified': True,
+            'signedBundleReplicaVerified': True,
+            'witnessRPCIndependenceProven': False,
+            'consensusFinalityProven': False,
+            'remoteReplicaValidated': False,
             'authorizationReadFromChainSnapshot': True,
             'independentOperatingSystems': False, 'separateLocalProcesses': True,
             'proofOfFinality': False, 'consumerDeliveryProven': False,
