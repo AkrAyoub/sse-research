@@ -689,8 +689,7 @@ contract SSESettlement is EIP712 {
             withdrawable[lease.consumer] += vrfFeeWei;
             emit VrfFeeRefunded(leaseId, lease.consumer, vrfFeeWei);
         }
-        if (address(randomnessAdapter) != address(0) &&
-            lease.monitors[0] == address(0)) {
+        if (lease.monitors[0] == address(0)) {
             // No committee has been handed to settlement. Release any
             // pending snapshots or pre-finalization selected bond locks.
             // Pool call is atomic with this closure and refund accounting.

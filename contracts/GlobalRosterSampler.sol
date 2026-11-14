@@ -2,7 +2,7 @@
 pragma solidity ^0.8.24;
 
 /// @notice Partial Fisher-Yates draw of distinct GLOBAL active-roster indexes.
-/// @dev O(k^2), k <= 10, independent of global roster size. Seed quality is
+/// @dev O(k^2), k <= 40, independent of global roster size. Seed quality is
 /// inherited from the selected entropy mode; keccak modulo has tiny bias.
 /// With a fixed root and no post-request exits, the ordered first 4 valid
 /// parties follow a uniform-without-replacement draw under ideal seed output.
@@ -21,7 +21,7 @@ library GlobalRosterSampler {
     function draw(uint256 seed, uint256 requestId, uint256 rosterSize, uint256 count)
         internal pure returns (uint256[] memory results)
     {
-        if (rosterSize < count || count > 10 || count == 0) revert InvalidDraw();
+        if (rosterSize < count || count > 40 || count == 0) revert InvalidDraw();
         results = new uint256[](count);
         uint256[] memory keys = new uint256[](count);
         uint256[] memory values = new uint256[](count);
