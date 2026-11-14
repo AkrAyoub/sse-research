@@ -68,7 +68,9 @@ contract BoundedActiveRegistryTest is Test {
             assertEq(locked, 0);
             assertTrue(active);
         }
+        uint256 fulfillStart = gasleft();
         pool.fulfillRandomness(1, 0xD00D);
+        assertLt(fulfillStart - gasleft(), 8_500_000);
         assertEq(pool.snapshotSize(1), 0);
         assertEq(pool.standbyRemaining(1), 60);
         address[4] memory selected = pool.getCommittee(1);
@@ -225,6 +227,21 @@ contract BoundedActiveRegistryTest is Test {
         assertEq(pool.nextSnapshotCursor(), 0);
         assertEq(settlement.nextLeaseId(), 1);
         assertEq(address(settlement).balance, 0);
+    }
+
+    function testWindowCursorNormalizesWhenRosterShrinksFrom65To64() public {
+        _register(65);
+        _lease();
+        assertEq(pool.nextSnapshotCursor(), 64);
+        // The 65th candidate was not snapshotted; it may exit freely.
+        vm.prank(_candidate(64));
+        pool.requestExit();
+        assertEq(pool.candidateCount(), 64);
+        assertEq(pool.activeSlot(_candidate(64)), 0);
+        assertEq(pool.nextSnapshotCursor(), 0);
+        _lease();
+        assertEq(pool.snapshotSize(2), 64);
+        assertEq(pool.nextSnapshotCursor(), 0);
     }
 
     function testWindowCursorCannotBeAdvancedByFailedRequest() public {
