@@ -65,8 +65,8 @@ contract RSA2048EntropyProofTest is Test {
         bytes memory differentEncoding = new bytes(256);
         uint256 carry;
         for (uint256 i = 256; i > 0; --i) {
-            uint256 value = uint8(STATIC_PROOF[i - 1]) +
-                uint8(LAB_MODULUS[i - 1]) + carry;
+            uint256 value = uint256(uint8(STATIC_PROOF[i - 1])) +
+                uint256(uint8(LAB_MODULUS[i - 1])) + carry;
             differentEncoding[i - 1] = bytes1(uint8(value));
             carry = value >> 8;
         }
