@@ -11,6 +11,7 @@ All network interactions are loopback-only for this laboratory increment.
 from __future__ import annotations
 
 import json
+import base64
 from contextlib import closing
 import math
 import secrets
@@ -171,6 +172,14 @@ class EvidenceArchive:
                     monitor_envelope TEXT NOT NULL,
                     UNIQUE(chain_id, settlement, lease_id, epoch_id, monitor, nonce)
                 );
+                CREATE TABLE IF NOT EXISTS chain_anchors (
+                    evidence_id TEXT PRIMARY KEY REFERENCES records(evidence_id),
+                    anchor_envelope TEXT NOT NULL
+                );
+                CREATE TABLE IF NOT EXISTS witness_quorums (
+                    evidence_id TEXT PRIMARY KEY REFERENCES chain_anchors(evidence_id),
+                    witness_envelopes TEXT NOT NULL
+                );
             ''')
 
     def _db(self) -> sqlite3.Connection:
@@ -180,7 +189,8 @@ class EvidenceArchive:
         return db
 
     def insert(self, envelope: dict, raw_payload: bytes, context: VerificationContext,
-               domain, expected_provider: str) -> tuple[str, bool]:
+               domain, expected_provider: str, *,
+               anchor_envelope: dict | None = None) -> tuple[str, bool]:
         """Re-authenticate BOTH provider and monitor before committing the bytes."""
         item = verify_observation(envelope, context)
         if not verify_payload(item.record, raw_payload):
@@ -194,6 +204,12 @@ class EvidenceArchive:
         key = (str(scope.chain_id), scope.settlement.lower(), str(scope.lease_id),
                str(scope.epoch_id), item.signer.lower(), item.record.nonce)
         serialized = json.dumps(envelope, sort_keys=True, separators=(',', ':'), ensure_ascii=True)
+        anchor_json = None
+        if anchor_envelope is not None:
+            from sse_wp08d_provenance import verify_anchor
+            verify_anchor(anchor_envelope, context, item.evidence_id, item.signer)
+            anchor_json = json.dumps(anchor_envelope, sort_keys=True,
+                                     separators=(',', ':'), ensure_ascii=True)
         with closing(self._db()) as db:
             try:
                 db.execute('BEGIN IMMEDIATE')
@@ -203,11 +219,20 @@ class EvidenceArchive:
                 if old is not None:
                     if old != (item.evidence_id, raw_payload, serialized):
                         raise EvidenceReplay('nonce reused with different committed evidence')
+                    if anchor_json is not None:
+                        previous = db.execute(
+                            'SELECT anchor_envelope FROM chain_anchors WHERE evidence_id=?',
+                            (item.evidence_id,)).fetchone()
+                        if previous != (anchor_json,):
+                            raise EvidenceReplay('duplicate evidence has different/missing snapshot anchor')
                     db.execute('COMMIT')
                     return item.evidence_id, False
                 db.execute('''INSERT INTO records(evidence_id,chain_id,settlement,lease_id,
                               epoch_id,monitor,nonce,provider_raw,monitor_envelope)
                               VALUES(?,?,?,?,?,?,?,?,?)''', (item.evidence_id, *key, raw_payload, serialized))
+                if anchor_json is not None:
+                    db.execute('INSERT INTO chain_anchors(evidence_id,anchor_envelope) VALUES(?,?)',
+                               (item.evidence_id, anchor_json))
                 db.execute('COMMIT')
                 return item.evidence_id, True
             except Exception:
@@ -231,6 +256,168 @@ class EvidenceArchive:
             raise EvidenceError('archived provider and monitor response hashes disagree')
         return envelope, row[1]
 
+    def load_anchored(self, evidence_id: str, context: VerificationContext,
+                      domain, expected_provider: str, rpc) -> tuple[dict, bytes, object]:
+        """Reverify three signatures (provider, observation, snapshot) and RPC chain.
+
+        Strict: old WP08B archive rows without a signed anchor are rejected.
+        A local trusted RPC can fabricate history; this is not a finality proof.
+        """
+        from sse_wp08d_provenance import (verify_anchor, check_canonical_snapshot,
+                                          ProvenanceError)
+        envelope, raw = self.load(evidence_id, context, domain, expected_provider)
+        verified = verify_observation(envelope, context)
+        with closing(self._db()) as db:
+            row = db.execute('SELECT anchor_envelope FROM chain_anchors WHERE evidence_id=?',
+                             (evidence_id,)).fetchone()
+        if row is None:
+            raise ProvenanceError('evidence has no signed block-snapshot anchor')
+        try:
+            anchor_envelope = json.loads(row[0])
+        except (TypeError, ValueError) as exc:
+            raise ProvenanceError('invalid stored anchor JSON') from exc
+        anchor = verify_anchor(anchor_envelope, context, evidence_id, verified.signer)
+        check_canonical_snapshot(rpc, anchor)
+        return envelope, raw, anchor
+
+    def store_witnesses(self, evidence_id: str, context: VerificationContext,
+                        domain, expected_provider: str, rpc, policy,
+                        envelopes: list[dict]) -> bool:
+        """Recheck archived data and external witness quorum, then persist immutably.
+
+        This is only a signed RPC *view* endorsement, NOT consensus finality.
+        """
+        from sse_wp08e_witness import verify_witnesses, WitnessError
+        _, _, anchor = self.load_anchored(evidence_id, context, domain,
+                                          expected_provider, rpc)
+        verify_witnesses(envelopes, anchor, context, expected_provider, policy)
+        ordered = sorted(envelopes, key=lambda e: e['signer'])
+        serialized = json.dumps(ordered, sort_keys=True, separators=(',', ':'),
+                                ensure_ascii=True, allow_nan=False)
+        with closing(self._db()) as db:
+            try:
+                db.execute('BEGIN IMMEDIATE')
+                previous = db.execute('SELECT witness_envelopes FROM witness_quorums '
+                                      'WHERE evidence_id=?', (evidence_id,)).fetchone()
+                if previous is not None:
+                    if previous != (serialized,):
+                        raise EvidenceReplay('conflicting witness checkpoint for same evidence')
+                    db.execute('COMMIT')
+                    return False
+                db.execute('INSERT INTO witness_quorums(evidence_id,witness_envelopes) '
+                           'VALUES(?,?)', (evidence_id, serialized))
+                db.execute('COMMIT')
+                return True
+            except Exception:
+                db.execute('ROLLBACK')
+                raise
+
+    def load_witnessed(self, evidence_id: str, context: VerificationContext,
+                       domain, expected_provider: str, rpc, policy):
+        """Return verified evidence/anchor/witnesses, never physical delivery facts."""
+        from sse_wp08e_witness import verify_witnesses, WitnessError
+        envelope, raw, anchor = self.load_anchored(evidence_id, context, domain,
+                                                    expected_provider, rpc)
+        with closing(self._db()) as db:
+            row = db.execute('SELECT witness_envelopes FROM witness_quorums '
+                             'WHERE evidence_id=?', (evidence_id,)).fetchone()
+        if row is None:
+            raise WitnessError('no external checkpoint witness quorum stored')
+        try:
+            witnesses = json.loads(row[0], object_pairs_hook=_unique_pairs)
+            if json.dumps(witnesses, sort_keys=True, separators=(',', ':'),
+                          ensure_ascii=True, allow_nan=False) != row[0]:
+                raise WitnessError('noncanonical saved witness quorum')
+        except (ValueError, TypeError, UnicodeDecodeError) as exc:
+            raise WitnessError('corrupted witness quorum JSON') from exc
+        signers = verify_witnesses(witnesses, anchor, context, expected_provider, policy)
+        return envelope, raw, anchor, witnesses, signers
+
+    def load_beacon_reported(self, evidence_id: str, context: VerificationContext,
+                             domain, expected_provider: str, rpc, policy,
+                             beacon, *, second_rpc=None):
+        """Fail-closed trusted Beacon REST view vs signed, witnessed raw evidence.
+
+        Beacon API flags are NOT an independently verified PoS finality proof.
+        A dishonest consensus REST server can lie; this never authorizes payout.
+        """
+        from sse_wp08f_beacon_finality import (LoopbackBeaconREST,
+                cross_check_reported_finality, BeaconFinalityError)
+        if not isinstance(beacon, LoopbackBeaconREST):
+            raise BeaconFinalityError('explicit loopback Beacon API verifier required')
+        envelope, raw, anchor, witnesses, signers = self.load_witnessed(
+            evidence_id, context, domain, expected_provider, rpc, policy)
+        checkpoint = beacon.get_reported_finalized_execution()
+        result = cross_check_reported_finality(
+            anchor, checkpoint, rpc, second_rpc=second_rpc)
+        return envelope, raw, anchor, witnesses, signers, result
+
+    def export_witnessed(self, evidence_id: str, context: VerificationContext,
+                         domain, expected_provider: str, rpc, policy) -> bytes:
+        """Portable bounded source archive; authenticated by signatures, not disk."""
+        envelope, raw, anchor, witnesses, _ = self.load_witnessed(
+            evidence_id, context, domain, expected_provider, rpc, policy)
+        with closing(self._db()) as db:
+            row = db.execute('SELECT anchor_envelope FROM chain_anchors '
+                             'WHERE evidence_id=?', (evidence_id,)).fetchone()
+        if row is None:
+            raise EvidenceError('anchored evidence was removed during export')
+        from sse_wp08d_provenance import verify_anchor
+        saved_anchor = json.loads(row[0], object_pairs_hook=_unique_pairs)
+        signer = verify_observation(envelope, context).signer
+        if verify_anchor(saved_anchor, context, evidence_id, signer) != anchor:
+            raise EvidenceError('snapshot changed during export')
+        bundle = {
+            'schema': 'sse-witnessed-archive-bundle-v1',
+            'evidenceId': evidence_id, 'providerRawB64': base64.b64encode(raw).decode('ascii'),
+            'monitorEnvelope': envelope, 'anchorEnvelope': saved_anchor,
+            'witnessEnvelopes': witnesses,
+        }
+        return json.dumps(bundle, sort_keys=True, separators=(',', ':'),
+                          ensure_ascii=True, allow_nan=False).encode('ascii')
+
+    def import_witnessed(self, bundle: bytes, context: VerificationContext,
+                         domain, expected_provider: str, rpc, policy) -> bool:
+        """Fail-closed portable import; destination remains separately re-verifiable.
+
+        Pre-authenticates all statements and the witnessed RPC view BEFORE any
+        local SQLite insert. If the RPC reorgs between two commits, the source
+        may leave a *raw/anchored but unwitnessed* record, never a false witness
+        quorum. Strict load_witnessed rechecks the current chain every time.
+        """
+        from sse_wp08d_provenance import verify_anchor, check_canonical_snapshot
+        from sse_wp08e_witness import verify_witnesses, WitnessError
+        if type(bundle) is not bytes or not 1 <= len(bundle) <= 32768:
+            raise WitnessError('bounded portable archive bundle required')
+        try:
+            data = json.loads(bundle.decode('ascii'), object_pairs_hook=_unique_pairs)
+        except (ValueError, UnicodeDecodeError, TypeError) as exc:
+            raise WitnessError('invalid portable archive bundle JSON') from exc
+        if (type(data) is not dict or set(data) != {
+                'schema', 'evidenceId', 'providerRawB64', 'monitorEnvelope',
+                'anchorEnvelope', 'witnessEnvelopes'} or
+                data['schema'] != 'sse-witnessed-archive-bundle-v1' or
+                type(data['providerRawB64']) is not str):
+            raise WitnessError('unsupported bundle schema')
+        try:
+            raw = base64.b64decode(data['providerRawB64'], validate=True)
+        except (ValueError, base64.binascii.Error) as exc:
+            raise WitnessError('invalid provider raw byte encoding') from exc
+        if type(data['evidenceId']) is not str:
+            raise WitnessError('invalid evidence ID')
+        item = verify_observation(data['monitorEnvelope'], context)
+        if item.evidence_id != data['evidenceId'] or not verify_payload(item.record, raw):
+            raise WitnessError('archive monitor commitment does not match raw bytes')
+        anchor = verify_anchor(data['anchorEnvelope'], context, item.evidence_id, item.signer)
+        check_canonical_snapshot(rpc, anchor)
+        verify_witnesses(data['witnessEnvelopes'], anchor, context,
+                         expected_provider, policy)
+        self.insert(data['monitorEnvelope'], raw, context, domain,
+                    expected_provider, anchor_envelope=data['anchorEnvelope'])
+        return self.store_witnesses(item.evidence_id, context, domain,
+                                    expected_provider, rpc, policy,
+                                    data['witnessEnvelopes'])
+
     def count(self) -> int:
         with closing(self._db()) as db:
             return int(db.execute('SELECT COUNT(*) FROM records').fetchone()[0])
@@ -239,7 +426,7 @@ class EvidenceArchive:
 def capture_response(endpoint: str, domain, expected_provider: str, scope: EvidenceScope,
                      monitor_private_key: str, context: VerificationContext,
                      archive: EvidenceArchive, *, nonce: str | None = None,
-                     timeout: float = 2.0) -> CaptureResult:
+                     timeout: float = 2.0, chain_binding=None, rpc=None) -> CaptureResult:
     """Signed provider response -> signed raw monitor observation -> archive.
 
     No conversion to QualifiedFact and no on-chain vote/submission.
@@ -261,6 +448,26 @@ def capture_response(endpoint: str, domain, expected_provider: str, scope: Evide
         event_time_lower=lower, event_time_upper=upper, nonce=chosen_nonce,
     )
     envelope = sign_observation(observation, monitor_private_key)
-    evidence_id, stored_new = archive.insert(envelope, raw, context, domain, expected_provider)
+    anchor_env = None
+    if chain_binding is not None:
+        from sse_wp08c_chain_binding import ChainCaptureBinding
+        from sse_wp08d_provenance import (BlockAnchor, valid_block_hash, sign_anchor,
+                                          check_canonical_snapshot)
+        from sse_evidence_wire_v1 import record_hash
+        if (rpc is None or not isinstance(chain_binding, ChainCaptureBinding) or
+                chain_binding.context != context or
+                chain_binding.provider != expected_provider.lower() or
+                not valid_block_hash(chain_binding.block_hash)):
+            raise AuthenticationError('validated hash-pinned chain binding required')
+        anchor = BlockAnchor(scope.chain_id, scope.settlement.lower(),
+                             scope.lease_id, scope.epoch_id,
+                             record_hash(observation), chain_binding.block_number,
+                             chain_binding.block_hash, chain_binding.block_timestamp)
+        # Prevent archiving stale observations after an observed local reorg.
+        check_canonical_snapshot(rpc, anchor)
+        anchor_env = sign_anchor(anchor, monitor_private_key)
+    evidence_id, stored_new = archive.insert(
+        envelope, raw, context, domain, expected_provider,
+        anchor_envelope=anchor_env)
     return CaptureResult(evidence_id, sender, expected_provider.lower(),
                          verified_provider['responseHash'], stored_new, raw)

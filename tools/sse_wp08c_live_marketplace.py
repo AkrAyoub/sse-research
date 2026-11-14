@@ -1,0 +1,627 @@
+"""WP-08C genuine local marketplace -> chain-bound signed HTTP evidence integration.
+
+This is an isolated *development test*, not distributed cloud operation. It
+starts a new Anvil process with a PUBLIC test mnemonic, deploys V1 contracts
+from Foundry build artifacts, funds a marketplace lease, activates a selected
+committee and epoch, and starts the signed HTTP provider and monitor CLI as
+separate processes. It checks the persisted signed raw evidence against the
+actual chain-derived committee, and verifies NO votes/payouts are authorized.
+
+Run only after \`forge build\` with Anvil in PATH:
+  python tools/sse_wp08c_live_marketplace.py
+Do not use these deterministic test keys with real assets or public RPCs.
+"""
+from __future__ import annotations
+
+import json
+import os
+import socket
+import subprocess
+import sys
+import time
+from pathlib import Path
+
+ROOT = Path(__file__).resolve().parents[1]
+sys.path.insert(0, str(ROOT / 'tools'))
+sys.path.insert(0, str(ROOT / 'services' / 'monitor-agent'))
+from sse_challenge import keccak256
+from sse_wp09d_rsa_entropy import (read_lab_key, laboratory_proof,
+                                  rsa_request_digest, verify_proof,
+                                  seed_from_proof)
+from sse_wp09e_global_merkle import (
+    RosterTree, sampled_indexes, request_commitment,
+)
+from eth_abi import encode, decode
+from sse_chain_read import LocalRPC, inspect_chain
+from sse_wp08c_chain_binding import bind_capture_to_chain
+from sse_evidence_wire_v1 import EvidenceScope, verify_observation, to_wp07_raw, ObservationKind
+from sse_http_signed_delivery_v1 import EvidenceArchive
+from typed_evidence import Domain
+
+# Anvil's widely published test mnemonic; never use this wallet on a real chain.
+MNEMONIC = 'test test test test test test test test test test test junk'
+CHAIN_ID = 31337
+CONTRACTS = ('OpenMonitorCommittee', 'SSESettlement', 'OpenResourceBoard')
+SCOPED_ERRORS = (ValueError, RuntimeError, OSError, KeyError, AssertionError)
+
+
+def _port() -> int:
+    with socket.socket(socket.AF_INET, socket.SOCK_STREAM) as sock:
+        sock.bind(('127.0.0.1', 0))
+        return sock.getsockname()[1]
+
+
+def _word(value: int | str) -> bytes:
+    if type(value) is int and 0 <= value < (1 << 256):
+        return value.to_bytes(32, 'big')
+    if type(value) is str and value.startswith('0x'):
+        raw = bytes.fromhex(value[2:])
+        if len(raw) in (20, 32):
+            return raw.rjust(32, b'\x00')
+    raise ValueError('invalid static ABI value')
+
+
+def _calldata(signature: str, *args: int | str) -> str:
+    return '0x' + (keccak256(signature.encode('ascii'))[:4] +
+                   b''.join(_word(a) for a in args)).hex()
+
+
+def _send(rpc: LocalRPC, sender: str, to: str | None, data: str,
+          value: int = 0) -> dict:
+    call = {'from': sender, 'data': data, 'gas': hex(9_000_000)}
+    if to is not None:
+        call['to'] = to
+    if value:
+        call['value'] = hex(value)
+    h = rpc.request('eth_sendTransaction', [call])
+    if type(h) is not str or len(h) != 66:
+        raise AssertionError('Anvil did not return a transaction hash')
+    for _ in range(100):
+        receipt = rpc.request('eth_getTransactionReceipt', [h])
+        if receipt is not None:
+            if receipt.get('status') != '0x1':
+                raise AssertionError(f'local transaction reverted: {h}')
+            return receipt
+        time.sleep(0.1)
+    raise AssertionError(f'local transaction not mined: {h}')
+
+
+def _deploy(rpc: LocalRPC, sender: str, contract: str,
+            *constructor_args: int | str) -> str:
+    path = ROOT / 'out' / f'{contract}.sol' / f'{contract}.json'
+    artifact = json.loads(path.read_text(encoding='utf-8'))
+    bytecode = artifact['bytecode']['object']
+    if type(bytecode) is not str or not bytecode.startswith('0x') or len(bytecode) < 100:
+        raise AssertionError(f'invalid Foundry bytecode: {contract}')
+    receipt = _send(rpc, sender, None,
+                    bytecode + b''.join(_word(a) for a in constructor_args).hex())
+    address = receipt.get('contractAddress')
+    if type(address) is not str or len(address) != 42:
+        raise AssertionError(f'missing deployed contract: {contract}')
+    return address.lower()
+
+
+def _wait_chain(rpc: LocalRPC, anvil: subprocess.Popen) -> list[str]:
+    for _ in range(100):
+        if anvil.poll() is not None:
+            raise RuntimeError(f'Anvil exited early ({anvil.returncode})')
+        try:
+            if int(rpc.request('eth_chainId', []), 16) != CHAIN_ID:
+                raise AssertionError('unexpected chain ID')
+            accounts = rpc.request('eth_accounts', [])
+            if type(accounts) is list and len(accounts) >= 10:
+                return [a.lower() for a in accounts]
+        except (ValueError, OSError):
+            time.sleep(0.1)
+    raise RuntimeError('fresh Anvil failed to start')
+
+
+def _await_provider(endpoint: str, provider_proc: subprocess.Popen) -> None:
+    from urllib.request import urlopen
+    for _ in range(80):
+        if provider_proc.poll() is not None:
+            raise AssertionError('signed provider process exited early')
+        try:
+            with urlopen(endpoint + '/healthz', timeout=0.5) as response:
+                health = json.loads(response.read(2048))
+            if response.status == 200 and health.get('experimental') is True:
+                return
+        except OSError:
+            time.sleep(0.1)
+    raise AssertionError('signed provider did not become available on localhost')
+
+
+def _terminate(proc: subprocess.Popen | None) -> None:
+    if proc is not None and proc.poll() is None:
+        proc.terminate()
+        try:
+            proc.wait(timeout=5)
+        except subprocess.TimeoutExpired:
+            proc.kill()
+            proc.wait(timeout=5)
+
+
+def _run_cli(args: list[str], env: dict, *, should_succeed: bool) -> str:
+    result = subprocess.run(args, cwd=ROOT, env=env, capture_output=True,
+                            text=True, timeout=30, check=False)
+    if should_succeed and result.returncode != 0:
+        raise AssertionError('capture failed:\n' + result.stderr[-3500:])
+    if not should_succeed and result.returncode == 0:
+        raise AssertionError('invalid chain-bound capture unexpectedly succeeded')
+    return result.stdout
+
+
+def run(output_dir: Path) -> dict:
+    from eth_account import Account
+    Account.enable_unaudited_hdwallet_features()
+    output_dir = output_dir.resolve()
+    if output_dir.exists() and any(output_dir.iterdir()):
+        raise ValueError('refusing to replace existing evidence directory')
+    output_dir.mkdir(parents=True, exist_ok=True)
+    # No system-wide Anvil state, long-lived funded keys, or external RPC calls.
+    port = _port()
+    rpc = LocalRPC(f'http://127.0.0.1:{port}')
+    anvil = None
+    provider_proc = None
+    tx_hashes: list[str] = []
+    try:
+        anvil = subprocess.Popen(
+            ['anvil', '--silent', '--host', '127.0.0.1', '--port', str(port),
+             '--chain-id', str(CHAIN_ID), '--accounts', '10', '--mnemonic', MNEMONIC],
+            cwd=ROOT, stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL,
+        )
+        accounts = _wait_chain(rpc, anvil)
+        key_for = {}
+        for i, address in enumerate(accounts):
+            account = Account.from_mnemonic(
+                MNEMONIC, account_path=f"m/44'/60'/0'/0/{i}")
+            if account.address.lower() != address:
+                raise AssertionError('Anvil account and test mnemonic disagree')
+            key_for[address] = bytes(account.key).hex()
+        consumer, provider = accounts[:2]
+        candidates = accounts[2:7]
+        outsider = accounts[7]
+        min_bond = 10**9
+
+        pool = _deploy(rpc, consumer, 'OpenMonitorCommittee', consumer,
+                       min_bond, 86400, 3600)
+        settlement = _deploy(rpc, consumer, 'SSESettlement', pool)
+        board = _deploy(rpc, consumer, 'OpenResourceBoard')
+        # R3 WP09D: this test uses a PUBLIC/INSECURE RSA private key, kept
+        # solely in tests/fixtures. A real application MUST use an audited
+        # setup, protected key and independent proof operator. Opt-in occurs
+        # only before the settlement binding, and disables arbitrary seeds.
+        lab_modulus, lab_private_exponent = read_lab_key()
+        public_modulus = lab_modulus.to_bytes(256, 'big')
+        selector = keccak256(b'enableRSAProofEntropy(bytes)')[:4]
+        activate = '0x' + (selector + _word(32) + _word(256) +
+                           public_modulus).hex()
+        tx_hashes.append(_send(rpc, consumer, pool, activate)['transactionHash'])
+        # WP09E: independent one-way opt-in for the GLOBAL roster root;
+        # activate BEFORE registry enrollment, as index events are needed
+        # to reproduce historical leaves and proofs.
+        tx_hashes.append(_send(
+            rpc, consumer, pool, _calldata('enableGlobalMerkleElection()')
+        )['transactionHash'])
+        for contract, data in (
+            (pool, _calldata('bindSettlement(address)', settlement)),
+            (settlement, _calldata('bindResourceBoard(address)', board)),
+            (board, _calldata('bindSettlement(address)', settlement)),
+        ):
+            receipt = _send(rpc, consumer, contract, data)
+            tx_hashes.append(receipt['transactionHash'])
+        for candidate in candidates:
+            receipt = _send(rpc, candidate, pool, _calldata('register()'), min_bond)
+            tx_hashes.append(receipt['transactionHash'])
+
+        # Select a loopback port before it is committed to the lease.
+        endpoint = f'http://127.0.0.1:{_port()}'
+        endpoint_hash = '0x' + keccak256(endpoint.encode('utf-8')).hex()
+        profile_hash = '0x' + keccak256(b'wp08c-local-http-profile').hex()
+        policy_hash = '0x' + keccak256(b'wp08c-raw-HTTP-policy-lab-only').hex()
+        request_hash = '0x' + keccak256(b'wp08c-fresh-real-anvil-epoch').hex()
+        block = rpc.request('eth_getBlockByNumber', ['latest', False])
+        bidding_close = int(block['timestamp'], 16) + 60
+        receipt = _send(rpc, consumer, board,
+                        _calldata('requestResource(bytes32,bytes32,uint256,uint64)',
+                                  profile_hash, policy_hash, 40, bidding_close))
+        tx_hashes.append(receipt['transactionHash'])
+        receipt = _send(rpc, provider, board,
+                        _calldata('placeBid(uint256,uint256)', 1, 25))
+        tx_hashes.append(receipt['transactionHash'])
+        timestamp = int(rpc.request('eth_getBlockByNumber',
+                                    ['latest', False])['timestamp'], 16)
+        rpc.request('evm_increaseTime', [max(0, bidding_close - timestamp + 1)])
+        rpc.request('evm_mine', [])
+
+        # The last parameter is a static tuple, so its seven fields are
+        # encoded consecutively in the ABI head (no dynamic offset).
+        receipt = _send(
+            rpc, consumer, board,
+            _calldata('chooseBidAndFundLease(uint256,uint256,address,(bytes32,uint256,uint256,uint256,uint64,uint64,uint64))',
+                      1, 0, settlement, endpoint_hash, 5, 25, 1, 600, 300, 300),
+            value=25)
+        tx_hashes.append(receipt['transactionHash'])
+        before = inspect_chain(rpc, settlement, 1, 0, endpoint=endpoint)
+        lease = before['lease']
+        if (before['status'] != 'NO_EPOCH_ADMITTED' or
+                lease['marketplaceRequestId'] != 1 or
+                lease['slaPolicyHash'] != policy_hash or
+                lease['totalEscrow'] != 25 or
+                lease['provider'] != provider):
+            raise AssertionError('marketplace funding or policy binding failed')
+
+        tx_hashes.append(_send(rpc, provider, settlement,
+                               _calldata('acceptLease(uint256)', 1))['transactionHash'])
+        # The eligible bounded roster is committed BEFORE any proof request.
+        # The public test signer can later compute ONE canonical RSA root.
+        # The verifier runs actual EVM modexp on the live chain (no mocking).
+        assignment_id = lease['assignmentId']
+        assignment_block_hex = rpc.request('eth_call', [
+            {'to': pool,
+             'data': _calldata('assignmentRequestedBlock(uint256)', assignment_id)},
+            'latest'])
+        assignment_block = int(assignment_block_hex, 16)
+        snapshot_hash = rpc.request('eth_call', [
+            {'to': pool,
+             'data': _calldata('snapshotCommitment(uint256)', assignment_id)},
+            'latest'])
+        if snapshot_hash == '0x' + '00' * 32:
+            raise AssertionError('eligible snapshot was not committed before proof')
+        digest_hex = rpc.request('eth_call', [
+            {'to': pool, 'data': _calldata('rsaRequestDigest(uint256)', assignment_id)},
+            'latest'])
+        rsa_digest = bytes.fromhex(digest_hex[2:])
+        expected_digest = rsa_request_digest(CHAIN_ID, pool, assignment_id,
+            assignment_block, bytes.fromhex(snapshot_hash[2:]))
+        if rsa_digest != expected_digest:
+            raise AssertionError('independent RSA digest disagreed with on-chain request scope')
+        proof = laboratory_proof(rsa_digest, lab_modulus, lab_private_exponent)
+        if not verify_proof(rsa_digest, proof, lab_modulus):
+            raise AssertionError('independent local RSA verifier rejected generated proof')
+        verifier_word = rpc.request('eth_call', [
+            {'to': pool, 'data': _calldata('rsaEntropyVerifier()')}, 'latest'])
+        verifier_address = '0x' + verifier_word[-40:]
+        if verifier_address == '0x' + '00' * 20:
+            raise AssertionError('RSA verifier not deployed by pool')
+        verify_selector = keccak256(b'verify(bytes32,bytes)')[:4]
+        verify_data = '0x' + (verify_selector + rsa_digest + _word(64) +
+                             _word(len(proof)) + proof).hex()
+        on_chain_verified = rpc.request('eth_call', [
+            {'to': verifier_address, 'data': verify_data}, 'latest'])
+        if int(on_chain_verified, 16) != 1:
+            raise AssertionError('real EVM RSA modular-exponentiation verifier rejected proof')
+        rsa_selector = keccak256(b'fulfillRSAProofEntropy(uint256,bytes)')[:4]
+        rsa_calldata = '0x' + (rsa_selector + _word(assignment_id) + _word(64) +
+                              _word(len(proof)) + proof).hex()
+        tx_hashes.append(_send(rpc, outsider, pool, rsa_calldata)['transactionHash'])
+        # RSA proof only REVEALS the fixed seed in global Merkle mode.
+        # A second, permissionless transaction submits the deterministic
+        # GLOBAL draw indexes' historical Merkle inclusion proofs.
+        ready_word = rpc.request('eth_call', [
+            {'to': pool, 'data': _calldata('pendingGlobalSeedReady(uint256)',
+                                         assignment_id)}, 'latest'])
+        if int(ready_word, 16) != 1:
+            raise AssertionError('global seed not ready after on-chain RSA proof')
+        seed_onchain = int(rpc.request('eth_call', [
+            {'to': pool, 'data': _calldata('pendingGlobalSeed(uint256)',
+                                         assignment_id)}, 'latest']), 16)
+        seed_local = seed_from_proof(rsa_digest, proof)
+        if seed_onchain != seed_local:
+            raise AssertionError('global entropy seed differs from proof reference')
+        root_word = rpc.request('eth_call', [
+            {'to': pool, 'data': _calldata('globalSnapshotRoot(uint256)',
+                                         assignment_id)}, 'latest'])
+        size_word = rpc.request('eth_call', [
+            {'to': pool, 'data': _calldata('globalSnapshotCount(uint256)',
+                                         assignment_id)}, 'latest'])
+        snapshot_count = int(size_word, 16)
+        if snapshot_count != len(candidates):
+            raise AssertionError('wrong global active roster size')
+        historical_tree = RosterTree()
+        for candidate in candidates:
+            historical_tree.append(candidate)
+        if root_word.lower() != '0x' + historical_tree.root.hex():
+            raise AssertionError('independent global Merkle root differs from contract')
+        expected_commitment = request_commitment(CHAIN_ID, pool, assignment_id,
+            assignment_block, historical_tree.root, snapshot_count)
+        if expected_commitment.hex() != snapshot_hash[2:]:
+            raise AssertionError('global request snapshot commitment mismatch')
+        onchain_indexes_word = rpc.request('eth_call', [
+            {'to': pool, 'data': _calldata('globalDrawIndexes(uint256)',
+                                         assignment_id)}, 'latest'])
+        onchain_indexes = list(decode(['uint256[]'],
+                                     bytes.fromhex(onchain_indexes_word[2:]))[0])
+        global_indexes = sampled_indexes(seed_local, assignment_id, snapshot_count)
+        if onchain_indexes != global_indexes:
+            raise AssertionError('on-chain and independent global draw order differ')
+        draw_accounts = [candidates[i] for i in global_indexes]
+        paths = [historical_tree.proof(i) for i in global_indexes]
+        global_selector = keccak256(
+            b'finalizeGlobalCommittee(uint256,address[],bytes32[][])')[:4]
+        global_calldata = '0x' + (global_selector + encode(
+            ['uint256', 'address[]', 'bytes32[][]'],
+            [assignment_id, draw_accounts, paths]
+        )).hex()
+        tx_hashes.append(_send(rpc, outsider, pool, global_calldata)['transactionHash'])
+        tx_hashes.append(_send(rpc, consumer, settlement,
+                               _calldata('finalizeMonitorCommittee(uint256)', 1))['transactionHash'])
+        assigned = inspect_chain(rpc, settlement, 1, 0, endpoint=endpoint)['lease']['monitors']
+        if len(set(assigned)) != 4 or not set(assigned).issubset(set(candidates)):
+            raise AssertionError('unexpected committee selection')
+        # R3 WP09A: three of the original four confirm; permissionless
+        # timeout-based rescue selects the one standby from the SAME seed.
+        no_show_monitor = assigned[3]
+        for monitor in assigned[:3]:
+            tx_hashes.append(_send(rpc, monitor, settlement,
+                                   _calldata('confirmMonitorAssignment(uint256)', 1))['transactionHash'])
+        pending = inspect_chain(rpc, settlement, 1, 0, endpoint=endpoint)['lease']
+        if pending['monitorConfirmations'] != 3 or pending['stateName'] != 'Accepted':
+            raise AssertionError('three-of-four confirmations incorrectly made the lease ready')
+        deadline_hex = rpc.request('eth_call', [
+            {'to': settlement,
+             'data': _calldata('monitorConfirmationDeadline(uint256)', 1)}, 'latest'])
+        deadline = int(deadline_hex, 16)
+        current_ts = int(rpc.request('eth_getBlockByNumber',
+                                    ['latest', False])['timestamp'], 16)
+        rpc.request('evm_increaseTime', [max(0, deadline - current_ts + 1)])
+        rpc.request('evm_mine', [])
+        tx_hashes.append(_send(rpc, outsider, settlement,
+                               _calldata('replaceNoShowMonitor(uint256)', 1))['transactionHash'])
+        selected_after_rotation = inspect_chain(rpc, settlement, 1, 0,
+                                                endpoint=endpoint)['lease']['monitors']
+        if (selected_after_rotation[:3] != assigned[:3] or
+                selected_after_rotation[3] == no_show_monitor or
+                selected_after_rotation[3] not in candidates or
+                len(set(selected_after_rotation)) != 4):
+            raise AssertionError('timed-out no-show was not replaced by unused bonded standby')
+        assigned = selected_after_rotation
+        tx_hashes.append(_send(rpc, assigned[3], settlement,
+                               _calldata('confirmMonitorAssignment(uint256)', 1))['transactionHash'])
+        ready = inspect_chain(rpc, settlement, 1, 0, endpoint=endpoint)['lease']
+        if ready['stateName'] != 'Ready' or ready['monitorConfirmations'] != 4:
+            raise AssertionError('replaced monitor confirmation did not unlock epoch admission')
+        tx_hashes.append(_send(rpc, consumer, settlement,
+                               _calldata('admitEpoch(uint256,bytes32)', 1, request_hash))['transactionHash'])
+
+        scope = EvidenceScope(CHAIN_ID, settlement, 1, 0, policy_hash,
+                              profile_hash, request_hash)
+        before_fork = rpc.request('evm_snapshot', [])
+        rpc.request('evm_mine', [])
+        bound = bind_capture_to_chain(rpc, scope, endpoint, provider,
+                                      pin_block_hash=True)
+        if bound.context.authorized_monitors != frozenset(assigned):
+            raise AssertionError('chain-selected monitors were not derived correctly')
+
+        provider_port = int(endpoint.rsplit(':', 1)[1])
+        provider_env = {**os.environ, 'SSE_WP08B_PROVIDER_KEY': '0x' + key_for[provider]}
+        provider_proc = subprocess.Popen(
+            [sys.executable, str(ROOT / 'services/provider-agent/signed_http_service.py'),
+             '--port', str(provider_port), '--chain-id', str(CHAIN_ID),
+             '--settlement', settlement, '--lease-id', '1', '--epoch-id', '0',
+             '--request-hash', request_hash],
+            cwd=ROOT, env=provider_env, stdout=subprocess.DEVNULL,
+            stderr=subprocess.DEVNULL,
+        )
+        _await_provider(endpoint, provider_proc)
+
+        archive_path = output_dir / 'evidence.sqlite'
+        capture_cli = [
+            sys.executable, str(ROOT / 'services/monitor-agent/evidence_capture.py'),
+            '--endpoint', endpoint, '--chain-id', str(CHAIN_ID),
+            '--settlement', settlement, '--lease-id', '1', '--epoch-id', '0',
+            '--sla-policy-hash', policy_hash, '--resource-profile-hash', profile_hash,
+            '--request-hash', request_hash, '--provider', provider,
+            '--archive', str(archive_path), '--rpc-url', rpc.url,
+        ]
+        first_monitor = assigned[0]
+        good_env = {**os.environ, 'SSE_WP08B_MONITOR_KEY': '0x' + key_for[first_monitor]}
+        output = _run_cli(capture_cli, good_env, should_succeed=True)
+        if 'Monitor-signed RPC block anchor' not in output:
+            raise AssertionError('capture was not executed in the chain-bound mode')
+        archive = EvidenceArchive(archive_path)
+        if archive.count() != 1:
+            raise AssertionError('expected exactly one stored raw observation')
+        from contextlib import closing
+        with closing(archive._db()) as db:
+            evidence_id = db.execute('SELECT evidence_id FROM records').fetchone()[0]
+        envelope, raw_bytes, pinned = archive.load_anchored(
+            evidence_id, bound.context, Domain(CHAIN_ID, settlement), provider, rpc)
+        if pinned.block_hash != bound.block_hash or pinned.block_number != bound.block_number:
+            raise AssertionError('stored monitor-signed snapshot differs from observed chain')
+        verified = verify_observation(envelope, bound.context)
+        if (verified.signer != first_monitor or
+                verified.record.kind != ObservationKind.RESPONSE_SEEN or
+                to_wp07_raw(verified).signer != first_monitor or
+                not raw_bytes):
+            raise AssertionError('stored HTTP response/monitor signatures or raw mapping mismatch')
+
+        # WP08E: TWO OTHER signing keys witness the same historical block in
+        # separate CLI processes. Both currently query one lab Anvil RPC;
+        # key separation is proven, independent consensus finality is NOT.
+        from sse_wp08e_witness import WitnessPolicy, WitnessError
+        witness_addresses = accounts[8:10]
+        policy = WitnessPolicy(frozenset(witness_addresses), 2)
+        anchor_file = output_dir / 'snapshot_anchor.json'
+        anchor_file.write_text(json.dumps(pinned.fields(), sort_keys=True) + '\n',
+                               encoding='ascii')
+        witness_envelopes = []
+        for witness_index, witness_address in enumerate(witness_addresses, start=1):
+            witness_file = output_dir / f'witness_{witness_index}.json'
+            witness_env = {**os.environ,
+                           'SSE_WP08E_WITNESS_KEY': '0x' + key_for[witness_address]}
+            witness_output = _run_cli(
+                [sys.executable,
+                 str(ROOT / 'services/witness-agent/checkpoint_witness.py'),
+                 '--rpc-url', rpc.url, '--anchor', str(anchor_file),
+                 '--output', str(witness_file)],
+                witness_env, should_succeed=True)
+            if 'Not verified Ethereum consensus finality' not in witness_output:
+                raise AssertionError('independent witness CLI did not disclaim finality')
+            witness_envelopes.append(json.loads(witness_file.read_text(encoding='ascii')))
+        if not archive.store_witnesses(evidence_id, bound.context,
+                                       Domain(CHAIN_ID, settlement), provider,
+                                       rpc, policy, witness_envelopes):
+            raise AssertionError('expected new independent checkpoint signatures')
+        _, raw_verified, _, stored_witnesses, signers = archive.load_witnessed(
+            evidence_id, bound.context, Domain(CHAIN_ID, settlement), provider,
+            rpc, policy)
+        if (raw_verified != raw_bytes or len(stored_witnesses) != 2 or
+                set(signers) != set(witness_addresses)):
+            raise AssertionError('witness quorum did not bind the actual raw HTTP evidence')
+        bundle = archive.export_witnessed(
+            evidence_id, bound.context, Domain(CHAIN_ID, settlement), provider,
+            rpc, policy)
+        (output_dir / 'portable_evidence_bundle.json').write_bytes(bundle)
+        replica = EvidenceArchive(output_dir / 'replica_evidence.sqlite')
+        if not replica.import_witnessed(
+                bundle, bound.context, Domain(CHAIN_ID, settlement), provider,
+                rpc, policy):
+            raise AssertionError('verified replica import was not new')
+        _, replicated_raw, _, _, replica_signers = replica.load_witnessed(
+            evidence_id, bound.context, Domain(CHAIN_ID, settlement), provider,
+            rpc, policy)
+        if replicated_raw != raw_bytes or set(replica_signers) != set(signers):
+            raise AssertionError('replicated archive cannot independently reverify evidence')
+
+        # WP08F: Anvil has no consensus client. Simulate a trusted REST
+        # "finalized" claim from the current Anvil head to exercise REAL EL
+        # ancestry walks; this is NOT a validated beacon consensus proof.
+        from sse_wp08f_beacon_finality import (
+            BeaconReportedFinalizedExecution, BeaconFinalityError,
+            cross_check_reported_finality)
+        rpc.request('evm_mine', [])
+        el_head = rpc.request('eth_getBlockByNumber', ['latest', False])
+        simulated_claim = BeaconReportedFinalizedExecution(
+            '0x' + 'b1' * 32, 1024, int(el_head['number'], 16),
+            el_head['hash'].lower(), int(el_head['timestamp'], 16))
+        finality_guard = cross_check_reported_finality(pinned, simulated_claim, rpc)
+        if finality_guard.ancestry_depth < 1 or finality_guard.pos_finality_proven:
+            raise AssertionError('Anvil ancestry test accidentally asserted consensus finality')
+
+        class MalformedPeer:
+            # Not a second node: a synthetic RPC fork-disagreement injector.
+            url = 'http://127.0.0.1:65000'
+
+            def request(self, method, params):
+                result = rpc.request(method, params)
+                if (method == 'eth_getBlockByNumber' and
+                        params[0] == hex(pinned.block_number)):
+                    return {**result, 'hash': '0x' + 'ff' * 32}
+                return result
+
+        try:
+            cross_check_reported_finality(
+                pinned, simulated_claim, rpc, second_rpc=MalformedPeer())
+        except BeaconFinalityError:
+            pass
+        else:
+            raise AssertionError('divergent execution RPC was incorrectly accepted')
+
+        bad_env = {**os.environ, 'SSE_WP08B_MONITOR_KEY': '0x' + key_for[outsider]}
+        _run_cli(capture_cli, bad_env, should_succeed=False)
+        if archive.count() != 1:
+            raise AssertionError('unauthorized monitor modified the archive')
+        epoch = inspect_chain(rpc, settlement, 1, 0, endpoint=endpoint)['epoch']
+        if (epoch['successVotes'] != 0 or epoch['failureVotes'] != 0 or
+                epoch['providerCredited'] != 0 or epoch['consumerCredited'] != 0 or
+                epoch['unresolvedExposure'] != 25 or epoch['monitoringSealed']):
+            raise AssertionError('raw capture unexpectedly authorized a vote or payout')
+
+        # Local explicit chain rewind models losing an unfinalized block.
+        # The archived monitor signature remains valid, but the snapshot is
+        # no longer canonical; strict retrieval MUST reject it.
+        from sse_wp08d_provenance import SnapshotReorganized
+        if rpc.request('evm_revert', [before_fork]) is not True:
+            raise AssertionError('Anvil did not revert the planned block snapshot')
+        try:
+            archive.load_anchored(evidence_id, bound.context,
+                                  Domain(CHAIN_ID, settlement), provider, rpc)
+        except SnapshotReorganized:
+            pass
+        else:
+            raise AssertionError('reorged evidence snapshot was not rejected')
+        for local_archive in (archive, replica):
+            try:
+                local_archive.load_witnessed(evidence_id, bound.context,
+                                             Domain(CHAIN_ID, settlement),
+                                             provider, rpc, policy)
+            except SnapshotReorganized:
+                pass
+            else:
+                raise AssertionError('witness quorum incorrectly overrode a chain reorg')
+        try:
+            cross_check_reported_finality(pinned, simulated_claim, rpc)
+        except BeaconFinalityError:
+            pass
+        else:
+            raise AssertionError('consensus-claim simulation accepted a reverted execution chain')
+
+        summary = {
+            'schema': 'sse-wp08c-live-marketplace-v1', 'status': 'PASS',
+            'localAnvilOnly': True, 'chainId': CHAIN_ID,
+            'usesMarketplaceFundedLease': True, 'marketplaceRequestId': 1,
+            'leaseId': 1, 'epochId': 0, 'settlement': settlement,
+            'board': board, 'committeePool': pool,
+            'selectedMonitors': assigned, 'captureMonitor': first_monitor,
+            'originalNoShowMonitor': no_show_monitor,
+            'noShowReplacedAfterTimeout': True,
+            'globalMerkleFullRosterCommitted': True,
+            'globalMerkleRootMatchedIndependentPython': True,
+            'globalSampledIndexes': global_indexes,
+            'globalMerkleAllDrawnProofsVerifiedOnChain': True,
+            'globalRandomnessWithholdingStillPossible': True,
+            'globalChurnAfterCommitMayReduceLiveness': True,
+            'rsaProofEntropyApplied': True,
+            'rsaModexpActuallyVerifiedOnChain': True,
+            'rsaProofRequestDigest': '0x' + rsa_digest.hex(),
+            'rsaDerivedSeed': hex(seed_from_proof(rsa_digest, proof)),
+            'rsaPublicLabKeyOnly': True,
+            'rsaPrivateKeyOperatorWithholdingUnresolved': True,
+            'snapshotHashCommittedBeforeEntropy': snapshot_hash,
+            'futureBlockEntropyApplied': False,
+            'globalSelectionUniformityProven': False,
+            'threeOfFourStillBlocksEpochAdmission': True,
+            'replacementNeededFreshMonitorConfirmation': True,
+            'provider': provider, 'evidenceId': evidence_id,
+            'providerAndMonitorSignaturesVerified': True,
+            'monitorSignedBlockHash': pinned.block_hash,
+            'monitorSignedBlockNumber': pinned.block_number,
+            'reorgInvalidatesAnchoredRetrieval': True,
+            'witnessSigners': list(signers), 'witnessQuorum': 2,
+            'externalCheckpointSignaturesVerified': True,
+            'signedBundleReplicaVerified': True,
+            'witnessRPCIndependenceProven': False,
+            'consensusFinalityProven': False,
+            'mockBeaconExecutionAncestryChecked': True,
+            'mockConflictingExecutionPeerRejected': True,
+            'simulatedBeaconFinalityOnly': True,
+            'beaconBlsFinalityVerified': False,
+            'remoteReplicaValidated': False,
+            'authorizationReadFromChainSnapshot': True,
+            'independentOperatingSystems': False, 'separateLocalProcesses': True,
+            'proofOfFinality': False, 'consumerDeliveryProven': False,
+            'qualifiedFactConstructed': False, 'onChainMonitorVotes': 0,
+            'servicePayoutsAuthorized': False,
+            'localTransactionHashes': tx_hashes,
+        }
+        (output_dir / 'run.json').write_text(
+            json.dumps(summary, indent=2, sort_keys=True) + '\n', encoding='utf-8')
+        print(json.dumps(summary, indent=2, sort_keys=True), flush=True)
+        return summary
+    finally:
+        _terminate(provider_proc)
+        _terminate(anvil)
+
+
+def main() -> int:
+    try:
+        run(ROOT / '.local' / 'wp08c-live')
+        return 0
+    except SCOPED_ERRORS as exc:
+        print(f'WP08C live integration STOPPED: {exc}', file=sys.stderr)
+        return 2
+
+
+if __name__ == '__main__':
+    raise SystemExit(main())

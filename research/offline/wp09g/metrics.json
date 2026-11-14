@@ -1,0 +1,128 @@
+{
+  "id": "WP09G-OFFLINE-2026-11-14",
+  "execution": "stdlib-only local Python, zero network or GitHub Actions",
+  "reference_model": "bounded 8-proof per transaction, max 40 distinct globally sampled indices",
+  "assumptions": {
+    "global_population": 160,
+    "enrolled_lease_parties": 2,
+    "independent_post_snapshot_exit_probability": true,
+    "ideal_uniform_seed_for_closed_form_liveness": true,
+    "no_proof_unavailability_or_censorship_in_probability_model": true
+  },
+  "per_exit_rate": [
+    {
+      "exit_probability": 0.0,
+      "old_10_proofs_p_four_usable": 1.0,
+      "new_40_proofs_p_four_usable": 1.0,
+      "improvement_percentage_points": 0.0
+    },
+    {
+      "exit_probability": 0.1,
+      "old_10_proofs_p_four_usable": 0.99998288,
+      "new_40_proofs_p_four_usable": 1.0,
+      "improvement_percentage_points": 0.0017
+    },
+    {
+      "exit_probability": 0.2,
+      "old_10_proofs_p_four_usable": 0.99884221,
+      "new_40_proofs_p_four_usable": 1.0,
+      "improvement_percentage_points": 0.1158
+    },
+    {
+      "exit_probability": 0.4,
+      "old_10_proofs_p_four_usable": 0.93955911,
+      "new_40_proofs_p_four_usable": 1.0,
+      "improvement_percentage_points": 6.0441
+    },
+    {
+      "exit_probability": 0.6,
+      "old_10_proofs_p_four_usable": 0.60513883,
+      "new_40_proofs_p_four_usable": 0.9999943,
+      "improvement_percentage_points": 39.4855
+    },
+    {
+      "exit_probability": 0.7,
+      "old_10_proofs_p_four_usable": 0.34039672,
+      "new_40_proofs_p_four_usable": 0.99930009,
+      "improvement_percentage_points": 65.8903
+    },
+    {
+      "exit_probability": 0.8,
+      "old_10_proofs_p_four_usable": 0.11649064,
+      "new_40_proofs_p_four_usable": 0.96912052,
+      "improvement_percentage_points": 85.263
+    },
+    {
+      "exit_probability": 0.9,
+      "old_10_proofs_p_four_usable": 0.01224128,
+      "new_40_proofs_p_four_usable": 0.56654262,
+      "improvement_percentage_points": 55.4301
+    }
+  ],
+  "attackers_40_of_160_p_at_least_one_in_four_under_ideal_randomness": 0.6875919398684738,
+  "selective_signer_publish_only_if_attacker_selected_publication_rate": 0.6875919398684738,
+  "selective_signer_withholding_fraction": 0.3124080601315262,
+  "selective_signer_attack_in_published_committees": 1.0,
+  "seed_1234_request1_population160_first10": [
+    42,
+    10,
+    22,
+    78,
+    37,
+    128,
+    82,
+    118,
+    93,
+    145
+  ],
+  "seed_1234_request1_population160_all40": [
+    42,
+    10,
+    22,
+    78,
+    37,
+    128,
+    82,
+    118,
+    93,
+    145,
+    27,
+    65,
+    38,
+    95,
+    147,
+    125,
+    57,
+    74,
+    11,
+    71,
+    141,
+    157,
+    52,
+    149,
+    136,
+    3,
+    135,
+    102,
+    46,
+    120,
+    89,
+    132,
+    79,
+    44,
+    53,
+    30,
+    25,
+    97,
+    40,
+    108
+  ],
+  "tests": "python -m unittest -q test_wp09g.py",
+  "critical_nonclaims": [
+    "Off-chain reference model, NOT compiled/verified Solidity.",
+    "More standby draws improve independent-exit availability, not unbiased entropy.",
+    "Adversarial targeted exits, proof withholding and deadline censorship can still force failure.",
+    "Partial seat reservations are bounded in time but expose lock-griefing risk.",
+    "Gas cost, calldata and real-world performance must be measured in local Foundry."
+  ]
+}

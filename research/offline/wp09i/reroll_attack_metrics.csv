@@ -1,0 +1,9 @@
+attempts,attack_identity_share,ideal_single_hit_probability,ability_to_find_favourable_by_any_attempt,relative_increase_percentage_points,model
+1,0.25,0.6875919398684738,0.6875919398684738,0.0,ideal independent draws; adaptive abort/retry
+2,0.25,0.6875919398684738,0.9024012039648567,21.48092640963829,ideal independent draws; adaptive abort/retry
+3,0.25,0.6875919398684738,0.9695093494594884,28.191740959101462,ideal independent draws; adaptive abort/retry
+5,0.25,0.6875919398684738,0.9970241492169177,30.943220934844394,ideal independent draws; adaptive abort/retry
+10,0.25,0.6875919398684738,0.9999911443121168,31.2399204443643,ideal independent draws; adaptive abort/retry
+1,0.25,0.6875919398684738,0.6875919398684738,0,fixed one draw; coordinator online prob=0.90; resolve prob=0.90; expire prob=0.10
+1,0.25,0.6875919398684738,0.6875919398684738,0,fixed one draw; coordinator online prob=0.95; resolve prob=0.95; expire prob=0.05
+1,0.25,0.6875919398684738,0.6875919398684738,0,fixed one draw; coordinator online prob=0.99; resolve prob=0.99; expire prob=0.01
