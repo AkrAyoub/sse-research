@@ -5,7 +5,10 @@ pragma solidity ^0.8.24;
 
 
 contract OpenMonitorCommittee {
-    uint256 public constant MAX_IDENTITIES = 32;
+    // Maximum active candidates examined by ONE assignment transaction.
+    // This is a gas bound, NOT a lifetime registration ceiling or a global
+    // uniform sampling claim. Enrollment is permissionless but not Sybil-safe.
+    uint256 public constant MAX_SNAPSHOT_SCAN = 64;
     uint256 public constant COMMITTEE_SIZE = 4;
 
     enum RequestStatus { None, AwaitingRandomness, Assigned, Expired, Released }
@@ -34,7 +37,12 @@ contract OpenMonitorCommittee {
     uint256 public nextAssignmentId = 1;
     bool private entered;
 
-    address[] private allCandidates;
+    // Dense ACTIVE roster. Exited addresses are removed by swap-and-pop,
+    // allowing new identities to register without an unbounded history scan.
+    address[] private activeCandidates;
+    mapping(address => uint256) private activeIndexPlusOne;
+    uint256 public totalRegistrations;
+    uint256 public nextSnapshotCursor;
     mapping(address => Candidate) public candidates;
     mapping(uint256 => Assignment) private assignments;
     mapping(uint256 => address[]) private snapshots;
@@ -48,6 +56,9 @@ contract OpenMonitorCommittee {
     error InsufficientCandidates();
     error TransferFailed();
     event CandidateRegistered(address indexed account, uint256 bond);
+    event ActiveCandidateRemoved(address indexed account, uint256 activeRemaining);
+    event SnapshotWindowUsed(uint256 indexed requestId, uint256 startIndex,
+                             uint256 scanned, uint256 activeCount, uint256 eligible);
     event ExitRequested(address indexed account);
     event BondWithdrawn(address indexed account, uint256 amount);
     event SettlementBound(address indexed settlement);
@@ -85,11 +96,13 @@ contract OpenMonitorCommittee {
     function register() external payable {
         Candidate storage c = candidates[msg.sender];
         if (c.bond != 0 || msg.value < minimumBond) revert InvalidInput();
+        if (activeIndexPlusOne[msg.sender] != 0) revert InvalidInput();
         if (!c.everRegistered) {
-            if (allCandidates.length >= MAX_IDENTITIES) revert InvalidInput();
-            allCandidates.push(msg.sender);
             c.everRegistered = true;
+            ++totalRegistrations;
         }
+        activeCandidates.push(msg.sender);
+        activeIndexPlusOne[msg.sender] = activeCandidates.length;
         c.bond = msg.value;
         c.active = true;
         c.exitRequestedAt = 0;
@@ -107,7 +120,27 @@ contract OpenMonitorCommittee {
         if (!c.active || c.pendingSelections != 0 || c.activeAssignments != 0) revert InvalidPhase();
         c.active = false;
         c.exitRequestedAt = uint64(block.timestamp);
+        // A candidate cannot exit while an unfulfilled snapshot references it
+        // or while a confirmed/selected seat keeps its active bond locked.
+        _removeActive(msg.sender);
         emit ExitRequested(msg.sender);
+    }
+
+    function _removeActive(address account) internal {
+        uint256 slot = activeIndexPlusOne[account];
+        if (slot == 0) revert InvalidPhase();
+        uint256 last = activeCandidates.length - 1;
+        uint256 index = slot - 1;
+        if (index != last) {
+            address moved = activeCandidates[last];
+            activeCandidates[index] = moved;
+            activeIndexPlusOne[moved] = slot;
+        }
+        activeCandidates.pop();
+        delete activeIndexPlusOne[account];
+        if (activeCandidates.length == 0 ||
+            nextSnapshotCursor >= activeCandidates.length) nextSnapshotCursor = 0;
+        emit ActiveCandidateRemoved(account, activeCandidates.length);
     }
 
     function withdrawBond() external {
@@ -133,8 +166,12 @@ contract OpenMonitorCommittee {
         r.provider = provider;
         r.requestedAt = uint64(block.timestamp);
         r.status = RequestStatus.AwaitingRandomness;
-        for (uint256 i; i < allCandidates.length; ++i) {
-            address account = allCandidates[i];
+        uint256 count = activeCandidates.length;
+        if (count < COMMITTEE_SIZE) revert InsufficientCandidates();
+        uint256 scanned = count < MAX_SNAPSHOT_SCAN ? count : MAX_SNAPSHOT_SCAN;
+        uint256 start = nextSnapshotCursor % count;
+        for (uint256 i; i < scanned; ++i) {
+            address account = activeCandidates[(start + i) % count];
             Candidate storage c = candidates[account];
             if (account != consumer && account != provider && c.active && c.bond >= minimumBond) {
                 snapshots[id].push(account);
@@ -142,6 +179,8 @@ contract OpenMonitorCommittee {
             }
         }
         if (snapshots[id].length < COMMITTEE_SIZE) revert InsufficientCandidates();
+        nextSnapshotCursor = (start + scanned) % count;
+        emit SnapshotWindowUsed(id, start, scanned, count, snapshots[id].length);
         emit AssignmentRequested(id, consumer, provider, snapshots[id].length);
     }
 
@@ -155,9 +194,8 @@ contract OpenMonitorCommittee {
         
         // Finish the seed-determined Fisher-Yates-style permutation; modulo
         // reduction may introduce negligible bias and the seed is V1 trusted.
-        // Shuffle the full roster, not just the first four slots.
-        // four selections, to establish an immutable standby order from the
-        // SAME randomness draw. No consumer choice or second seed on recovery.
+        // Finish all selected and standby slots in this bounded snapshot.
+        // SAME randomness draw; no consumer-selected standby on recovery.
         for (uint256 i; i < length; ++i) {
             uint256 j = i + uint256(keccak256(abi.encode(seed, id, i))) % (length - i);
             (roster[i], roster[j]) = (roster[j], roster[i]);
@@ -252,7 +290,11 @@ contract OpenMonitorCommittee {
     }
 
     function assignmentStatus(uint256 id) external view returns (RequestStatus) { return assignments[id].status; }
-    function candidateCount() external view returns (uint256) { return allCandidates.length; }
-    function candidateAt(uint256 index) external view returns (address) { return allCandidates[index]; }
+    // These getters enumerate ACTIVE bonded candidates, not a lifetime list.
+    function candidateCount() external view returns (uint256) { return activeCandidates.length; }
+    function candidateAt(uint256 index) external view returns (address) { return activeCandidates[index]; }
+    function activeSlot(address account) external view returns (uint256) {
+        return activeIndexPlusOne[account];
+    }
     function snapshotSize(uint256 id) external view returns (uint256) { return snapshots[id].length; }
 }
