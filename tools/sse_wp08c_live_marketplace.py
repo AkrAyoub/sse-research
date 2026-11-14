@@ -303,7 +303,7 @@ def run(output_dir: Path) -> dict:
         witness_addresses = accounts[8:10]
         policy = WitnessPolicy(frozenset(witness_addresses), 2)
         anchor_file = output_dir / 'snapshot_anchor.json'
-        anchor_file.write_text(json.dumps(pinned.fields(), sort_keys=True) + '\\n',
+        anchor_file.write_text(json.dumps(pinned.fields(), sort_keys=True) + '\n',
                                encoding='ascii')
         witness_envelopes = []
         for witness_index, witness_address in enumerate(witness_addresses, start=1):
