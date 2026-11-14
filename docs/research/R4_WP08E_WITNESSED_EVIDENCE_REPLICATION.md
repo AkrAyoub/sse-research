@@ -1,6 +1,6 @@
 # R4 WP-08E — Signed external RPC checkpoint and portable evidence replicas
 
-**Checkpoint:** 2026-11-14. Stacked draft PR #20, built on draft PR #19 and #18. Not merged. Completion evidence is recorded after CI.
+**Checkpoint:** 2026-11-14. Stacked draft PR #20, built on draft PR #19 and #18. Not merged. **All four CI jobs passed** (369 Python tests on Ubuntu, 369 on Windows, 52 Foundry tests, and the fresh Anvil live witness/replica/reorg scenario). Independent consensus finality remains open.
 
 ## Problem and scope
 
@@ -18,6 +18,10 @@ WP-08D anchors a monitor's observation to a block hash. WP-08E adds separately a
 ## Reproduction
 
 Run the WP08E Python unittest, full unittest suite, forge build/test and the fresh disposable local Anvil runner tools/sse_wp08c_live_marketplace.py. The runner refuses to overwrite a nonempty .local/wp08c-live folder. GitHub Actions provides cross-platform test counts and publishes a short-retention evidence archive artifact.
+
+## Verified CI checkpoint
+
+[GitHub Actions run #43538865411](https://github.com/AkrAyoub/sse-research/actions/runs/43538865411) passed 4/4 jobs: **369/369 Python Ubuntu, 369/369 Python Windows, 52/52 Foundry Ubuntu**, plus fresh Anvil marketplace / HTTP / two-witness / portable second-archive integration marked **PASS**. The same live job saved both source and replica SQLite databases, two witness signatures and the signed portable bundle in the 14-day artifact. **R4 = 35% (+5 pp); engineering 24%, research 26%, overall 24%** under the original equal-phase-weight planning convention. These are phase estimates, not measured cryptographic or production security correctness.
 
 ## Unsolved trust and product requirements
 
