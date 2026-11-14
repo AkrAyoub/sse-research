@@ -42,6 +42,7 @@ New `foundry/test/BoundedActiveRegistry.t.sol` validates:
 5. Constant-time voluntary exit with correct swap-and-pop index updates, no orphan entries, unchanged exit delay, safe withdrawal and re-registration without a new historical registration.
 6. Pending-selection/selected active-bond lock enforcement and standby exit behavior; no candidate may evade a currently active assignment by exiting.
 7. Consumer/provider candidates are excluded from their own lease, even if bonded; insufficient qualified candidates cause atomic lease and escrow revert; unauthorized direct assignment calls cannot advance the cursor.
+8. The **64-candidate seed fulfillment** also stays below the lab 8.5-million-gas budget, and the next-snapshot cursor resets safely when 65 active addresses shrink to 64.
 
 The existing Foundry suite covers 3-of-4 no-show rescue, two absent seats, residual conservatism and signed observations. The live Anvil marketplace and signed-HTTP scenario is also run in GitHub CI.
 
@@ -54,7 +55,7 @@ python -m unittest discover -s tests -v
 python tools/sse_wp08c_live_marketplace.py
 ```
 
-GitHub Actions evidence and final phase percentages are added after all jobs pass.
+**Validated source CI:** [GitHub Actions run #43543913041](https://github.com/AkrAyoub/sse-research/actions/runs/43543913041): 67/67 Foundry tests, 385/385 Python tests on Ubuntu and Windows, plus fresh local Anvil marketplace/evidence scenario (all four jobs). These are laboratory tests, not production gas guarantees at every EVM fee schedule or audited security proofs. **Estimated engineering R3 = 26% (+6pp), engineering aggregate 25%, research aggregate 26%, overall 25%** by the project's equal-phase progress tracker.
 
 ## Remaining acceptance blockers
 
