@@ -233,6 +233,43 @@ contract MonitorConfirmationRecoveryTest is Test {
                  uint8(SSESettlement.LeaseState.Ready));
     }
 
+    function testTwoMissingMembersRotateInRoundRobinOrder() public {
+        for (uint256 i = 5; i < 7; ++i) {
+            address monitor = address(uint160(0xC100 + i));
+            vm.deal(monitor, 2 ether);
+            vm.prank(monitor);
+            pool.register{value: MIN_BOND}();
+        }
+        (uint256 leaseId, address[4] memory selected) = _fundAndAssign();
+        // Only TWO of the original committee confirm: two different
+        // unconfirmed seats need separate standby replacements.
+        for (uint256 i; i < 2; ++i) {
+            vm.prank(selected[i]);
+            settlement.confirmMonitorAssignment(leaseId);
+        }
+        vm.warp(settlement.monitorConfirmationDeadline(leaseId) + 1);
+        settlement.replaceNoShowMonitor(leaseId);
+        SSESettlement.Lease memory first = settlement.getLease(leaseId);
+        assertTrue(first.monitors[2] != selected[2]);
+        assertEq(first.monitors[3], selected[3]);
+        assertEq(first.monitorConfirmations, 2);
+        // The first standby stays eligible for a whole renewed window; when
+        // a second timeout passes, recovery rotates ANOTHER missing seat.
+        vm.warp(settlement.monitorConfirmationDeadline(leaseId) + 1);
+        settlement.replaceNoShowMonitor(leaseId);
+        SSESettlement.Lease memory second = settlement.getLease(leaseId);
+        assertEq(second.monitors[2], first.monitors[2]);
+        assertTrue(second.monitors[3] != selected[3]);
+        assertTrue(second.monitors[3] != second.monitors[2]);
+        assertEq(second.monitorConfirmations, 2);
+        vm.prank(second.monitors[2]);
+        settlement.confirmMonitorAssignment(leaseId);
+        vm.prank(second.monitors[3]);
+        settlement.confirmMonitorAssignment(leaseId);
+        assertEq(uint8(settlement.getLease(leaseId).state),
+                 uint8(SSESettlement.LeaseState.Ready));
+    }
+
     function testPostRecoveryReleasesExactlyCurrentFourBonds() public {
         (uint256 leaseId, address[4] memory selected) = _fundAndAssign();
         _confirmThree(leaseId, selected);
