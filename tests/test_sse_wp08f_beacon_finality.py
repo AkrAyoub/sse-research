@@ -130,6 +130,25 @@ class BeaconApiTests(unittest.TestCase):
         self.assertFalse(cross_check_reported_finality(anchor(), view,
                          FakeExecutionRPC()).pos_finality_proven)
 
+    def test_archive_strict_loader_cross_checks_beacon_report(self):
+        import tempfile
+        from sse_http_signed_delivery_v1 import EvidenceArchive
+        with tempfile.TemporaryDirectory() as folder:
+            archive = EvidenceArchive(Path(folder) / 'capture.sqlite')
+            fake_loaded = ({'record': True}, b'response', anchor(), [], ('witness',))
+            with patch.object(archive, 'load_witnessed', return_value=fake_loaded) as loaded:
+                outcome = archive.load_beacon_reported(
+                    EVIDENCE, object(), object(), '0x'+'11'*20,
+                    FakeExecutionRPC(), object(), self.client)
+                self.assertEqual(outcome[-1].ancestry_depth, 2)
+                self.assertFalse(outcome[-1].pos_finality_proven)
+                self.assertEqual(outcome[1], b'response')
+                loaded.assert_called_once()
+                self.server.optimistic = True
+                with self.assertRaises(BeaconFinalityError):
+                    archive.load_beacon_reported(EVIDENCE, object(), object(),
+                        '0x'+'11'*20, FakeExecutionRPC(), object(), self.client)
+
     def test_wrong_genesis_is_fail_closed(self):
         self.server.genesis = '0x' + '55' * 32
         with self.assertRaisesRegex(BeaconFinalityError, 'genesis'):
