@@ -28,6 +28,10 @@ from sse_challenge import keccak256
 from sse_wp09d_rsa_entropy import (read_lab_key, laboratory_proof,
                                   rsa_request_digest, verify_proof,
                                   seed_from_proof)
+from sse_wp09e_global_merkle import (
+    RosterTree, sampled_indexes, request_commitment,
+)
+from eth_abi import encode, decode
 from sse_chain_read import LocalRPC, inspect_chain
 from sse_wp08c_chain_binding import bind_capture_to_chain
 from sse_evidence_wire_v1 import EvidenceScope, verify_observation, to_wp07_raw, ObservationKind
@@ -193,6 +197,12 @@ def run(output_dir: Path) -> dict:
         activate = '0x' + (selector + _word(32) + _word(256) +
                            public_modulus).hex()
         tx_hashes.append(_send(rpc, consumer, pool, activate)['transactionHash'])
+        # WP09E: independent one-way opt-in for the GLOBAL roster root;
+        # activate BEFORE registry enrollment, as index events are needed
+        # to reproduce historical leaves and proofs.
+        tx_hashes.append(_send(
+            rpc, consumer, pool, _calldata('enableGlobalMerkleElection()')
+        )['transactionHash'])
         for contract, data in (
             (pool, _calldata('bindSettlement(address)', settlement)),
             (settlement, _calldata('bindResourceBoard(address)', board)),
@@ -285,6 +295,55 @@ def run(output_dir: Path) -> dict:
         rsa_calldata = '0x' + (rsa_selector + _word(assignment_id) + _word(64) +
                               _word(len(proof)) + proof).hex()
         tx_hashes.append(_send(rpc, outsider, pool, rsa_calldata)['transactionHash'])
+        # RSA proof only REVEALS the fixed seed in global Merkle mode.
+        # A second, permissionless transaction submits the deterministic
+        # GLOBAL draw indexes' historical Merkle inclusion proofs.
+        ready_word = rpc.request('eth_call', [
+            {'to': pool, 'data': _calldata('pendingGlobalSeedReady(uint256)',
+                                         assignment_id)}, 'latest'])
+        if int(ready_word, 16) != 1:
+            raise AssertionError('global seed not ready after on-chain RSA proof')
+        seed_onchain = int(rpc.request('eth_call', [
+            {'to': pool, 'data': _calldata('pendingGlobalSeed(uint256)',
+                                         assignment_id)}, 'latest']), 16)
+        seed_local = seed_from_proof(rsa_digest, proof)
+        if seed_onchain != seed_local:
+            raise AssertionError('global entropy seed differs from proof reference')
+        root_word = rpc.request('eth_call', [
+            {'to': pool, 'data': _calldata('globalSnapshotRoot(uint256)',
+                                         assignment_id)}, 'latest'])
+        size_word = rpc.request('eth_call', [
+            {'to': pool, 'data': _calldata('globalSnapshotCount(uint256)',
+                                         assignment_id)}, 'latest'])
+        snapshot_count = int(size_word, 16)
+        if snapshot_count != len(candidates):
+            raise AssertionError('wrong global active roster size')
+        historical_tree = RosterTree()
+        for candidate in candidates:
+            historical_tree.append(candidate)
+        if root_word.lower() != '0x' + historical_tree.root.hex():
+            raise AssertionError('independent global Merkle root differs from contract')
+        expected_commitment = request_commitment(CHAIN_ID, pool, assignment_id,
+            assignment_block, historical_tree.root, snapshot_count)
+        if expected_commitment.hex() != snapshot_hash[2:]:
+            raise AssertionError('global request snapshot commitment mismatch')
+        onchain_indexes_word = rpc.request('eth_call', [
+            {'to': pool, 'data': _calldata('globalDrawIndexes(uint256)',
+                                         assignment_id)}, 'latest'])
+        onchain_indexes = list(decode(['uint256[]'],
+                                     bytes.fromhex(onchain_indexes_word[2:]))[0])
+        global_indexes = sampled_indexes(seed_local, assignment_id, snapshot_count)
+        if onchain_indexes != global_indexes:
+            raise AssertionError('on-chain and independent global draw order differ')
+        draw_accounts = [candidates[i] for i in global_indexes]
+        paths = [historical_tree.proof(i) for i in global_indexes]
+        global_selector = keccak256(
+            b'finalizeGlobalCommittee(uint256,address[],bytes32[][])')[:4]
+        global_calldata = '0x' + (global_selector + encode(
+            ['uint256', 'address[]', 'bytes32[][]'],
+            [assignment_id, draw_accounts, paths]
+        )).hex()
+        tx_hashes.append(_send(rpc, outsider, pool, global_calldata)['transactionHash'])
         tx_hashes.append(_send(rpc, consumer, settlement,
                                _calldata('finalizeMonitorCommittee(uint256)', 1))['transactionHash'])
         assigned = inspect_chain(rpc, settlement, 1, 0, endpoint=endpoint)['lease']['monitors']
@@ -507,6 +566,12 @@ def run(output_dir: Path) -> dict:
             'selectedMonitors': assigned, 'captureMonitor': first_monitor,
             'originalNoShowMonitor': no_show_monitor,
             'noShowReplacedAfterTimeout': True,
+            'globalMerkleFullRosterCommitted': True,
+            'globalMerkleRootMatchedIndependentPython': True,
+            'globalSampledIndexes': global_indexes,
+            'globalMerkleAllDrawnProofsVerifiedOnChain': True,
+            'globalRandomnessWithholdingStillPossible': True,
+            'globalChurnAfterCommitMayReduceLiveness': True,
             'rsaProofEntropyApplied': True,
             'rsaModexpActuallyVerifiedOnChain': True,
             'rsaProofRequestDigest': '0x' + rsa_digest.hex(),
