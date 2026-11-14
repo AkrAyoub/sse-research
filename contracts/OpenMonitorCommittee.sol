@@ -153,7 +153,9 @@ contract OpenMonitorCommittee {
         address[] memory roster = snapshots[id];
         uint256 length = roster.length;
         
-        // Finish the unbiased Fisher-Yates permutation, not just the first
+        // Finish the seed-determined Fisher-Yates-style permutation; modulo
+        // reduction may introduce negligible bias and the seed is V1 trusted.
+        // Shuffle the full roster, not just the first four slots.
         // four selections, to establish an immutable standby order from the
         // SAME randomness draw. No consumer choice or second seed on recovery.
         for (uint256 i; i < length; ++i) {
