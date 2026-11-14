@@ -25,6 +25,9 @@ ROOT = Path(__file__).resolve().parents[1]
 sys.path.insert(0, str(ROOT / 'tools'))
 sys.path.insert(0, str(ROOT / 'services' / 'monitor-agent'))
 from sse_challenge import keccak256
+from sse_wp09d_rsa_entropy import (read_lab_key, laboratory_proof,
+                                  rsa_request_digest, verify_proof,
+                                  seed_from_proof)
 from sse_chain_read import LocalRPC, inspect_chain
 from sse_wp08c_chain_binding import bind_capture_to_chain
 from sse_evidence_wire_v1 import EvidenceScope, verify_observation, to_wp07_raw, ObservationKind
@@ -180,10 +183,16 @@ def run(output_dir: Path) -> dict:
                        min_bond, 86400, 3600)
         settlement = _deploy(rpc, consumer, 'SSESettlement', pool)
         board = _deploy(rpc, consumer, 'OpenResourceBoard')
-        # R3 WP09C: one-way opt-in must precede the binding of settlement.
-        tx_hashes.append(_send(
-            rpc, consumer, pool, _calldata('enableDelayedBlockEntropy()')
-        )['transactionHash'])
+        # R3 WP09D: this test uses a PUBLIC/INSECURE RSA private key, kept
+        # solely in tests/fixtures. A real application MUST use an audited
+        # setup, protected key and independent proof operator. Opt-in occurs
+        # only before the settlement binding, and disables arbitrary seeds.
+        lab_modulus, lab_private_exponent = read_lab_key()
+        public_modulus = lab_modulus.to_bytes(256, 'big')
+        selector = keccak256(b'enableRSAProofEntropy(bytes)')[:4]
+        activate = '0x' + (selector + _word(32) + _word(256) +
+                           public_modulus).hex()
+        tx_hashes.append(_send(rpc, consumer, pool, activate)['transactionHash'])
         for contract, data in (
             (pool, _calldata('bindSettlement(address)', settlement)),
             (settlement, _calldata('bindResourceBoard(address)', board)),
@@ -234,10 +243,9 @@ def run(output_dir: Path) -> dict:
 
         tx_hashes.append(_send(rpc, provider, settlement,
                                _calldata('acceptLease(uint256)', 1))['transactionHash'])
-        # The eligible roster is already committed by the pool BEFORE the
-        # future entropy block exists; anyone can later fulfill the request.
-        # Anvil is a LOCAL test chain: its mined block hash is not secure VRF
-        # entropy, PoS finality, or independent proposer unpredictability.
+        # The eligible bounded roster is committed BEFORE any proof request.
+        # The public test signer can later compute ONE canonical RSA root.
+        # The verifier runs actual EVM modexp on the live chain (no mocking).
         assignment_id = lease['assignmentId']
         assignment_block_hex = rpc.request('eth_call', [
             {'to': pool,
@@ -249,19 +257,34 @@ def run(output_dir: Path) -> dict:
              'data': _calldata('snapshotCommitment(uint256)', assignment_id)},
             'latest'])
         if snapshot_hash == '0x' + '00' * 32:
-            raise AssertionError('eligible snapshot was not committed before entropy')
-        entropy_target = assignment_block + 4
-        current_block = int(rpc.request('eth_blockNumber', []), 16)
-        for _ in range(max(0, entropy_target + 1 - current_block)):
-            rpc.request('evm_mine', [])
-        future_block = rpc.request('eth_getBlockByNumber',
-                                   [hex(entropy_target), False])
-        if not future_block or int(future_block['number'], 16) != entropy_target:
-            raise AssertionError('future entropy block is unavailable')
-        tx_hashes.append(_send(
-            rpc, outsider, pool,
-            _calldata('fulfillDelayedBlockEntropy(uint256)', assignment_id)
-        )['transactionHash'])
+            raise AssertionError('eligible snapshot was not committed before proof')
+        digest_hex = rpc.request('eth_call', [
+            {'to': pool, 'data': _calldata('rsaRequestDigest(uint256)', assignment_id)},
+            'latest'])
+        rsa_digest = bytes.fromhex(digest_hex[2:])
+        expected_digest = rsa_request_digest(CHAIN_ID, pool, assignment_id,
+            assignment_block, bytes.fromhex(snapshot_hash[2:]))
+        if rsa_digest != expected_digest:
+            raise AssertionError('independent RSA digest disagreed with on-chain request scope')
+        proof = laboratory_proof(rsa_digest, lab_modulus, lab_private_exponent)
+        if not verify_proof(rsa_digest, proof, lab_modulus):
+            raise AssertionError('independent local RSA verifier rejected generated proof')
+        verifier_word = rpc.request('eth_call', [
+            {'to': pool, 'data': _calldata('rsaEntropyVerifier()')}, 'latest'])
+        verifier_address = '0x' + verifier_word[-40:]
+        if verifier_address == '0x' + '00' * 20:
+            raise AssertionError('RSA verifier not deployed by pool')
+        verify_selector = keccak256(b'verify(bytes32,bytes)')[:4]
+        verify_data = '0x' + (verify_selector + rsa_digest + _word(64) +
+                             _word(len(proof)) + proof).hex()
+        on_chain_verified = rpc.request('eth_call', [
+            {'to': verifier_address, 'data': verify_data}, 'latest'])
+        if int(on_chain_verified, 16) != 1:
+            raise AssertionError('real EVM RSA modular-exponentiation verifier rejected proof')
+        rsa_selector = keccak256(b'fulfillRSAProofEntropy(uint256,bytes)')[:4]
+        rsa_calldata = '0x' + (rsa_selector + _word(assignment_id) + _word(64) +
+                              _word(len(proof)) + proof).hex()
+        tx_hashes.append(_send(rpc, outsider, pool, rsa_calldata)['transactionHash'])
         tx_hashes.append(_send(rpc, consumer, settlement,
                                _calldata('finalizeMonitorCommittee(uint256)', 1))['transactionHash'])
         assigned = inspect_chain(rpc, settlement, 1, 0, endpoint=endpoint)['lease']['monitors']
@@ -484,10 +507,14 @@ def run(output_dir: Path) -> dict:
             'selectedMonitors': assigned, 'captureMonitor': first_monitor,
             'originalNoShowMonitor': no_show_monitor,
             'noShowReplacedAfterTimeout': True,
-            'futureBlockEntropyApplied': True,
+            'rsaProofEntropyApplied': True,
+            'rsaModexpActuallyVerifiedOnChain': True,
+            'rsaProofRequestDigest': '0x' + rsa_digest.hex(),
+            'rsaDerivedSeed': hex(seed_from_proof(rsa_digest, proof)),
+            'rsaPublicLabKeyOnly': True,
+            'rsaPrivateKeyOperatorWithholdingUnresolved': True,
             'snapshotHashCommittedBeforeEntropy': snapshot_hash,
-            'entropyBlockNumber': entropy_target,
-            'futureBlockProposerBiasUnresolved': True,
+            'futureBlockEntropyApplied': False,
             'globalSelectionUniformityProven': False,
             'threeOfFourStillBlocksEpochAdmission': True,
             'replacementNeededFreshMonitorConfirmation': True,
