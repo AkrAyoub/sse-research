@@ -127,6 +127,9 @@ contract SSESettlement is EIP712 {
     mapping(uint256 => mapping(uint256 => Epoch)) private epochs;
     mapping(uint256 => mapping(address => bool)) private confirmedMonitor;
     mapping(uint256 => uint64) public monitorConfirmationDeadline;
+    // Rotate fairly across several missing seats; a just-selected standby
+    // must not be the only target while another original member is absent.
+    mapping(uint256 => uint8) private nextUnconfirmedSeat;
     mapping(uint256 => mapping(uint256 => mapping(address => bool))) private voted;
     mapping(uint256 => mapping(bytes32 => bool)) private usedRequestHash;
     mapping(address => uint256) public withdrawable;
@@ -326,7 +329,7 @@ contract SSESettlement is EIP712 {
 
     /// @notice Recover a pre-epoch lease if a selected monitor never confirms.
     /// @dev Permissionless after one full confirmation window; replaces only the
-    /// first unconfirmed seat with the next eligible pre-shuffled standby.
+    /// next unconfirmed seat in round-robin order with a pre-shuffled standby.
     /// Existing confirmation signatures and lease funds are untouched. This
     /// cannot be invoked once the committee is Ready or an epoch has started.
     function replaceNoShowMonitor(uint256 leaseId) external {
@@ -337,7 +340,8 @@ contract SSESettlement is EIP712 {
         if (monitorConfirmationDeadline[leaseId] == 0 ||
             block.timestamp <= monitorConfirmationDeadline[leaseId]) revert OutsideWindow();
 
-        for (uint256 i; i < COMMITTEE_SIZE; ++i) {
+        for (uint256 offset; offset < COMMITTEE_SIZE; ++offset) {
+            uint256 i = (uint256(nextUnconfirmedSeat[leaseId]) + offset) % COMMITTEE_SIZE;
             address missing = lease.monitors[i];
             if (confirmedMonitor[leaseId][missing]) continue;
             // Pool requires its original seed-determined standby order and
@@ -346,6 +350,7 @@ contract SSESettlement is EIP712 {
             if (replacement == address(0) || confirmedMonitor[leaseId][replacement])
                 revert InvalidState();
             lease.monitors[i] = replacement;
+            nextUnconfirmedSeat[leaseId] = uint8((i + 1) % COMMITTEE_SIZE);
             _resetMonitorConfirmationDeadline(leaseId);
             emit CommitteeSeatRotated(leaseId, missing, replacement,
                                       monitorConfirmationDeadline[leaseId]);
