@@ -24,6 +24,13 @@
 - Client API migration: `candidateCount()` and `candidateAt()` now enumerate only **currently active** entries; historical distinct-account count is `totalRegistrations()` and historical identities can be reconstructed from event logs.
 - Evidence: [stacked draft PR #23](https://github.com/AkrAyoub/sse-research/pull/23) and `R3_WP09B_BOUNDED_ACTIVE_REGISTRY.md`. Acceptance remains conditional on GitHub CI plus subsequent fairness/adversarial experiments.
 
+## WP-09C bounded-snapshot future-block entropy (draft, 2026-11-14)
+
+- Implemented: **opt-in, one-way** future-block mode before settlement binding; hash-commit the entire **already bounded eligible snapshot** at assignment time; after four additional blocks, any caller may derive a domain-separated seed from the future block hash. Arbitrary seed submission by the former authorized source is disabled **in this mode**, while the legacy behavior remains supported when not enabled.
+- The snapshot commitment is cryptographically reproducible, but the input block hash is **not a verified VRF result** and may be affected by validators, sequencers, reorgs, chain timing, and selective requester cancellation. A four-block wait is for the lab, not a justified production security parameter. This incremental change does **not** freeze the *entire global candidate universe*, which remains limited to the rolling 64-entry WP09B snapshot.
+- Full unbiased, ungrindable global selection, Sybil/operator independence, verifiable PoS finality, candidate-concentration defenses and physical evidence soundness remain separate and unfinished research goals. In particular, a future-block hash must never be described as a Chainlink/VRF proof.
+- Evidence: [stacked draft PR #24](https://github.com/AkrAyoub/sse-research/pull/24), `R3_WP09C_FUTURE_BLOCK_ENTROPY.md`; hosted source CI [75 Foundry, 385 Python each OS and live Anvil](https://github.com/AkrAyoub/sse-research/actions/runs/43545560434), 4/4 green.
+
 ## Dependencies retained elsewhere
 
 R1 contractual SLA/evidence semantics; R2 financial and residual safety; R4 interoperable signed records; R5 independent role agents; R6 NAT/cloud enrollment; R7 HTTP/compute/storage/OCI/API predicates; R8 archive/observatory; R9/R10 cross-host failure experiments; R11 external reproduction; P0–P6 theory and paper. **Nothing is dropped.**
