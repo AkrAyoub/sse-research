@@ -195,6 +195,10 @@ contract DelayedBlockEntropyTest is Test {
         vm.prank(consumer);
         settlement.closeLease(id);
         assertEq(settlement.withdrawable(consumer), 25);
+        // An expired PRE-SELECTION request had no assigned committee to
+        // release. expire() already unlocked its pending snapshot bonds.
+        // Trying the assigned-committee release path must fail closed.
+        vm.expectRevert(OpenMonitorCommittee.InvalidPhase.selector);
         settlement.releaseCommitteeAfterEvidence(id);
         assertEq(uint8(pool.assignmentStatus(id)),
                  uint8(OpenMonitorCommittee.RequestStatus.Expired));
