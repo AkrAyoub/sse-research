@@ -238,7 +238,8 @@ contract OpenMonitorCommittee {
         if (requestBlock == 0 || snapshotCommitment[id] == bytes32(0))
             revert InvalidPhase();
         uint256 entropyBlock = requestBlock + DELAYED_ENTROPY_BLOCKS;
-        if (block.number <= entropyBlock) revert InvalidPhase();
+        if (block.number <= entropyBlock || block.number - entropyBlock > 256)
+            revert InvalidPhase();
         bytes32 hash = blockhash(entropyBlock);
         if (hash == bytes32(0)) revert InvalidPhase(); // >256 old or missing
         uint256 seed = uint256(keccak256(abi.encode(
