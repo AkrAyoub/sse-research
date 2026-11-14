@@ -542,24 +542,44 @@ contract OpenMonitorCommittee {
         if (r.status != RequestStatus.AwaitingRandomness ||
             block.timestamp > uint256(r.requestedAt) + randomnessTimeout)
             revert InvalidPhase();
-        uint256 n = globalSnapshotCount[id];
-        uint256 total = n < GLOBAL_RECOVERY_DRAW_LIMIT ? n : GLOBAL_RECOVERY_DRAW_LIMIT;
+
+        uint256 count = globalSnapshotCount[id];
+        uint256 total = count < GLOBAL_RECOVERY_DRAW_LIMIT
+            ? count : GLOBAL_RECOVERY_DRAW_LIMIT;
         uint256 cursor = globalRecoveryCursor[id];
-        uint256 length = accounts.length;
-        if (length == 0 || length > GLOBAL_RECOVERY_BATCH_LIMIT ||
-            siblingPaths.length != length || cursor + length > total)
+        if (accounts.length == 0 || accounts.length > GLOBAL_RECOVERY_BATCH_LIMIT ||
+            siblingPaths.length != accounts.length || cursor + accounts.length > total)
             revert InvalidInput();
+
+        _verifyGlobalRecoveryBatch(id, cursor, total, accounts, siblingPaths);
+
+        uint256 nextCursor = cursor + accounts.length;
+        globalRecoveryCursor[id] = nextCursor;
+        emit GlobalRecoveryBatchAdvanced(id, nextCursor, total, globalRecoveryLocks[id]);
+
+        if (nextCursor == total) _completeGlobalRecovery(id, nextCursor);
+    }
+
+    /// @dev Isolate index-array allocation and Merkle checks from state transition.
+    ///      This reduces stack pressure for Solidity 0.8.24 without via-IR.
+    function _verifyGlobalRecoveryBatch(
+        uint256 id, uint256 cursor, uint256 total,
+        address[] calldata accounts, bytes32[][] calldata siblingPaths
+    ) internal {
         uint256[] memory indexes = GlobalRosterSampler.draw(
-            pendingGlobalSeed[id], id, n, total
+            pendingGlobalSeed[id], id, globalSnapshotCount[id], total
         );
-        for (uint256 j; j < length; ++j) {
-            _acceptGlobalRecoveryProof(id, indexes[cursor + j], accounts[j],
-                                       siblingPaths[j]);
+        for (uint256 j; j < accounts.length; ++j) {
+            _acceptGlobalRecoveryProof(
+                id, indexes[cursor + j], accounts[j], siblingPaths[j]
+            );
         }
-        cursor += length;
-        globalRecoveryCursor[id] = cursor;
-        emit GlobalRecoveryBatchAdvanced(id, cursor, total, globalRecoveryLocks[id]);
-        if (cursor != total) return;
+    }
+
+    /// @dev The full predetermined draw was verified in order. Never reroll.
+    ///      The fail-closed branch atomically releases all provisional locks.
+    function _completeGlobalRecovery(uint256 id, uint256 processed) internal {
+        Assignment storage r = assignments[id];
         if (globalRecoveryLocks[id] < COMMITTEE_SIZE) {
             _clearGlobalRecovery(id);
             delete pendingGlobalSeedReady[id];
@@ -572,7 +592,7 @@ contract OpenMonitorCommittee {
         delete globalRecoveryLocks[id];
         delete pendingGlobalSeedReady[id];
         delete pendingGlobalSeed[id];
-        emit GlobalRecoveryCompleted(id, cursor, standbyRosters[id].length);
+        emit GlobalRecoveryCompleted(id, processed, standbyRosters[id].length);
         emit CommitteeSelected(id, r.committee);
     }
 
