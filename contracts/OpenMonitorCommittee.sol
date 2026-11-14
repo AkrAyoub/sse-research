@@ -114,6 +114,7 @@ contract OpenMonitorCommittee {
     event CommitteeMemberReplaced(uint256 indexed requestId, address indexed removed,
                                   address indexed replacement, uint256 remainingStandbys);
     event AssignmentExpired(uint256 indexed requestId);
+    event AssignmentCancelled(uint256 indexed requestId, RequestStatus previousStatus);
     event AssignmentReleased(uint256 indexed requestId);
 
     constructor(address randomProvider, uint256 minBond, uint64 exitDelaySeconds, uint64 randomnessTimeoutSeconds) {
@@ -473,6 +474,34 @@ contract OpenMonitorCommittee {
         return GlobalRosterSampler.draw(pendingGlobalSeed[id], id, n, k);
     }
 
+    /// @notice Settlement may atomically cancel an assignment when a
+    /// lease is CLOSED before the committee is copied into settlement.
+    /// The consumer is NOT granted direct permission on this pool method.
+    /// This also prevents already-staged global seeds from assigning after
+    /// lease close, and frees selected bonds if not yet finalized.
+    function cancelUnassigned(uint256 id) external onlySettlement {
+        Assignment storage r = assignments[id];
+        RequestStatus previous = r.status;
+        if (previous == RequestStatus.AwaitingRandomness) {
+            if (!globalMerkleElectionEnabled) _unlockSnapshot(id);
+            delete pendingGlobalSeedReady[id];
+            delete pendingGlobalSeed[id];
+            r.status = RequestStatus.Expired;
+        } else if (previous == RequestStatus.Assigned) {
+            // Settlement hasn't copied the committee yet; no epoch exists.
+            for (uint256 i; i < COMMITTEE_SIZE; ++i) {
+                --candidates[r.committee[i]].activeAssignments;
+            }
+            delete standbyRosters[id];
+            delete nextStandbyIndex[id];
+            r.status = RequestStatus.Released;
+            emit AssignmentReleased(id);
+        } else if (previous != RequestStatus.Expired) {
+            revert InvalidPhase();
+        }
+        emit AssignmentCancelled(id, previous);
+    }
+
     function expire(uint256 id) external {
         Assignment storage r = assignments[id];
         if (r.status != RequestStatus.AwaitingRandomness ||
@@ -554,6 +583,10 @@ contract OpenMonitorCommittee {
         return r.committee;
     }
 
+    /// @notice Original request time anchors VRF timeout; immutable per ID.
+    function assignmentRequestedAt(uint256 id) external view returns (uint64) {
+        return assignments[id].requestedAt;
+    }
     function assignmentStatus(uint256 id) external view returns (RequestStatus) { return assignments[id].status; }
     // These getters enumerate ACTIVE bonded candidates, not a lifetime list.
     function candidateCount() external view returns (uint256) { return activeCandidates.length; }

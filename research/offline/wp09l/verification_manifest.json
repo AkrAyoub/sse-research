@@ -1,0 +1,173 @@
+{
+  "project": "SSE Research",
+  "work_package": "WP-09L",
+  "date": "2026-11-14",
+  "scope": "consumer-prepaid flat-ETH request fee, lifetime quota and closure refunds",
+  "mode": "entirely local; no GitHub actions, commits, deployments, or paid services",
+  "verified_python_tests": {
+    "WP09L": 24,
+    "WP09K_replay": 19,
+    "WP09I_replay": 25,
+    "total": 68
+  },
+  "wp09l_modeled_actions": 36000,
+  "foundry_test_functions_authored": 14,
+  "foundry_compiled": false,
+  "foundry_executed": false,
+  "solidity_compiled": false,
+  "production_vrf_verified": false,
+  "research_security_caveat": "flat ETH service fee is not a verified subscription cost or audited VRF",
+  "progress_recorded": {
+    "R3": 38,
+    "engineering": 26,
+    "research": 26,
+    "overall": 26
+  },
+  "files": [
+    {
+      "file": "README.md",
+      "sha256": "e7bf62624477348bfe0acb352700fc1502f83529ee6000df4525ff869f416754",
+      "bytes": 3893
+    },
+    {
+      "file": "WP09L_FINDINGS.md",
+      "sha256": "801a20516671c2a7a48a6ae2474a2d2f75454f6ef156517e2c784595169a8adc",
+      "bytes": 9056
+    },
+    {
+      "file": "apply_wp09l.py",
+      "sha256": "a3ae4148b68b9da0a5dd9a5ba6f72831dd51358c5586357467f9a84dc41f9fec",
+      "bytes": 3177
+    },
+    {
+      "file": "foundry_test/VRFFeePolicy.t.sol",
+      "sha256": "e9bfcaee04f544785a387f2d40ecbc968a453d2121e0c5ac10306264331c40d6",
+      "bytes": 12430
+    },
+    {
+      "file": "logs/local_evm_probe.log",
+      "sha256": "c92d03a0a2b11745e13945b15ecb348af2c76b2524fe45f4bc80c49baf7436a3",
+      "bytes": 60
+    },
+    {
+      "file": "logs/wp09i_regression.log",
+      "sha256": "18cc866239d7d5d9dcc26cbdd38feec0e0cb9a3bd9ad501991aa5937246bc781",
+      "bytes": 3215
+    },
+    {
+      "file": "logs/wp09k_regression.log",
+      "sha256": "368da0a6bc56804e374d016e0df7922046b1aca9278d34bf15a7dec5f0639902",
+      "bytes": 2908
+    },
+    {
+      "file": "logs/wp09l_tests.log",
+      "sha256": "0e3086f442cd049a0bf412e7c4fba67af46090c6107243f8978d157bcb5f5443",
+      "bytes": 3145
+    },
+    {
+      "file": "policy_reference/VRFAdapterIntegration.t.sol",
+      "sha256": "6e3a1c03493d22f1e5e1b2f55b54f4c2562544aecab07970b6a61ebab7d52147",
+      "bytes": 20008
+    },
+    {
+      "file": "policy_reference/WP09I_offline/README.md",
+      "sha256": "c85939af95b9d80d4a83296163411c0bec0e78bf617f710df9de64ef5eeb56a7",
+      "bytes": 1799
+    },
+    {
+      "file": "policy_reference/WP09I_offline/WP09I_FINDINGS.md",
+      "sha256": "592054734bdb84e41c2ebecd36b2e213b7ff07047156731ab979e9cad7c50242",
+      "bytes": 10561
+    },
+    {
+      "file": "policy_reference/WP09I_offline/WP09I_VRFV25_ADAPTER_DRAFT.sol",
+      "sha256": "5c82fbfb3d61f63e0c239c31ccc55d6bf9def0ed5f85f80112eb0744feb98e2b",
+      "bytes": 8801
+    },
+    {
+      "file": "policy_reference/WP09I_offline/keccak.py",
+      "sha256": "e20a31fc4ab23336085198b3ddb8b294912e1f167334370966c2df133cd6055d",
+      "bytes": 1546
+    },
+    {
+      "file": "policy_reference/WP09I_offline/reroll_attack_metrics.csv",
+      "sha256": "31acf2967d1fee47c1bedc4acf6103c3dfd3cc4b35378994e0d9672b8f362820",
+      "bytes": 1073
+    },
+    {
+      "file": "policy_reference/WP09I_offline/test_wp09i.py",
+      "sha256": "9d50f8d5cb2b65f70e5adadebc88f46498c54c2505267134406c8b0f3df4f22a",
+      "bytes": 11465
+    },
+    {
+      "file": "policy_reference/WP09I_offline/wp09g_recovery.py",
+      "sha256": "181ffc0ceebbbfcbcb06d1918e85e6148b7513768acc3807df2dbd77d685cacd",
+      "bytes": 7974
+    },
+    {
+      "file": "policy_reference/WP09I_offline/wp09i_vrf_policy.py",
+      "sha256": "46729cdb95f9919419eb09eff327b81fa4eb486b6fe80be523a6c4e4eb0b5bba",
+      "bytes": 10953
+    },
+    {
+      "file": "policy_reference/apply_wp09k.py",
+      "sha256": "c3f02547958a96b5f248779c2adaf596e852df617cf6bb9c53366997e6ab94a2",
+      "bytes": 7966
+    },
+    {
+      "file": "policy_reference/contracts/MockVRFV25Coordinator.sol",
+      "sha256": "1e119a67ef8c4c244cb00caea0c5cb45631bcf1f819441ad9c2812b4b317dc45",
+      "bytes": 3406
+    },
+    {
+      "file": "policy_reference/contracts/SSEVRFV25Adapter.sol",
+      "sha256": "9629fee15cffaf0fa9e2882ffcf5dde1a80d72f81183ceffc6931574b51c52d5",
+      "bytes": 10282
+    },
+    {
+      "file": "policy_reference/foundry_test/VRFAdapterIntegration.t.sol",
+      "sha256": "6e3a1c03493d22f1e5e1b2f55b54f4c2562544aecab07970b6a61ebab7d52147",
+      "bytes": 20008
+    },
+    {
+      "file": "policy_reference/harden_source.py",
+      "sha256": "91d56d7756d44f7504e5326b7efefbec046c9d1f17357e91d70b62d0bef8370a",
+      "bytes": 11760
+    },
+    {
+      "file": "policy_reference/test_wp09k_offline.py",
+      "sha256": "cb2ed3e993f3b69cbea7e2fe2725971d3a7d1c705fb85b723a937b7726710262",
+      "bytes": 12664
+    },
+    {
+      "file": "policy_reference/tests/test_wp09k_offline.py",
+      "sha256": "cb2ed3e993f3b69cbea7e2fe2725971d3a7d1c705fb85b723a937b7726710262",
+      "bytes": 12664
+    },
+    {
+      "file": "policy_reference/wp09k_policy_model.py",
+      "sha256": "d4d716c5135c0eb5f2663cbffa0ffb3671f9ddc2d9d759531b8933b99f42ec63",
+      "bytes": 6573
+    },
+    {
+      "file": "tests/test_wp09l.py",
+      "sha256": "56274da8e7ab9728aebccab756efdf5f464d348da667c8f1f01211cdfb9beb4f",
+      "bytes": 10207
+    },
+    {
+      "file": "verify_wp09l_locally.sh",
+      "sha256": "f694105aac21992e11fff5f0b941402fbb3efd284822958d9d1b3e826af17f80",
+      "bytes": 1594
+    },
+    {
+      "file": "wp09l_fee_model.py",
+      "sha256": "c20fe389615c44855425792b34ea636bd05ec14f5fdf7800a0f2f5fb4231f43e",
+      "bytes": 6650
+    },
+    {
+      "file": "wp09l_source.py",
+      "sha256": "aa1ebfa6b531ab4f65dc9b3496b6dd4a3eb54e86ccd366ee256fd652e0b49e7f",
+      "bytes": 7275
+    }
+  ]
+}

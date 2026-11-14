@@ -6,6 +6,13 @@ import {ECDSA} from "@openzeppelin/contracts/utils/cryptography/ECDSA.sol";
 import {OpenMonitorCommittee} from "./OpenMonitorCommittee.sol";
 
 
+interface ISSEVRFAdapter {
+    function pool() external view returns (address);
+    function settlement() external view returns (address);
+    function requestSeed(uint256 leaseId, uint256 assignmentId)
+        external returns (uint256);
+}
+
 contract SSESettlement is EIP712 {
     uint8 private constant COMMITTEE_SIZE = 4;
     uint8 private constant QUORUM = 3;
@@ -120,6 +127,17 @@ contract SSESettlement is EIP712 {
     OpenMonitorCommittee public immutable committeePool;
     address public immutable bootstrapper;
     address public resourceBoard;
+    ISSEVRFAdapter public randomnessAdapter;
+    // WP09L: one-price native ETH reimbursement, NOT exact coordinator billing.
+    // The bootstrapper pays coordinator subscription expenses externally.
+    uint256 public vrfFeeWei;
+    uint256 public vrfLifetimeRequestCap;
+    uint256 public vrfRequestsUsed;
+    bool public vrfFeePolicyConfigured;
+    bool private vrfPurchaseEntered;
+    mapping(uint256 => bool) public vrfFeeFunded;
+    mapping(uint256 => bool) public vrfFeeSpent;
+
     uint256 public nextLeaseId = 1;
     bool private withdrawalEntered;
 
@@ -141,6 +159,14 @@ contract SSESettlement is EIP712 {
     mapping(uint256 => mapping(uint256 => mapping(address => bytes32))) public monitorEvidenceHash;
 
     event ResourceBoardBound(address indexed board);
+    event RandomnessAdapterBound(address indexed adapter);
+    event VrfFeePolicyLocked(uint256 feeWei, uint256 maxLifetimeRequests);
+    event VrfFeeFunded(uint256 indexed leaseId, address indexed consumer, uint256 amount);
+    event VrfFeeEarned(uint256 indexed leaseId, address indexed sponsor, uint256 amount);
+    event VrfFeeRefunded(uint256 indexed leaseId, address indexed consumer, uint256 amount);
+
+    event LeaseRandomnessRequested(uint256 indexed leaseId,
+                                  uint256 indexed assignmentId, uint256 vrfId);
     event CommitteeAssignmentRequested(uint256 indexed leaseId, uint256 indexed assignmentId);
     event CommitteeAssigned(uint256 indexed leaseId, uint256 indexed assignmentId);
     event CommitteeBondsReleased(uint256 indexed leaseId);
@@ -180,6 +206,52 @@ contract SSESettlement is EIP712 {
         if (pool == address(0)) revert InvalidArgument();
         committeePool = OpenMonitorCommittee(pool);
         bootstrapper = msg.sender;
+    }
+
+    /// @notice One-way, optional binding BEFORE the first lease. Legacy V1
+    /// keeps adapter unset, preserving previous functionality and gas paths.
+    /// @notice One-time, immutable fixed native-ETH service fee and bounded
+    /// lifetime number of subscription-backed coordinator requests.
+    /// @dev The fee reimburses the bootstrapper; it is NOT a trustless measure
+    /// of LINK/native billing. No VRF requests can be started without funding.
+    function configureVrfFeePolicy(uint256 feeWei, uint256 maxLifetimeRequests) external {
+        if (msg.sender != bootstrapper || vrfFeePolicyConfigured ||
+            address(randomnessAdapter) != address(0) || nextLeaseId != 1 ||
+            feeWei == 0 || maxLifetimeRequests == 0) revert InvalidArgument();
+        vrfFeePolicyConfigured = true;
+        vrfFeeWei = feeWei;
+        vrfLifetimeRequestCap = maxLifetimeRequests;
+        emit VrfFeePolicyLocked(feeWei, maxLifetimeRequests);
+    }
+
+    /// @notice Only the accepted lease's consumer can prepay the VRF request.
+    /// @dev Separate from service escrow and report/release incentives.
+    /// Prepayment is refundable on lease close UNTIL purchase succeeds.
+    function fundVrfRequestFee(uint256 leaseId) external payable onlyConsumer(leaseId) {
+        Lease storage lease = leases[leaseId];
+        if (!vrfFeePolicyConfigured || address(randomnessAdapter) == address(0) ||
+            !isLeaseRandomnessOpen(leaseId, lease.assignmentId) ||
+            vrfRequestsUsed >= vrfLifetimeRequestCap ||
+            vrfFeeFunded[leaseId] || vrfFeeSpent[leaseId] ||
+            msg.value != vrfFeeWei) revert InvalidState();
+        vrfFeeFunded[leaseId] = true;
+        emit VrfFeeFunded(leaseId, msg.sender, msg.value);
+    }
+
+    function bindRandomnessAdapter(address adapter) external {
+        if (msg.sender != bootstrapper || !vrfFeePolicyConfigured ||
+            address(randomnessAdapter) != address(0) || nextLeaseId != 1 ||
+            adapter == address(0) || adapter.code.length == 0)
+            revert Unauthorized();
+        ISSEVRFAdapter candidate = ISSEVRFAdapter(adapter);
+        if (candidate.pool() != address(committeePool) ||
+            candidate.settlement() != address(this) ||
+            committeePool.randomnessSource() != adapter ||
+            committeePool.delayedBlockEntropyEnabled() ||
+            address(committeePool.rsaEntropyVerifier()) != address(0))
+            revert InvalidArgument();
+        randomnessAdapter = candidate;
+        emit RandomnessAdapterBound(adapter);
     }
 
     function bindResourceBoard(address board) external {
@@ -300,6 +372,51 @@ contract SSESettlement is EIP712 {
         if (lease.state != LeaseState.Offered) revert InvalidState();
         lease.state = LeaseState.Accepted;
         emit LeaseAccepted(leaseId);
+    }
+
+    /// @notice TEMPORARY subscription-spend gate: only the bootstrapper
+    /// can dispatch a paid VRF request, and only after provider acceptance.
+    /// This is a deliberately CENTRALIZED cost control, not final protocol.
+    /// A fee-backed permissionless dispatch policy needs separate review.
+    /// @dev The adapter checks the original pool timestamp/deadline and binds
+    /// the returned coordinator request ID to that immutable snapshot.
+    /// @notice Permissionless dispatch only AFTER consumer funds this lease.
+    /// @dev Reimburse sponsor once on purchase; NEVER on callback success.
+    /// Spending a request's fixed fee does not depend on randomness delivery.
+    /// Coordinator revert atomically restores fee, quota and request state.
+    function requestLeaseRandomness(uint256 leaseId) external returns (uint256 vrfId) {
+        Lease storage lease = leases[leaseId];
+        if (!vrfFeePolicyConfigured || vrfPurchaseEntered ||
+            !vrfFeeFunded[leaseId] || vrfFeeSpent[leaseId] ||
+            vrfRequestsUsed >= vrfLifetimeRequestCap ||
+            address(randomnessAdapter) == address(0) ||
+            !isLeaseRandomnessOpen(leaseId, lease.assignmentId)) revert InvalidState();
+        // Effects BEFORE calling the external coordinator via the adapter.
+        // Protects unrelated, separately funded leases from reentrant buys.
+        vrfPurchaseEntered = true;
+        vrfFeeFunded[leaseId] = false;
+        vrfFeeSpent[leaseId] = true;
+        ++vrfRequestsUsed;
+        withdrawable[bootstrapper] += vrfFeeWei;
+        vrfId = randomnessAdapter.requestSeed(leaseId, lease.assignmentId);
+        vrfPurchaseEntered = false;
+        emit VrfFeeEarned(leaseId, bootstrapper, vrfFeeWei);
+        emit LeaseRandomnessRequested(leaseId, lease.assignmentId, vrfId);
+    }
+
+    /// @notice Adapter safety check both before PURCHASE and before APPLY.
+    /// @dev Does not rely only on pool assignment status: closing a lease
+    /// must prevent subsequent randomness from locking monitor bonds.
+    function isLeaseRandomnessOpen(uint256 leaseId, uint256 assignmentId)
+        public view returns (bool)
+    {
+        Lease storage lease = leases[leaseId];
+        return assignmentId != 0 && lease.consumer != address(0) &&
+            lease.assignmentId == assignmentId &&
+            lease.state == LeaseState.Accepted &&
+            lease.monitors[0] == address(0) &&
+            committeePool.assignmentStatus(assignmentId) ==
+                OpenMonitorCommittee.RequestStatus.AwaitingRandomness;
     }
 
     function finalizeMonitorCommittee(uint256 leaseId) external {
@@ -564,6 +681,21 @@ contract SSESettlement is EIP712 {
     function closeLease(uint256 leaseId) external onlyConsumer(leaseId) {
         Lease storage lease = leases[leaseId];
         if (lease.state == LeaseState.Closed) revert InvalidState();
+        // The consumer gets the unspent VRF fee back on lease closure.
+        // Once the coordinator purchase succeeded the sponsor already earned
+        // the fee, EVEN IF the VRF request later times out or is withheld.
+        if (vrfFeeFunded[leaseId] && !vrfFeeSpent[leaseId]) {
+            vrfFeeFunded[leaseId] = false;
+            withdrawable[lease.consumer] += vrfFeeWei;
+            emit VrfFeeRefunded(leaseId, lease.consumer, vrfFeeWei);
+        }
+        if (address(randomnessAdapter) != address(0) &&
+            lease.monitors[0] == address(0)) {
+            // No committee has been handed to settlement. Release any
+            // pending snapshots or pre-finalization selected bond locks.
+            // Pool call is atomic with this closure and refund accounting.
+            committeePool.cancelUnassigned(lease.assignmentId);
+        }
         uint256 unused = lease.uncommittedEscrow;
         lease.uncommittedEscrow = 0;
         lease.refundedUnusedEscrow += unused;
