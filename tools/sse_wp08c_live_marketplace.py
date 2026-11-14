@@ -238,9 +238,38 @@ def run(output_dir: Path) -> dict:
         assigned = inspect_chain(rpc, settlement, 1, 0, endpoint=endpoint)['lease']['monitors']
         if len(set(assigned)) != 4 or not set(assigned).issubset(set(candidates)):
             raise AssertionError('unexpected committee selection')
-        for monitor in assigned:
+        # R3 WP09A: three of the original four confirm; permissionless
+        # timeout-based rescue selects the one standby from the SAME seed.
+        no_show_monitor = assigned[3]
+        for monitor in assigned[:3]:
             tx_hashes.append(_send(rpc, monitor, settlement,
                                    _calldata('confirmMonitorAssignment(uint256)', 1))['transactionHash'])
+        pending = inspect_chain(rpc, settlement, 1, 0, endpoint=endpoint)['lease']
+        if pending['monitorConfirmations'] != 3 or pending['stateName'] != 'Accepted':
+            raise AssertionError('three-of-four confirmations incorrectly made the lease ready')
+        deadline_hex = rpc.request('eth_call', [
+            {'to': settlement,
+             'data': _calldata('monitorConfirmationDeadline(uint256)', 1)}, 'latest'])
+        deadline = int(deadline_hex, 16)
+        current_ts = int(rpc.request('eth_getBlockByNumber',
+                                    ['latest', False])['timestamp'], 16)
+        rpc.request('evm_increaseTime', [max(0, deadline - current_ts + 1)])
+        rpc.request('evm_mine', [])
+        tx_hashes.append(_send(rpc, outsider, settlement,
+                               _calldata('replaceNoShowMonitor(uint256)', 1))['transactionHash'])
+        selected_after_rotation = inspect_chain(rpc, settlement, 1, 0,
+                                                endpoint=endpoint)['lease']['monitors']
+        if (selected_after_rotation[:3] != assigned[:3] or
+                selected_after_rotation[3] == no_show_monitor or
+                selected_after_rotation[3] not in candidates or
+                len(set(selected_after_rotation)) != 4):
+            raise AssertionError('timed-out no-show was not replaced by unused bonded standby')
+        assigned = selected_after_rotation
+        tx_hashes.append(_send(rpc, assigned[3], settlement,
+                               _calldata('confirmMonitorAssignment(uint256)', 1))['transactionHash'])
+        ready = inspect_chain(rpc, settlement, 1, 0, endpoint=endpoint)['lease']
+        if ready['stateName'] != 'Ready' or ready['monitorConfirmations'] != 4:
+            raise AssertionError('replaced monitor confirmation did not unlock epoch admission')
         tx_hashes.append(_send(rpc, consumer, settlement,
                                _calldata('admitEpoch(uint256,bytes32)', 1, request_hash))['transactionHash'])
 
@@ -424,6 +453,10 @@ def run(output_dir: Path) -> dict:
             'leaseId': 1, 'epochId': 0, 'settlement': settlement,
             'board': board, 'committeePool': pool,
             'selectedMonitors': assigned, 'captureMonitor': first_monitor,
+            'originalNoShowMonitor': no_show_monitor,
+            'noShowReplacedAfterTimeout': True,
+            'threeOfFourStillBlocksEpochAdmission': True,
+            'replacementNeededFreshMonitorConfirmation': True,
             'provider': provider, 'evidenceId': evidence_id,
             'providerAndMonitorSignaturesVerified': True,
             'monitorSignedBlockHash': pinned.block_hash,
