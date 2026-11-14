@@ -38,6 +38,9 @@ contract OpenMonitorCommittee {
     mapping(address => Candidate) public candidates;
     mapping(uint256 => Assignment) private assignments;
     mapping(uint256 => address[]) private snapshots;
+    // Full post-seed shuffle: never hand-pick a replacement or resample seed.
+    mapping(uint256 => address[]) private standbyRosters;
+    mapping(uint256 => uint256) private nextStandbyIndex;
 
     error InvalidInput();
     error InvalidPhase();
@@ -50,6 +53,8 @@ contract OpenMonitorCommittee {
     event SettlementBound(address indexed settlement);
     event AssignmentRequested(uint256 indexed requestId, address consumer, address provider, uint256 poolSize);
     event CommitteeSelected(uint256 indexed requestId, address[4] committee);
+    event CommitteeMemberReplaced(uint256 indexed requestId, address indexed removed,
+                                  address indexed replacement, uint256 remainingStandbys);
     event AssignmentExpired(uint256 indexed requestId);
     event AssignmentReleased(uint256 indexed requestId);
 
@@ -148,10 +153,14 @@ contract OpenMonitorCommittee {
         address[] memory roster = snapshots[id];
         uint256 length = roster.length;
         
-        for (uint256 i; i < COMMITTEE_SIZE; ++i) {
+        // Finish the unbiased Fisher-Yates permutation, not just the first
+        // four selections, to establish an immutable standby order from the
+        // SAME randomness draw. No consumer choice or second seed on recovery.
+        for (uint256 i; i < length; ++i) {
             uint256 j = i + uint256(keccak256(abi.encode(seed, id, i))) % (length - i);
             (roster[i], roster[j]) = (roster[j], roster[i]);
-            r.committee[i] = roster[i];
+            if (i < COMMITTEE_SIZE) r.committee[i] = roster[i];
+            else standbyRosters[id].push(roster[i]);
         }
         _unlockSnapshot(id);
         for (uint256 i; i < COMMITTEE_SIZE; ++i) {
@@ -170,12 +179,60 @@ contract OpenMonitorCommittee {
         emit AssignmentExpired(id);
     }
 
+    /// @dev A standby may have exited after the original randomness reveal;
+    /// skip it, never select an unbonded or currently inactive identity.
+    /// Only the bound settlement may replace a confirmed *missing* seat.
+    /// The settlement enforces the per-seat confirmation timeout and no epochs.
+    function replaceUnconfirmed(uint256 id, address missing)
+        external onlySettlement returns (address replacement)
+    {
+        Assignment storage r = assignments[id];
+        if (r.status != RequestStatus.Assigned || missing == address(0)) revert InvalidPhase();
+        bool member;
+        for (uint256 i; i < COMMITTEE_SIZE; ++i) {
+            if (r.committee[i] == missing) { member = true; break; }
+        }
+        if (!member) revert InvalidInput();
+
+        address[] storage standby = standbyRosters[id];
+        uint256 cursor = nextStandbyIndex[id];
+        while (cursor < standby.length) {
+            address candidate = standby[cursor++];
+            Candidate storage c = candidates[candidate];
+            if (!c.active || c.bond < minimumBond) continue;
+            bool alreadyMember;
+            for (uint256 j; j < COMMITTEE_SIZE; ++j) {
+                if (r.committee[j] == candidate) { alreadyMember = true; break; }
+            }
+            if (alreadyMember) continue;
+            replacement = candidate;
+            break;
+        }
+        if (replacement == address(0)) revert InsufficientCandidates();
+        nextStandbyIndex[id] = cursor;
+        for (uint256 i; i < COMMITTEE_SIZE; ++i) {
+            if (r.committee[i] == missing) {
+                r.committee[i] = replacement;
+                break;
+            }
+        }
+        --candidates[missing].activeAssignments;
+        ++candidates[replacement].activeAssignments;
+        emit CommitteeMemberReplaced(id, missing, replacement, standby.length - cursor);
+    }
+
+    function standbyRemaining(uint256 id) external view returns (uint256) {
+        return standbyRosters[id].length - nextStandbyIndex[id];
+    }
+
     function releaseAssignment(uint256 id) external onlySettlement {
         Assignment storage r = assignments[id];
         if (r.status != RequestStatus.Assigned) revert InvalidPhase();
         for (uint256 i; i < COMMITTEE_SIZE; ++i) {
             --candidates[r.committee[i]].activeAssignments;
         }
+        delete standbyRosters[id];
+        delete nextStandbyIndex[id];
         r.status = RequestStatus.Released;
         emit AssignmentReleased(id);
     }
