@@ -10,6 +10,8 @@ contract OpenMonitorCommittee {
     // uniform sampling claim. Enrollment is permissionless but not Sybil-safe.
     uint256 public constant MAX_SNAPSHOT_SCAN = 64;
     uint256 public constant COMMITTEE_SIZE = 4;
+    uint256 public constant DELAYED_ENTROPY_BLOCKS = 4;
+    bytes32 public constant DELAYED_ENTROPY_DOMAIN = keccak256("SSEDelayedBlockEntropyV1");
 
     enum RequestStatus { None, AwaitingRandomness, Assigned, Expired, Released }
     struct Candidate {
@@ -35,6 +37,9 @@ contract OpenMonitorCommittee {
     uint64 public immutable randomnessTimeout;
     address public settlement;
     uint256 public nextAssignmentId = 1;
+    // Opt-in only before settlement binding: blocks the legacy source callback
+    // and uses a future block hash. This is NOT an Ethereum VRF/finality proof.
+    bool public delayedBlockEntropyEnabled;
     bool private entered;
 
     // Dense ACTIVE roster. Exited addresses are removed by swap-and-pop,
@@ -49,6 +54,8 @@ contract OpenMonitorCommittee {
     // Full post-seed shuffle: never hand-pick a replacement or resample seed.
     mapping(uint256 => address[]) private standbyRosters;
     mapping(uint256 => uint256) private nextStandbyIndex;
+    mapping(uint256 => uint256) public assignmentRequestedBlock;
+    mapping(uint256 => bytes32) public snapshotCommitment;
 
     error InvalidInput();
     error InvalidPhase();
@@ -62,6 +69,12 @@ contract OpenMonitorCommittee {
     event ExitRequested(address indexed account);
     event BondWithdrawn(address indexed account, uint256 amount);
     event SettlementBound(address indexed settlement);
+    event DelayedEntropyModeEnabled();
+    event EligibilitySnapshotCommitted(uint256 indexed requestId, bytes32 commitment,
+                                       uint256 requestBlock, uint256 entropyBlock);
+    event DelayedEntropyApplied(uint256 indexed requestId, uint256 entropyBlock,
+                                bytes32 entropyBlockHash, bytes32 snapshotHash,
+                                uint256 derivedSeed);
     event AssignmentRequested(uint256 indexed requestId, address consumer, address provider, uint256 poolSize);
     event CommitteeSelected(uint256 indexed requestId, address[4] committee);
     event CommitteeMemberReplaced(uint256 indexed requestId, address indexed removed,
@@ -86,6 +99,16 @@ contract OpenMonitorCommittee {
         if (target == address(0) || target.code.length == 0) revert InvalidInput();
         settlement = target;
         emit SettlementBound(target);
+    }
+
+    /// @notice One-way deployment configuration, before any lease can be wired.
+    /// @dev A block proposer can bias/reorg the future block; use reviewed
+    /// VRF or other independent entropy for production global elections.
+    function enableDelayedBlockEntropy() external {
+        if (msg.sender != bootstrapper || settlement != address(0) ||
+            delayedBlockEntropyEnabled) revert Unauthorized();
+        delayedBlockEntropyEnabled = true;
+        emit DelayedEntropyModeEnabled();
     }
 
     modifier onlySettlement() {
@@ -179,13 +202,54 @@ contract OpenMonitorCommittee {
             }
         }
         if (snapshots[id].length < COMMITTEE_SIZE) revert InsufficientCandidates();
+        // The eligible order and membership are frozen BEFORE the future
+        // block can exist; bounded to 64 addresses from WP-09B.
+        assignmentRequestedBlock[id] = block.number;
+        bytes32 commitment = keccak256(abi.encode(
+            block.chainid, address(this), id, block.number, snapshots[id]));
+        snapshotCommitment[id] = commitment;
+        if (delayedBlockEntropyEnabled) {
+            emit EligibilitySnapshotCommitted(id, commitment, block.number,
+                                              block.number + DELAYED_ENTROPY_BLOCKS);
+        }
         nextSnapshotCursor = (start + scanned) % count;
         emit SnapshotWindowUsed(id, start, scanned, count, snapshots[id].length);
         emit AssignmentRequested(id, consumer, provider, snapshots[id].length);
     }
 
+    /// @notice Legacy source-controlled path; disabled under delayed mode.
     function fulfillRandomness(uint256 id, uint256 seed) external {
-        if (msg.sender != randomnessSource) revert Unauthorized();
+        if (delayedBlockEntropyEnabled || msg.sender != randomnessSource)
+            revert Unauthorized();
+        _selectSeededCommittee(id, seed);
+    }
+
+    /// @notice Anyone may finalize once the FUTURE target block has been mined.
+    /// @dev This is reproducible on-chain entropy, not unbiased PoS VRF or
+    /// finality. Reorgs, block-proposer bias and targeted assignment timing
+    /// remain possible and are explicitly outside this WP09C guarantee.
+    function fulfillDelayedBlockEntropy(uint256 id) external {
+        if (!delayedBlockEntropyEnabled) revert InvalidPhase();
+        Assignment storage r = assignments[id];
+        if (r.status != RequestStatus.AwaitingRandomness ||
+            block.timestamp > uint256(r.requestedAt) + randomnessTimeout)
+            revert InvalidPhase();
+        uint256 requestBlock = assignmentRequestedBlock[id];
+        if (requestBlock == 0 || snapshotCommitment[id] == bytes32(0))
+            revert InvalidPhase();
+        uint256 entropyBlock = requestBlock + DELAYED_ENTROPY_BLOCKS;
+        if (block.number <= entropyBlock) revert InvalidPhase();
+        bytes32 hash = blockhash(entropyBlock);
+        if (hash == bytes32(0)) revert InvalidPhase(); // >256 old or missing
+        uint256 seed = uint256(keccak256(abi.encode(
+            DELAYED_ENTROPY_DOMAIN, block.chainid, address(this), id,
+            snapshotCommitment[id], entropyBlock, hash)));
+        _selectSeededCommittee(id, seed);
+        emit DelayedEntropyApplied(id, entropyBlock, hash,
+                                   snapshotCommitment[id], seed);
+    }
+
+    function _selectSeededCommittee(uint256 id, uint256 seed) internal {
         Assignment storage r = assignments[id];
         if (r.status != RequestStatus.AwaitingRandomness ||
             block.timestamp > uint256(r.requestedAt) + randomnessTimeout) revert InvalidPhase();
