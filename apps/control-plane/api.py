@@ -8,7 +8,7 @@ from datetime import datetime, timezone
 from pathlib import Path
 from typing import Literal
 
-from fastapi import FastAPI, Header, HTTPException
+from fastapi import FastAPI, Header, HTTPException, Query
 from fastapi.responses import FileResponse, Response
 from pydantic import BaseModel, Field
 
@@ -18,6 +18,7 @@ from propose_node import build_proposal
 from validate_inventory import validate
 from plan_deploy import plan
 from settlement_scenarios import report as settlement_report
+from sse_chain_observer import Observer, ObserverError, read_config
 
 app = FastAPI(title='SSE Control Plane', docs_url=None, redoc_url=None)
 STATIC = Path(__file__).parent / 'static'
@@ -205,3 +206,51 @@ def audit(authorization: str | None = Header(None)):
 def settlement_scenarios(authorization: str | None = Header(None)):
     _authorize(authorization)
     return settlement_report()
+
+
+# R8 observer: independently hosted, authenticated, read-only EVM RPC surface.
+# These endpoints cannot submit transactions or send commands to SSE nodes.
+def _chain_observer():
+    try:
+        return Observer(read_config())
+    except ObserverError:
+        raise HTTPException(status_code=503, detail="chain observer not configured") from None
+
+
+def _observed(call):
+    try:
+        return call()
+    except ObserverError:
+        raise HTTPException(status_code=502, detail="chain observer RPC unavailable or inconsistent") from None
+
+
+@app.get("/v1/chain/overview")
+def chain_overview(authorization: str | None = Header(None)):
+    _authorize(authorization)
+    observer = _chain_observer()
+    return _observed(observer.overview)
+
+
+@app.get("/v1/chain/blocks")
+def chain_blocks(limit: int = Query(default=10, ge=1, le=20),
+                 authorization: str | None = Header(None)):
+    _authorize(authorization)
+    observer = _chain_observer()
+    return _observed(lambda: observer.blocks(limit))
+
+
+@app.get("/v1/chain/transactions/{tx_hash}")
+def chain_transaction(tx_hash: str,
+                      authorization: str | None = Header(None)):
+    _authorize(authorization)
+    observer = _chain_observer()
+    return _observed(lambda: observer.transaction(tx_hash))
+
+
+@app.get("/v1/chain/events")
+def chain_events(start_block: int = Query(ge=0),
+                 end_block: int = Query(ge=0),
+                 authorization: str | None = Header(None)):
+    _authorize(authorization)
+    observer = _chain_observer()
+    return _observed(lambda: observer.events(start_block, end_block))
