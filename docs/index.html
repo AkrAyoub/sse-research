@@ -1,0 +1,230 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<meta name="color-scheme" content="dark">
+<title>SSE Intercloud · Join with Ubuntu</title>
+<meta name="description" content="Prepare an existing Ubuntu VM for SSE Intercloud using an immutable Git release and read-only chain validation.">
+<style>
+:root{font:16px/1.55 system-ui,-apple-system,BlinkMacSystemFont,"Segoe UI",sans-serif;color:#e5edf8;background:#0a1322}
+*{box-sizing:border-box}
+body{margin:0;background:radial-gradient(70rem 38rem at 95% -5%,#12345d 0%,transparent 63%),#0a1322}
+main{max-width:1030px;margin:auto;padding:32px 22px 84px}
+nav{display:flex;align-items:center;justify-content:space-between;gap:12px;margin-bottom:72px}
+nav strong{letter-spacing:.13em;font-size:.93rem}
+a{color:#9ed4ff;text-decoration:underline;text-underline-offset:3px}
+a:hover{color:#fff}
+a.buttonlink{text-decoration:none}
+.pill{border:1px solid #375471;color:#a9c6e5;border-radius:30px;font-size:.76rem;padding:5px 11px}
+h1{font-size:clamp(2rem,5.7vw,4rem);line-height:1.08;letter-spacing:-.04em;max-width:820px;margin:18px 0 18px}
+.lead{font-size:1.12rem;color:#b0c4da;max-width:700px}
+h2{font-size:1.32rem;margin:0 0 14px}
+h3{font-size:1.05rem;margin:0 0 8px}
+.caption{color:#a9bacf;font-size:.9rem}
+.section{margin-top:48px}
+.status{background:#11243a;border:1px solid #395473;border-radius:12px;padding:15px 18px;color:#cee3fa}
+.status strong{color:#e7f7ff}
+.grid{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:16px}
+.card{border:1px solid #2b425c;background:#101d2f;border-radius:16px;padding:24px}
+.step{font-size:.8rem;color:#72d5cd;text-transform:uppercase;letter-spacing:.12em;font-weight:700;margin-bottom:6px}
+label{display:block;font-size:.91rem;color:#d4e4f5;margin:12px 0 6px}
+input,select{display:block;width:100%;font:inherit;background:#081626;color:#f1f7ff;border:1px solid #4e6884;border-radius:8px;padding:11px 12px;outline-offset:3px}
+input:focus,select:focus{border-color:#7bd9da}
+input::placeholder{color:#8ba6c0}
+select{appearance:auto}
+fieldset{border:0;padding:0;margin:0}
+.roles{display:grid;grid-template-columns:1fr 1fr;gap:6px 14px}
+.roles label{display:flex;align-items:center;gap:8px;margin:7px 0}
+.roles input{width:auto}
+button{background:#6ee0d0;color:#07212e;border:0;border-radius:9px;font:inherit;font-weight:700;padding:10px 17px;cursor:pointer}
+button:hover{background:#91f4e5}
+button.secondary{background:#253c56;color:#e3f4ff}
+button.secondary:hover{background:#345674}
+.command{position:relative;border:1px solid #334d69;background:#07111f;border-radius:12px;padding:18px;margin:13px 0;overflow:auto}
+pre{font:12.6px/1.6 ui-monospace,SFMono-Regular,Consolas,monospace;white-space:pre-wrap;word-break:break-word;margin:0;color:#d6f0fd}
+.commands{display:grid;gap:12px}
+.commands .cmdhead{display:flex;align-items:center;justify-content:space-between;gap:12px;margin-bottom:12px}
+.note{color:#b9cae0;font-size:.92rem}
+#message{min-height:28px;margin:12px 0;color:#9fecc9;font-weight:600}
+footer{padding-top:32px;margin-top:60px;border-top:1px solid #2e4058;color:#a8bed3;font-size:.89rem}
+@media(max-width:690px){main{padding:23px 16px 65px}nav{margin-bottom:48px}.grid{grid-template-columns:1fr}.roles{grid-template-columns:1fr}}
+</style>
+</head>
+<body>
+<main>
+<nav>
+<strong>SSE / INTERCLOUD</strong>
+<a href="https://github.com/AkrAyoub/sse-research" rel="noopener noreferrer">View GitHub repository</a>
+</nav>
+
+<section>
+<div class="pill" style="display:inline-block">UBUNTU NODE ONBOARDING · RESEARCH PREVIEW</div>
+<h1>Start an Ubuntu VM. Connect it to SSE.</h1>
+<p class="lead">No custom VM image. No cloud-init access required. Open this page after your VM is running, choose a role, and copy the setup steps into its Ubuntu terminal.</p>
+<div class="status"><strong>Current capability:</strong> installs a pinned SSE checkout and a local read-only role heartbeat after a blockchain preflight. <strong>It does not yet activate provider/monitor transactions, register bonded monitors, or join the Ethereum validator network.</strong></div>
+</section>
+
+<section class="section grid">
+<div class="card"><div class="step">01 · VM already created</div><h3>Ubuntu is enough</h3><p class="caption">Sign in to the VM using its web console or SSH. You only need a user with <code>sudo</code> privileges and outbound HTTPS.</p></div>
+<div class="card"><div class="step">02 · Configure a role</div><h3>Consumer, provider, monitor, observer</h3><p class="caption">Pick application roles. A configured role is not active until the corresponding on-chain registration and transactions are implemented and completed.</p></div>
+</section>
+
+<section class="section card" aria-labelledby="configure">
+<h2 id="configure">Generate your VM setup commands</h2>
+<p class="caption">This form runs entirely in your browser. It does not send its contents to us. Enter public addresses only—never wallet secrets or private keys.</p>
+<div class="grid">
+<div>
+<label for="nodeId">VM node ID</label>
+<input id="nodeId" autocomplete="off" value="provider-vm-01" maxlength="63">
+<label for="network">Blockchain network</label>
+<select id="network">
+<option value="sepolia">Sepolia public testnet (test ETH)</option>
+<option value="anvil">Local Anvil (simulated ETH)</option>
+</select>
+<label for="rpc">Ethereum RPC HTTPS URL or local Anvil URL</label>
+<input id="rpc" autocomplete="off" spellcheck="false" placeholder="https://your-rpc-host.example">
+<label for="settlement">Deployed SSESettlement address (public)</label>
+<input id="settlement" autocomplete="off" spellcheck="false" placeholder="0x + 40 hexadecimal digits" maxlength="42">
+</div>
+<div>
+<fieldset>
+<legend style="margin:12px 0 8px">SSE application roles</legend>
+<div class="roles">
+<label><input type="checkbox" name="role" value="provider" checked> Provider</label>
+<label><input type="checkbox" name="role" value="monitor"> Monitor</label>
+<label><input type="checkbox" name="role" value="consumer"> Consumer</label>
+<label><input type="checkbox" name="role" value="observer"> Observer</label>
+</div>
+</fieldset>
+<label for="wallet">Public wallet address (optional)</label>
+<input id="wallet" autocomplete="off" spellcheck="false" placeholder="0x + 40 hexadecimal digits">
+<div class="status" style="margin-top:20px"><strong>Installer release:</strong><div id="sha" style="font-family:monospace;font-size:.8rem;overflow-wrap:anywhere"></div><p class="caption" style="margin-bottom:0">Pinned to an immutable project commit. Don't replace this SHA with a moving branch name.</p></div>
+</div>
+</div>
+<p class="caption">If you do not yet have a deployed contract or RPC endpoint, you can download and review the installer now, but its final apply step cannot pass until those are available.</p>
+<button type="button" id="generate">Generate commands</button>
+<p id="message" aria-live="polite"></p>
+</section>
+
+<section class="section" aria-labelledby="commands">
+<h2 id="commands">Run these steps on your Ubuntu VM</h2>
+<p class="caption">Commands are generated only when all required public configuration values are valid. First review the script, then run the dry-run, then explicitly apply.</p>
+<div class="commands">
+<div class="card">
+<div class="cmdhead"><strong>1. Install basic Ubuntu prerequisites</strong><button class="secondary" type="button" data-copy="packages">Copy</button></div>
+<div class="command"><pre id="packages">sudo apt-get update &amp;&amp; sudo apt-get install -y ca-certificates git curl python3 python3-venv</pre></div>
+</div>
+<div class="card">
+<div class="cmdhead"><strong>2. Download the pinned installer</strong><button class="secondary" type="button" data-copy="download">Copy</button></div>
+<div class="command"><pre id="download"></pre></div>
+<p class="caption">The installer URL is an HTTPS GitHub raw file at a fixed SHA. Inspect it before execution.</p>
+<a id="downloadLink" href="#" rel="noopener noreferrer">View the exact installer source</a>
+</div>
+<div class="card">
+<div class="cmdhead"><strong>3. Dry-run (no changes)</strong><button class="secondary" type="button" data-copy="dryrun">Copy</button></div>
+<div class="command"><pre id="dryrun">Complete the form to generate a safe command.</pre></div>
+</div>
+<div class="card">
+<div class="cmdhead"><strong>4. Explicit installation after reviewing the plan</strong><button class="secondary" type="button" data-copy="apply">Copy</button></div>
+<div class="command"><pre id="apply">Complete the form to generate a safe command.</pre></div>
+</div>
+<div class="card">
+<div class="cmdhead"><strong>5. Check local agent status</strong><button class="secondary" type="button" data-copy="status">Copy</button></div>
+<div class="command"><pre id="status">sudo systemctl status sse-vm-role-agent.service --no-pager
+curl --fail http://127.0.0.1:8765/v1/status</pre></div>
+<p class="caption">This checks the configured role heartbeat only. It does not certify network participation.</p>
+</div>
+</div>
+</section>
+
+<section class="section grid">
+<div class="card">
+<h3>What is SSE connecting to?</h3>
+<p class="note">An existing Ethereum-compatible blockchain—initially Anvil for local tests and eventually a public testnet using native test ETH. Each application VM connects through an Ethereum RPC endpoint; it does <strong>not</strong> have to run a validator.</p>
+</div>
+<div class="card">
+<h3>What remains before the full marketplace?</h3>
+<p class="note">Independent wallet custody, monitor bonds and confirmation, transaction-sending agents, real provider workloads, and verifiable cloud-service SLAs. Those are R5/R6/R7 integration tasks, not features of this installer yet.</p>
+</div>
+</section>
+<footer>
+SSE Intercloud research onboarding · Static site, no accounts or server-side form submission ·
+<a href="https://github.com/AkrAyoub/sse-research/tree/research/r6-ubuntu-firstboot-no-ci" rel="noopener noreferrer">Review installer branch</a>
+</footer>
+</main>
+<script>
+(() => {
+  "use strict";
+  const SHA = "97bd3d434af1bb20ce08b763b90b58cce7e4c036";
+  const DOWNLOAD = "https://raw.githubusercontent.com/AkrAyoub/sse-research/" + SHA + "/tools/sse_vm_bootstrap.py";
+  const el = id => document.getElementById(id);
+  const commands = {};
+  const safeAddress = x => /^0x[0-9a-fA-F]{40}$/.test(x) && !/^0x0{40}$/.test(x);
+  const supportedUrl = x => {
+    if (!/^[A-Za-z0-9:/._-]+$/.test(x)) return false;
+    try {
+      const u = new URL(x);
+      if (u.username || u.password || u.search || u.hash || u.pathname !== "/") return false;
+      if (u.protocol === "https:") return true;
+      return u.protocol === "http:" && ["localhost", "127.0.0.1", "[::1]"].includes(u.hostname);
+    } catch (_) { return false; }
+  };
+  const quote = x => "'" + x + "'"; // only called with strings validated by strict regex
+  const command = (options, apply) =>
+    "python3 /tmp/sse_vm_bootstrap.py \\\n" +
+    options.map((o, i) => "  --" + o[0] + " " + quote(o[1]) + (i < options.length - 1 || apply ? " \\" : "")).join("\n") +
+    (apply ? "\n  --apply" : "");
+  function generate() {
+    el("message").textContent = "";
+    ["dryrun", "apply"].forEach(id => { commands[id] = ""; el(id).textContent = "Fix configuration above to generate this command."; });
+    const nodeId = el("nodeId").value.trim();
+    const rpc = el("rpc").value.trim();
+    const settlement = el("settlement").value.trim();
+    const wallet = el("wallet").value.trim();
+    const network = el("network").value;
+    const chain = network === "sepolia" ? "11155111" : network === "anvil" ? "31337" : null;
+    const selected = [...document.querySelectorAll('input[name="role"]:checked')].map(x => x.value);
+    if (!/^[a-z][a-z0-9-]{0,62}$/.test(nodeId) || !chain ||
+        !supportedUrl(rpc) || !safeAddress(settlement) ||
+        (wallet && !safeAddress(wallet)) || !selected.length ||
+        selected.some(x => !["provider", "consumer", "monitor", "observer"].includes(x))) {
+      el("message").textContent = "Enter a valid node ID, one or more roles, a public RPC URL, and a real deployed SSESettlement address. Do not enter private keys.";
+      return;
+    }
+    if (network === "anvil" && rpc !== "http://127.0.0.1:8545" && rpc !== "http://localhost:8545") {
+      el("message").textContent = "For this local Anvil demonstration, use RPC http://127.0.0.1:8545 on the SAME VM, or a securely tunneled loopback connection.";
+      return;
+    }
+    const fields = [["revision", SHA], ["node-id", nodeId], ["roles", selected.join(",")],
+                    ["rpc-url", rpc], ["chain-id", chain], ["settlement", settlement.toLowerCase()]];
+    if (wallet) fields.push(["wallet", wallet.toLowerCase()]);
+    commands.dryrun = command(fields, false);
+    commands.apply = "sudo " + command(fields, true);
+    el("dryrun").textContent = commands.dryrun;
+    el("apply").textContent = commands.apply;
+    el("message").textContent = "Commands generated. Review the dry-run before approving installation.";
+  }
+  el("sha").textContent = SHA;
+  commands.packages = el("packages").textContent;
+  commands.download = "curl --fail --show-error --silent --location --proto '=https' --tlsv1.2 " + quote(DOWNLOAD) +
+                      " --output /tmp/sse_vm_bootstrap.py\npython3 -m py_compile /tmp/sse_vm_bootstrap.py";
+  commands.status = el("status").textContent;
+  el("download").textContent = commands.download;
+  el("downloadLink").href = DOWNLOAD;
+  el("network").addEventListener("change", () => {
+    el("rpc").value = el("network").value === "anvil" ? "http://127.0.0.1:8545" : "";
+  });
+  el("generate").addEventListener("click", generate);
+  document.querySelectorAll("[data-copy]").forEach(btn => {
+    btn.addEventListener("click", async () => {
+      const value = commands[btn.dataset.copy];
+      if (!value) { el("message").textContent = "Generate valid commands first."; return; }
+      try { await navigator.clipboard.writeText(value); el("message").textContent = "Copied: " + btn.dataset.copy; }
+      catch (_) { el("message").textContent = "Clipboard unavailable; select the command manually."; }
+    });
+  });
+})();
+</script>
+</body>
+</html>
