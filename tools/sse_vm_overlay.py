@@ -39,12 +39,10 @@ def validate(node_id: str, roles: str, auth_key_file: str,
         raise MeshJoinError("invalid overlay ACL tag")
     if type(auth_key_file) is not str:
         raise MeshJoinError("invalid auth key file")
-    path = Path(auth_key_file)
-    # Avoid arbitrary paths, traversal, and empty path segments.
-    if (not path.is_absolute() or ".." in path.parts or
-            not (str(path).startswith("/run/sse/") or
-                 str(path).startswith("/etc/sse/")) or
-            path.name in ("", ".", "..")):
+    # Validate the intended *Ubuntu* path as a literal POSIX string, even
+    # when reviewing a dry-run from Windows. Never reinterpret it using the
+    # local host's pathlib.Path conventions.
+    if re.fullmatch(r"/(?:run|etc)/sse/[A-Za-z0-9_-][A-Za-z0-9._-]{0,127}", auth_key_file) is None:
         raise MeshJoinError("auth key file must reside under /run/sse or /etc/sse")
     return {
         "kind": "SSE_UBUNTU_OVERLAY_ENROLLMENT",
@@ -52,7 +50,7 @@ def validate(node_id: str, roles: str, auth_key_file: str,
         "nodeId": node_id,
         "rolesConfigured": list(selected),
         "aclTag": tag,
-        "authFilePath": str(path),
+        "authFilePath": auth_key_file,
         "requiresRoot": True,
         "requiresInstalledTailscale": True,
         "tailnetJoined": False,
