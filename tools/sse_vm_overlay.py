@@ -98,15 +98,22 @@ def _command(args: list[str]) -> str:
 
 
 def apply(plan: dict, command=_command) -> dict:
-    if plan.get("kind") != "SSE_UBUNTU_OVERLAY_ENROLLMENT":
+    if type(plan) is not dict or plan.get("kind") != "SSE_UBUNTU_OVERLAY_ENROLLMENT":
         raise MeshJoinError("unrecognized enrollment plan")
+    try:
+        expected = validate(plan["nodeId"], ",".join(plan["rolesConfigured"]),
+                            plan["authFilePath"], plan["aclTag"])
+    except (KeyError, TypeError, AttributeError) as exc:
+        raise MeshJoinError("invalid enrollment plan") from exc
+    if plan != expected:
+        raise MeshJoinError("enrollment plan was altered")
     _require_ubuntu_root()
     credential = Path(plan["authFilePath"])
     _check_auth_file(credential)
     if shutil.which("tailscale") is None:
         raise MeshJoinError("tailscale client not installed; install from approved Ubuntu package source")
     # file: prevents leaking the key in argv or shell history. No '--reset'.
-    command(["tailscale", "up", "--auth-key=file:" + str(credential),
+    command(["tailscale", "up", "--auth-key=file:" + expected["authFilePath"],
              "--hostname=" + plan["nodeId"], "--advertise-tags=" + plan["aclTag"],
              "--accept-routes=false", "--accept-dns=true"])
     try:
