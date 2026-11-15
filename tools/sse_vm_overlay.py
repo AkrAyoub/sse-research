@@ -117,7 +117,8 @@ def apply(plan: dict, command=_command) -> dict:
         raise MeshJoinError("invalid overlay status response") from exc
     local = status.get("Self") if type(status) is dict else None
     ips = local.get("TailscaleIPs") if type(local) is dict else None
-    if (status.get("BackendState") != "Running" or local.get("Online") is not True
+    if (type(status) is not dict or type(local) is not dict
+            or status.get("BackendState") != "Running" or local.get("Online") is not True
             or type(ips) is not list or not ips
             or not all(type(ip) is str and ip for ip in ips)):
         raise MeshJoinError("overlay did not reach online state")
