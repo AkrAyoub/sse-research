@@ -216,8 +216,7 @@ const actionRoles={
  provider:['bid','accept'],
  monitor:['monitor-register','monitor-confirm']
 };
-const available=["provider","consumer","monitor","observer"];
-const ownedRoles=" + json.dumps([r for r in conf["roles"] if r in ("consumer", "provider", "monitor")]) + ";
+const ownedRoles=""" + json.dumps([r for r in conf["roles"] if r in ("consumer", "provider", "monitor")]) + """;
 for(const role of ownedRoles.filter(r=>actionRoles[r])) {
  const option=document.createElement('option');option.value=role;option.textContent=role;
  roleSelect.appendChild(option);
