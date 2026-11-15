@@ -151,6 +151,10 @@ contract WP09QBatchedGlobalRecoveryTest is Test {
         uint256 id = _leaseAndSeed();
         address first = _firstSelected(id);
         _advance(id, 0, 8);
+        // Prepare the next historical batch BEFORE closure so the expected
+        // InvalidPhase comes from advanceGlobalRecovery, not proof preparation.
+        (address[] memory nextAccounts, bytes32[][] memory nextPaths) =
+            _proofs(id, 8, 8);
         (,,,uint32 lockedBefore,,) = pool.candidates(first);
         assertEq(lockedBefore, 1);
         vm.prank(CONSUMER);
@@ -163,7 +167,7 @@ contract WP09QBatchedGlobalRecoveryTest is Test {
         assertEq(lockedAfter, 0);
         assertEq(settlement.withdrawable(CONSUMER), 25);
         vm.expectRevert(OpenMonitorCommittee.InvalidPhase.selector);
-        _advance(id, 8, 8);
+        pool.advanceGlobalRecovery(id, nextAccounts, nextPaths);
     }
 
     function testProvisionalSelectedMonitorCannotExitMidProof() public {
