@@ -37,6 +37,8 @@ class BootstrapMarketplaceUI(unittest.TestCase):
         self.assertIn("Environment=SSE_SETTLEMENT_ADDRESS="+SETTLEMENT,unit)
         self.assertIn("Environment=SSE_COMMITTEE_POOL_ADDRESS="+POOL,unit)
         self.assertIn("Environment=SSE_CHAIN_ID=11155111",unit)
+        self.assertIn("ExecStart=/opt/sse/runtime/"+SHA+"/bin/python ",unit)
+        self.assertIn("/opt/sse/releases/"+SHA+"/services/role-agent/agent.py",unit)
         self.assertIn("Environment=SSE_AGENT_HOST=127.0.0.1",unit)
         self.assertNotIn("PRIVATE_KEY",unit)
         self.assertNotIn("SSE_NODE_UI_TOKEN=",unit)
