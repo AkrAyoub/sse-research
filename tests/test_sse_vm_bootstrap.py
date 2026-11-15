@@ -37,7 +37,7 @@ class BootstrapPlanTests(unittest.TestCase):
         unit = b.systemd_unit(spec())
         for required in ("User=sseagent", "Environment=SSE_AGENT_HOST=127.0.0.1",
                          "ProtectSystem=strict", "NoNewPrivileges=yes",
-                         "ExecStart=/usr/bin/python3 /opt/sse/releases/"):
+                         "ExecStart=/opt/sse/runtime/"):
             self.assertIn(required, unit)
         self.assertNotIn("https://sepolia.example.org", unit)
         self.assertNotIn("PrivateKey", unit)
