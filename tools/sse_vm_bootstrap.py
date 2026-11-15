@@ -11,6 +11,8 @@ import argparse
 import json
 import os
 import re
+import secrets
+import stat
 import shutil
 import subprocess
 import sys
@@ -143,6 +145,9 @@ def systemd_unit(spec: InstallSpec) -> str:
         "Environment=SSE_REVISION=" + spec.revision + "\n"
         "Environment=SSE_AGENT_HOST=127.0.0.1\n"
         "Environment=SSE_AGENT_PORT=8765\n"
+        "Environment=SSE_NODE_SETTINGS_FILE=/var/lib/sse-role-agent/preferences.json\n"
+        "LoadCredential=ui-token:/etc/sse/node-ui.token\n"
+        "StateDirectory=sse-role-agent\n"
         "ExecStart=/usr/bin/python3 " + script.as_posix() + "\n"
         "Restart=on-failure\nRestartSec=4\n"
         "NoNewPrivileges=yes\nProtectSystem=strict\nProtectHome=yes\n"
@@ -175,6 +180,35 @@ def ensure_agent_user() -> None:
         info = pwd.getpwnam("sseagent")
     if info.pw_uid == 0 or info.pw_shell not in ("/usr/sbin/nologin", "/bin/false"):
         raise BootstrapError("existing sseagent user is not sufficiently restricted")
+
+
+
+def ensure_node_ui_token() -> None:
+    """Provision private per-node UI auth without storing credentials in Git or unit text."""
+    folder = Path("/etc/sse")
+    if folder.is_symlink():
+        raise BootstrapError("symlinked SSE credential directory forbidden")
+    folder.mkdir(mode=0o700, exist_ok=True)
+    st = folder.stat()
+    if st.st_uid != 0 or stat.S_IMODE(st.st_mode) != 0o700:
+        raise BootstrapError("SSE credential directory must be root-owned mode 0700")
+    path = folder / "node-ui.token"
+    if path.is_symlink():
+        raise BootstrapError("SSE credential path must not be symlink")
+    if path.exists():
+        st = path.stat()
+        if (not stat.S_ISREG(st.st_mode) or st.st_uid != 0
+                or stat.S_IMODE(st.st_mode) != 0o600 or
+                not 32 <= st.st_size <= 256):
+            raise BootstrapError("unsafe existing SSE UI credential")
+        return
+    token = secrets.token_urlsafe(36) + "\n"
+    flags = os.O_WRONLY | os.O_CREAT | os.O_EXCL
+    if hasattr(os, "O_NOFOLLOW"):
+        flags |= os.O_NOFOLLOW
+    fd = os.open(path, flags, 0o600)
+    with os.fdopen(fd, "w", encoding="utf-8") as out:
+        out.write(token)
 
 
 def _assert_ubuntu() -> None:
@@ -255,6 +289,7 @@ def apply(spec: InstallSpec) -> dict:
             raise BootstrapError("VM join preflight did not pass its read-only gate")
 
         ensure_agent_user()
+        ensure_node_ui_token()
         unit = systemd_unit(spec)
         # The install command creates a root-owned mode-0644 unit, refusing
         # to replace any preexisting unit.
@@ -271,6 +306,8 @@ def apply(spec: InstallSpec) -> dict:
             "result": "READ_ONLY_ROLE_AGENT_INSTALLED",
             "revision": spec.revision,
             "service": SERVICE_NAME,
+            "nodeLocalUi": "http://127.0.0.1:8765/ui",
+            "draftSettingsAvailable": True,
             "preflight": "PASS",
             "roleActivated": False,
             "ethereumTransactionsSent": False,
