@@ -47,6 +47,8 @@ class InstallSpec:
     wallet: str | None = None
     broker_url: str | None = None
     enrollment_token_file: Path | None = None
+    board_address: str | None = None
+    committee_address: str | None = None
 
     @property
     def release(self) -> Path:
@@ -60,7 +62,9 @@ class InstallSpec:
 def make_spec(*, revision: str, node_id: str, role_names: str, rpc_url: str,
               chain_id: int, settlement: str, install_root: Path,
               wallet: str | None = None, broker_url: str | None = None,
-              enrollment_token_file: Path | None = None) -> InstallSpec:
+              enrollment_token_file: Path | None = None,
+              board_address: str | None = None,
+              committee_address: str | None = None) -> InstallSpec:
     if type(revision) is not str or not COMMIT_RE.fullmatch(revision):
         raise BootstrapError("requires externally approved full 40-character commit SHA")
     if type(node_id) is not str or not NAME_RE.fullmatch(node_id):
@@ -115,10 +119,20 @@ def make_spec(*, revision: str, node_id: str, role_names: str, rpc_url: str,
             raise BootstrapError("mesh broker must be an HTTPS origin")
         if Path(enrollment_token_file).as_posix() != "/run/sse/enrollment.token":
             raise BootstrapError("mesh enrollment token requires /run/sse/enrollment.token")
+    if (board_address is None) != (committee_address is None):
+        raise BootstrapError("node marketplace board and committee addresses are required together")
+    if board_address is not None:
+        for label, candidate in (("resource board", board_address),
+                                 ("committee pool", committee_address)):
+            if (type(candidate) is not str or not ADDR_RE.fullmatch(candidate)
+                    or int(candidate, 16) == 0):
+                raise BootstrapError("invalid " + label + " address")
     return InstallSpec(revision.lower(), node_id, role_tuple, rpc_url, chain_id,
                        settlement.lower(), root, None if wallet is None else wallet.lower(),
                        broker_url.rstrip("/") if broker_url else None,
-                       Path(enrollment_token_file) if enrollment_token_file else None)
+                       Path(enrollment_token_file) if enrollment_token_file else None,
+                       board_address.lower() if board_address else None,
+                       committee_address.lower() if committee_address else None)
 
 
 def describe(spec: InstallSpec) -> dict:
@@ -135,6 +149,7 @@ def describe(spec: InstallSpec) -> dict:
         "publicWallet": spec.wallet,
         "meshBrokerConfigured": spec.broker_url is not None,
         "meshBrokerOrigin": spec.broker_url,
+        "marketplacePreviewConfigured": spec.board_address is not None,
         "actionsIfApplied": [
             "fetch immutable commit and verify checkout HEAD",
             "install isolated pinned cryptographic dependency",
@@ -150,8 +165,16 @@ def describe(spec: InstallSpec) -> dict:
 
 
 def systemd_unit(spec: InstallSpec) -> str:
-    """Only run the existing read-only agent; no RPC or secrets in unit."""
+    """Run the isolated node-local UI; no RPC credentials or keys in unit."""
     script = spec.release / "services" / "role-agent" / "agent.py"
+    chain_env = ""
+    if spec.board_address is not None:
+        chain_env = (
+            "Environment=SSE_CHAIN_ID=" + str(spec.chain_id) + "\n"
+            "Environment=SSE_BOARD_ADDRESS=" + spec.board_address + "\n"
+            "Environment=SSE_SETTLEMENT_ADDRESS=" + spec.settlement + "\n"
+            "Environment=SSE_COMMITTEE_POOL_ADDRESS=" + spec.committee_address + "\n"
+        )
     return (
         "[Unit]\nDescription=SSE experimental read-only VM role heartbeat\n"
         "After=network-online.target\nWants=network-online.target\n\n"
@@ -163,6 +186,7 @@ def systemd_unit(spec: InstallSpec) -> str:
         "Environment=SSE_AGENT_HOST=127.0.0.1\n"
         "Environment=SSE_AGENT_PORT=8765\n"
         "Environment=SSE_NODE_SETTINGS_FILE=/var/lib/sse-role-agent/preferences.json\n"
+        + chain_env +
         "LoadCredential=ui-token:/etc/sse/node-ui.token\n"
         "StateDirectory=sse-role-agent\n"
         "ExecStart=/usr/bin/python3 " + script.as_posix() + "\n"
@@ -348,6 +372,8 @@ def main(argv: list[str] | None = None) -> int:
     p.add_argument("--chain-id", required=True, type=int)
     p.add_argument("--settlement", required=True)
     p.add_argument("--wallet", help="optional public wallet, NEVER private key")
+    p.add_argument("--board", help="public OpenResourceBoard address for node-local previews")
+    p.add_argument("--committee-pool", help="public OpenMonitorCommittee address for node-local previews")
     p.add_argument("--broker-url", help="optional HTTPS SSE mesh enrollment broker origin")
     p.add_argument("--enrollment-token-file", type=Path,
                    help="root-only one-time node token at /run/sse/enrollment.token")
@@ -361,7 +387,9 @@ def main(argv: list[str] | None = None) -> int:
                          chain_id=args.chain_id, settlement=args.settlement,
                          install_root=args.install_root, wallet=args.wallet,
                          broker_url=args.broker_url,
-                         enrollment_token_file=args.enrollment_token_file)
+                         enrollment_token_file=args.enrollment_token_file,
+                         board_address=args.board,
+                         committee_address=args.committee_pool)
         print(json.dumps(apply(spec) if args.apply else describe(spec),
                          sort_keys=True, indent=2))
         return 0
