@@ -16,7 +16,10 @@ body{margin:0;min-height:100vh}header{border-bottom:1px solid #344256;background
 <section class="wide"><h2>Connect to API</h2><label for="token">API token</label><input id="token" type="password" autocomplete="off" placeholder="Enter SSE_CONTROL_TOKEN or read-only token"><button id="connect">Refresh dashboard</button><span id="message" role="status"></span></section>
 <section class="tri"><h2>Node inventory</h2><p>Registered machines</p><strong id="nodeCount">—</strong> inventoried VMs</section>
 <section class="tri"><h2>Enrollments</h2><p>Pending review</p><strong id="proposalCount">—</strong> proposals</section>
-<section class="tri"><h2>Blockchain status</h2><p>Not connected</p><strong>Not verified</strong></section>
+<section class="tri"><h2>Blockchain status</h2><p id="chainStatus">Not configured</p><strong>RPC finality unverified</strong></section>
+<section class="wide"><h2>Recent Ethereum blocks</h2><p>Live RPC read-only view. Confirmation depth is not verified finality.</p><div id="chainBlocks">Configure observer RPC to view blocks.</div></section>
+<section><h2>Contract event logs</h2><p>Recent events from allowed SSE contracts only.</p><div id="chainEvents">Configure observer RPC to view logs.</div></section>
+<section><h2>Transaction receipt lookup</h2><label for="txhash">Ethereum transaction hash</label><input id="txhash" placeholder="0x… (64 hex digits)"><button id="lookupTx">Inspect transaction</button><pre id="txDetail">No transaction selected.</pre></section>
 <section class="wide"><h2>Managed node records</h2><div id="nodes">Connect to view inventory.</div></section>
 <section><h2>Register an Ubuntu VM</h2>
 <form id="enroll"><label for="node_id">Node ID</label><input id="node_id" required pattern="[a-z][a-z0-9-]{0,62}" placeholder="cloud-c-01">
