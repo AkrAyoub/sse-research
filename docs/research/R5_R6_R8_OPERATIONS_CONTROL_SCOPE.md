@@ -1,4 +1,4 @@
-# R5/R6/R8/R9 — VM fleet, NAT discovery, releases, operator console
+# R5/R6/R8/R9 — Ubuntu node UIs, network observer, NAT discovery and releases
 
 **Status:** operator-requested scope specification, **not implemented**, **not an acceptance report**. 2026-11-15.
 **Base:** R6 portal testfix commit `e44ade6b82afe99bd9f0b6377c2b9ba9aee6ebfc`. This file defines new work without changing contracts, existing tests, node processes, transactions, repository visibility, CI, or deployment.
@@ -9,7 +9,7 @@
 - **Existing R5 acceptance:** autonomous independently operated consumer/provider/monitor agents submit authorized transactions.
 - **Existing R8 acceptance:** read-only, rebuildable chain-finance observatory and protected node console; existing `apps/control-plane/api.py` supports only local inventory/proposals/audit/scenarios and nonexecuting deployment plans.
 - **Existing R9 acceptance:** reproducible independent failure/workload experiments.
-- **New explicit scope:** safe release/update workflow for running agents; node-discovery control plane; independent full marketplace/operator/experiment dashboard. None of these should be called complete because a UI appears.
+- **Corrected user scope:** safe release/update workflow for running agents; automated node discovery; independent network-wide observer dashboard; **role-specific operational UIs on every Ubuntu VM**. Consumer and provider operations, monitor controls, pricing, bidding and local fault experiments belong to the node-owned UIs, not the global dashboard. None of these should be called complete because a UI appears.
 
 ## Target architecture / trust boundaries
 
@@ -19,8 +19,8 @@
 4. **Network data plane:** choose an operator-managed WireGuard/Tailscale-style overlay for the lab, with DNS/service discovery based on stable node IDs and an authenticated relay/DERP-like fallback where peers are NATed. Avoid requiring incoming internet ports. Explicitly measure connectivity between independent VM operators; a lab overlay controller is a central **connectivity** trust dependency, not on-chain SLA authority.
 5. **Blockchain read model:** index events, tx hashes, receipts, gas, block/header hashes, requests, bids, winning selection, lease states, committee assignments, qualified evidence references, epoch accounting and withdrawals from configured RPC. Persist chain ID, contract ABI/version and block-hash provenance. Detect reorgs and reconcile; never call a provisional/latest block finalized. This index is a rebuildable cache, not canonical authority.
 6. **Off-chain evidence & observability:** each monitor/provider writes structured, signed local logs and raw immutable evidence; forward access-controlled metadata and hashes to an append-only archive. Dashboard links a record to its raw bytes, signature, event, block hash and qualification decision. Show absent/missing evidence explicitly.
-7. **Control/API boundary:** RBAC roles: observer (read), consumer (its own requests/price caps, bid selection, payments), provider (its own bids, capacity, workloads), monitor (its own observation, bond, confirmation), operator (node/update/fault test). Transactions require the role's own signer or narrowly delegated authorization; dashboard/operator must NOT be able to forge unrelated on-chain roles or override contract payouts.
-8. **Experiment orchestrator:** isolated lab-only authenticated actions to stop/restart provider containers or monitor processes, partition traffic and resume, with explicit target confirmation, time-bounded fault, automatic recovery, operator audit event and before/after telemetry. Never expose arbitrary remote shell or Docker socket to the public dashboard. Keep simulation/evidence/protocol outcomes distinct.
+7. **Control/API boundary:** The global dashboard is read-mostly with basic approved network metadata and discovery configuration. Consumer/provider/monitor transactions and role settings belong solely to individual VM-local interfaces, backed by the node's own wallet authorization. The global dashboard never signs as a participant or controls bids and workloads.
+8. **Node-local fault experiments:** authenticated lab-only controls on each operator-owned VM may stop/restart its provider container or monitor process, partition its traffic and resume, with explicit confirmation, bounded duration, automatic recovery, local audit and telemetry. The global dashboard observes experiments; it cannot invoke arbitrary remote shell or Docker actions.
 
 ## Release/update mechanism (new R6 work)
 
@@ -36,19 +36,19 @@
 
 **Initial acceptance:** use two Ubuntu VMs, deliver release A then B, prove both adopt B from outward-only network access, preserve identities and evidence, observe no unplanned quorum loss, and roll back a deliberately broken B while older A remains healthy. Test malicious feed, tampered hashes, incompatible ABI, interrupted download, offline node and replayed update.
 
-## Independent Operations Console (new R8 extension)
+## Independent Network Observatory (new R8 extension)
 
 ### Views and operations
 - **Fleet:** each node's stable ID, operator identity, role, capabilities, current revision, overlay connectivity, health, restart history, update progress and logs.
-- **Marketplace:** create resource requests and price caps, browse open requests, provider bids and availability, compare bids, select winner and show on-chain funded lease with tx receipt. Bid choice stays with authorized consumer.
+- **Marketplace:** read-only requests, price caps, provider bids, bidding history, winning selection and funded lease with transaction receipts. Creation, price changes and bid selection remain on the corresponding consumer/provider VM-local UIs.
 - **Leases:** provider acceptance, monitor sortition (seed/source/mode), committee and confirmations, per-epoch state, deadlines, funds/bonds/rewards/exposure, residual and withdrawals.
 - **Chain explorer:** blocks, hashes, txs, emitted logs, calldata ABI interpretation, gas, chain status, contract addresses/version, reorg/finality qualification; display trust/source boundaries.
 - **Evidence viewer:** real-time monitor probes (HTTP latency, status, signed digest, signer), provider service/job logs, raw off-chain archive, signature verification, hash cross-check and world-history narrowing. Mark any vote-only conclusions as conditional.
-- **Control actions:** node config proposals, authorized role-bound consumer/provider actions, protected release upgrades/restarts and lab fault experiments (stop provider/monitor, network partition, restore). Every action attributed, audited and reversible when technically possible.
+- **Basic network settings:** approved public node metadata, discovery and observer preferences only. Display release states and experiment results but never issue role transactions, price changes, software restarts, or fault commands.
 - **Experiments:** run IDs, wall-clock vs block-time distinctions, ground truth, all participant observations, on-chain outcomes, economics, failure-recovery latency, artifact export.
 
 ### Non-negotiable separation
-The console may *operate managed lab machines* and *observe network state*, but it cannot have omnipotent authority over unaffiliated independent providers/consumers/monitors or force an EVM contract to make arbitrary settlement decisions. Avoid centralizing all signing keys, oracle truth, provider capacity or monitoring attestations. Use least privilege and explicit delegation, never a single god-token for all role signatures.
+The independent dashboard may *observe network state* and manage restricted network metadata, but cannot operate participants or force EVM settlement decisions. Avoid centralizing all signing keys, oracle truth, provider capacity or monitoring attestations. Use least privilege and explicit delegation, never a single god-token for all role signatures.
 
 ## Critical-path build slices and measurable gates
 
@@ -56,7 +56,7 @@ The console may *operate managed lab machines* and *observe network state*, but 
 
 **Slice B — independent on-chain actors (R5/R2/R3):** one consumer, one provider and at least four independently signed monitor identities transacting on shared Anvil over authenticated network; real request/bid/selection/escrow/confirm/vote/settle/withdraw trace. Separate operational nodes vs four signing identities transparently.
 
-**Slice C — visibility and control (R8/R4):** event indexer and transaction explorer + role-bound request/bid/price UI + signed monitor/provider log/evidence archive; explicit physical-truth caveat and chain provenance.
+**Slice C — observability and role-owned interfaces (R8/R4/R5):** global event indexer and transaction explorer + node-local request/bid/price interfaces + signed monitor/provider log/evidence archive; explicit physical-truth caveat and chain provenance.
 
 **Slice D — faults and reproducibility (R9/R7):** stop actual provider container / monitor process, disconnect network, collect independent probe traces, verify no-show recovery and payout/held accounting, explain fault model and correct timing, export complete reproduction artifacts.
 
