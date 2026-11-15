@@ -157,11 +157,14 @@ class Observer:
         tx = self.rpc("eth_getTransactionByHash", [tx_hash])
         if tx is None:
             return {"found": False, "hash": tx_hash, "chainId": self.config["chain_id"]}
-        if type(tx) is not dict or tx.get("hash", "").lower() != tx_hash.lower():
+        if (type(tx) is not dict or type(tx.get("hash")) is not str or
+                tx["hash"].lower() != tx_hash.lower()):
             raise ObserverError("transaction identity mismatch")
         receipt = self.rpc("eth_getTransactionReceipt", [tx_hash])
-        if receipt is not None and (type(receipt) is not dict or
-                                   receipt.get("transactionHash", "").lower() != tx_hash.lower()):
+        if (receipt is not None and
+                (type(receipt) is not dict or
+                 type(receipt.get("transactionHash")) is not str or
+                 receipt["transactionHash"].lower() != tx_hash.lower())):
             raise ObserverError("receipt identity mismatch")
         block_number = tx.get("blockNumber")
         included = block_number is not None
