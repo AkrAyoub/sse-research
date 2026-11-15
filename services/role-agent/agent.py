@@ -12,6 +12,7 @@ import json
 import os
 import re
 import secrets
+import sys
 import tempfile
 import threading
 from datetime import datetime, timezone
@@ -73,6 +74,21 @@ def config(environ=None):
             raise ValueError("console credential symlink forbidden")
         token = credential.read_text(encoding="utf-8").strip()
     settings_file = env.get("SSE_NODE_SETTINGS_FILE", "")
+    chain_values = [env.get(key, "") for key in
+                    ("SSE_CHAIN_ID", "SSE_BOARD_ADDRESS", "SSE_SETTLEMENT_ADDRESS",
+                     "SSE_COMMITTEE_POOL_ADDRESS")]
+    chain = None
+    if any(chain_values):
+        if not all(chain_values):
+            raise ValueError("node marketplace requires complete public chain configuration")
+        chain_id, board, settlement, pool = chain_values
+        if not chain_id.isdigit() or int(chain_id) < 1 or int(chain_id) >= 2**256:
+            raise ValueError("invalid node marketplace chain ID")
+        if any(not re.fullmatch(r"0x[0-9a-fA-F]{40}", value) or int(value, 16) == 0
+               for value in (board, settlement, pool)):
+            raise ValueError("invalid node marketplace contract address")
+        chain = {"chain_id": int(chain_id), "board": board,
+                 "settlement": settlement, "pool": pool}
     if bool(token) != bool(settings_file):
         raise ValueError("local writes require both token and settings file")
     if token and len(token) < 32:
@@ -82,7 +98,7 @@ def config(environ=None):
         raise ValueError("settings file path must be absolute and safe")
     return {"node_id": name, "roles": roles, "port": port, "host": host,
             "revision": revision, "admin_token": token,
-            "settings_file": settings_file}
+            "settings_file": settings_file, "chain": chain}
 
 
 def validate_preferences(roles, payload):
@@ -163,6 +179,15 @@ for aggregate observation.</p><textarea id="preferences" spellcheck="false">{}</
 <label for="token">Node-local admin token (never stored by this page)</label>
 <input type="password" id="token" autocomplete="off"><button id="save">Save draft</button>
 <pre id="message">Read-only unless an owner-provisioned local admin token and settings path exist.</pre>
+</section><section><h2>Role-owned marketplace transaction preview</h2>
+<p>This does not sign, send, or fund transactions. It generates the exact
+contract call for review by the owner of this Ubuntu VM.</p>
+<label for="txrole">Owner role</label><select id="txrole"></select>
+<label for="txaction">Action</label><select id="txaction"></select>
+<label for="txparams">Action parameters (JSON)</label>
+<textarea id="txparams" spellcheck="false">{}</textarea>
+<button id="txpreview">Preview transaction only</button>
+<pre id="txresult">No transaction submitted.</pre>
 </section><script>
 const out=document.getElementById('message'), area=document.getElementById('preferences');
 async function refresh(){
@@ -183,13 +208,79 @@ document.getElementById('save').addEventListener('click',async()=>{
   if(r.ok)await refresh();
  }catch(_){out.textContent='Invalid JSON or request failure';}
 });
+const roleSelect=document.getElementById('txrole');
+const actSelect=document.getElementById('txaction');
+const txOutput=document.getElementById('txresult');
+const actionRoles={
+ consumer:['request','fund','admit-epoch'],
+ provider:['bid','accept'],
+ monitor:['monitor-register','monitor-confirm']
+};
+const available=["provider","consumer","monitor","observer"];
+const ownedRoles=" + json.dumps([r for r in conf["roles"] if r in ("consumer", "provider", "monitor")]) + ";
+for(const role of ownedRoles.filter(r=>actionRoles[r])) {
+ const option=document.createElement('option');option.value=role;option.textContent=role;
+ roleSelect.appendChild(option);
+}
+function updateActions(){
+ actSelect.replaceChildren();
+ for(const action of actionRoles[roleSelect.value]||[]) {
+  const opt=document.createElement('option');opt.value=action;opt.textContent=action;
+  actSelect.appendChild(opt);
+ }
+}
+roleSelect.addEventListener('change',updateActions);updateActions();
+document.getElementById('txpreview').addEventListener('click',async()=>{
+ const token=document.getElementById('token').value;
+ document.getElementById('token').value='';
+ try {
+  const params=JSON.parse(document.getElementById('txparams').value);
+  const r=await fetch('/v1/transaction-plans',{method:'POST',
+   headers:{'Content-Type':'application/json','Authorization':'Bearer '+token},
+   body:JSON.stringify({role:roleSelect.value,action:actSelect.value,params})});
+  const data=await r.json();
+  txOutput.textContent=r.ok?JSON.stringify(data,null,2):(data.error||'Preview refused');
+ }catch(_){txOutput.textContent='Invalid JSON or request error';}
+});
 refresh().catch(()=>{out.textContent='Node status unavailable';});
 </script></body></html>""")
+
+
+def transaction_preview(conf, message):
+    if not conf.get("chain"):
+        raise ValueError("node marketplace addresses not configured")
+    if type(message) is not dict or set(message) != {"role", "action", "params"}:
+        raise ValueError("expected role/action/params only")
+    role = message["role"]
+    if type(role) is not str or role not in conf["roles"] or role not in SETTINGS:
+        raise ValueError("this node does not own the requested role")
+    action = message["action"]
+    if type(action) is not str:
+        raise ValueError("transaction action must be a string")
+    # No signing keys or raw RPC access are available in this endpoint.
+    root = Path(__file__).resolve().parents[2] / "tools"
+    if str(root) not in sys.path:
+        sys.path.insert(0, str(root))
+    from sse_node_marketplace import make_plan, NodeTxError
+    try:
+        plan = make_plan(action, role, params=message["params"], **conf["chain"])
+    except (NodeTxError, ValueError, TypeError) as exc:
+        raise ValueError("invalid role transaction arguments") from exc
+    return {**plan.public(), "previewOnly": True, "canBroadcastHere": False,
+            "roleOwnerApprovalRequired": True}
 
 
 def make_server(conf):
     guard = threading.RLock()
     class Handler(BaseHTTPRequestHandler):
+        def _local_owner(self):
+            token = conf.get("admin_token", "")
+            auth = self.headers.get("Authorization", "")
+            origin = self.headers.get("Origin")
+            return (bool(token) and
+                    secrets.compare_digest(auth, "Bearer " + token) and
+                    (not origin or origin == "http://127.0.0.1:" + str(conf["port"])))
+
         def send_payload(self, code, body, content_type="application/json; charset=utf-8"):
             raw = (json.dumps(body, sort_keys=True).encode("utf-8")
                    if not isinstance(body, str) else body.encode("utf-8"))
@@ -226,16 +317,30 @@ def make_server(conf):
                 return self.send_payload(404, {"error": "not found"})
             self.send_payload(200, body)
 
+        def do_POST(self):
+            if self.path != "/v1/transaction-plans":
+                return self.send_payload(404, {"error": "not found"})
+            if not self._local_owner():
+                return self.send_payload(403, {"error": "local owner authorization required"})
+            if not conf.get("chain"):
+                return self.send_payload(503, {"error": "node marketplace not configured"})
+            if self.headers.get("Content-Type", "").split(";")[0].strip() != "application/json":
+                return self.send_payload(415, {"error": "JSON required"})
+            try:
+                length = int(self.headers.get("Content-Length", "0"))
+                if not 1 <= length <= 4096:
+                    return self.send_payload(413, {"error": "bounded request required"})
+                request = json.loads(self.rfile.read(length).decode("utf-8"))
+                plan = transaction_preview(conf, request)
+            except (ValueError, TypeError, UnicodeError, json.JSONDecodeError):
+                return self.send_payload(422, {"error": "invalid node-owned transaction plan"})
+            return self.send_payload(200, plan)
+
         def do_PUT(self):
             if self.path != "/v1/preferences":
                 return self.send_payload(404, {"error": "not found"})
-            token = conf.get("admin_token", "")
-            auth = self.headers.get("Authorization", "")
-            if not token or not secrets.compare_digest(auth, "Bearer " + token):
+            if not self._local_owner():
                 return self.send_payload(403, {"error": "local owner authorization required"})
-            origin = self.headers.get("Origin")
-            if origin and origin != "http://127.0.0.1:" + str(conf["port"]):
-                return self.send_payload(403, {"error": "cross-origin writes refused"})
             if self.headers.get("Content-Type", "").split(";")[0].strip() != "application/json":
                 return self.send_payload(415, {"error": "JSON required"})
             try:
