@@ -68,10 +68,6 @@ class OverlayTests(unittest.TestCase):
                 overlay.apply(self.make_plan())
 
     def test_secure_file_uses_nonsecret_cli_argument_and_erases_key(self):
-        class FakeCredential:
-            def __init__(self): self.erased = False
-            def unlink(self): self.erased = True
-        cred = FakeCredential()
         commands = []
         def run(args):
             commands.append(args)
@@ -81,19 +77,21 @@ class OverlayTests(unittest.TestCase):
                                             "DNSName": "provider-vm-01.example.ts.net."}})
             return ""
         plan = self.make_plan()
+        # Preserve genuine Path semantics. Mock only the filesystem effect
+        # (unlink), not the Path constructor that builds the CLI argument.
         with patch.object(overlay, "_require_ubuntu_root"), \
-             patch.object(overlay, "_check_auth_file"), \
+             patch.object(overlay, "_check_auth_file") as checked, \
              patch.object(overlay.shutil, "which", return_value="/usr/bin/tailscale"), \
-             patch.object(overlay, "Path", side_effect=lambda x: cred):
+             patch.object(overlay.Path, "unlink", autospec=True) as erased:
             out = overlay.apply(plan, command=run)
         self.assertEqual(out["result"], "OVERLAY_ONLINE")
-        self.assertTrue(cred.erased)
+        checked.assert_called_once()
+        erased.assert_called_once()
+        self.assertEqual(erased.call_args.args[0].name, "one-time.key")
         self.assertIn("--auth-key=file:/run/sse/one-time.key", commands[0])
         self.assertFalse(any("tskey-" in a for c in commands for a in c))
 
-    def test_offline_status_refuses_and_preserves_key_for_diagnostics(self):
-        class FakeCredential:
-            def unlink(self): raise AssertionError("should not erase after offline response")
+    def test_offline_status_refuses_without_erasing_key(self):
         def run(args):
             if args[1] == "status":
                 return json.dumps({"BackendState": "NeedsLogin", "Self": {"Online": False,
@@ -103,9 +101,26 @@ class OverlayTests(unittest.TestCase):
         with patch.object(overlay, "_require_ubuntu_root"), \
              patch.object(overlay, "_check_auth_file"), \
              patch.object(overlay.shutil, "which", return_value="/usr/bin/tailscale"), \
-             patch.object(overlay, "Path", side_effect=lambda x: FakeCredential()):
+             patch.object(overlay.Path, "unlink", autospec=True) as erased:
             with self.assertRaises(overlay.MeshJoinError):
                 overlay.apply(plan, command=run)
+        erased.assert_not_called()
+
+    def test_apply_refuses_modified_or_unvalidated_plan_before_system_changes(self):
+        base = self.make_plan()
+        for changes in (
+            {"authFilePath": "/tmp/attacker.key"},
+            {"aclTag": "tag:admin"},
+            {"rolesConfigured": ["provider", "provider"]},
+            {"tailnetJoined": True},
+            {"injected": "unexpected"},
+        ):
+            with self.subTest(changes=changes):
+                invalid = dict(base, **changes)
+                with patch.object(overlay, "_require_ubuntu_root",
+                                  side_effect=AssertionError("unexpected privileged action")):
+                    with self.assertRaises(overlay.MeshJoinError):
+                        overlay.apply(invalid)
 
 if __name__ == "__main__":
     unittest.main()
