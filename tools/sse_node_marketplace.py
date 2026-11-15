@@ -146,6 +146,9 @@ def make_plan(action: str, role: str, *, chain_id: int, board: str,
     }
     expected = {key for key, _ in specs[action]}
     if action == "fund":
+        # Settlement address is taken from the trusted node configuration,
+        # not from arbitrary action JSON.
+        expected.discard("settlement")
         expected |= {"selectedEpochFeeWei"}
     if action == "monitor-register":
         expected |= {"bondWei"}
@@ -262,7 +265,7 @@ def preflight(rpc, plan: Plan, *, signer: str | None = None,
         if expected_selected_fee is None:
             raise NodeTxError("missing expected selected bid fee")
         # requestId, bidIndex are the first two static argument words.
-        request_id = _read_word(plan.data, 0) if False else int(plan.data[10:74], 16)
+        request_id = int(plan.data[10:74], 16)
         bid_index = int(plan.data[74:138], 16)
         bid = _eth_call(rpc, plan.board, "getBid(uint256,uint256)", request_id, bid_index)
         provider = _read_word(bid, 0)
@@ -315,22 +318,25 @@ def execute(rpc, plan: Plan, signer, *, max_total_wei: int,
     if plan.value + gas * price > max_total_wei:
         raise NodeTxError("transaction exceeds local maximum total spend")
     nonce = _hex_int(rpc.request("eth_getTransactionCount", [owner, "pending"]))
+    from eth_utils import to_checksum_address
     tx = {"chainId": plan.chain_id, "nonce": nonce, "gas": gas,
-          "gasPrice": price, "to": plan.target,
+          "gasPrice": price, "to": to_checksum_address(plan.target),
           "value": plan.value, "data": plan.data}
     try:
         signed = signer.sign_transaction(tx)
     except (ValueError, TypeError):
         raise NodeTxError("local signing failed") from None
-    own_hash = "0x" + signed.hash.hex()
+    own_hash = "0x" + bytes(signed.hash).hex()
     emitted_hash = rpc.request("eth_sendRawTransaction", [
-        "0x" + signed.raw_transaction.hex()])
+        "0x" + bytes(signed.raw_transaction).hex()])
     if type(emitted_hash) is not str or emitted_hash.lower() != own_hash.lower():
         raise NodeTxError("RPC returned unexpected signed transaction hash")
     for _ in range(30):
         receipt = rpc.request("eth_getTransactionReceipt", [emitted_hash])
         if receipt is not None:
-            if type(receipt) is not dict or receipt.get("transactionHash", "").lower() != own_hash.lower():
+            if (type(receipt) is not dict or
+                    type(receipt.get("transactionHash")) is not str or
+                    receipt["transactionHash"].lower() != own_hash.lower()):
                 raise NodeTxError("invalid transaction receipt identity")
             if _hex_int(receipt.get("status")) != 1:
                 raise NodeTxError("transaction reverted: " + own_hash)
