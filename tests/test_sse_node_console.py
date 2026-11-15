@@ -102,6 +102,14 @@ class RoleConsoleTests(unittest.TestCase):
         _, raw, _ = self.get("/v1/preferences")
         self.assertEqual(json.loads(raw)["preferences"], p)
 
+    def test_preferences_require_token_even_when_draft(self):
+        data = {"provider": {"min_epoch_fee_wei": 1}}
+        bad, _ = self.put(data, token="w" * 40)
+        self.assertEqual(bad, 403)
+        good, _ = self.put(data, token=self.token)
+        self.assertEqual(good, 200)
+        self.assertEqual(agent.read_preferences(self.conf), data)
+
     def test_other_roles_and_unknown_keys_rejected(self):
         for bad in (
             {"consumer": {"max_epoch_fee_wei": 10}},
