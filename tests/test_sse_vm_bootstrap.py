@@ -1,5 +1,6 @@
 """Offline tests for R6 bootstrap plan and systemd posture; never run --apply."""
 import json
+import os
 import sys
 import tempfile
 import unittest
@@ -83,17 +84,11 @@ class BootstrapPlanTests(unittest.TestCase):
             with self.subTest(root=bad), self.assertRaises(b.BootstrapError):
                 spec(install_root=Path(bad))
 
+    @unittest.skipUnless(os.name == "posix", "filesystem symlink test is POSIX only")
     def test_symlink_install_path_rejected(self):
-        with tempfile.TemporaryDirectory() as d:
-            target = Path(d) / "actual"
-            target.mkdir()
-            link = Path(d) / "link"
-            try:
-                link.symlink_to(target, target_is_directory=True)
-            except (OSError, NotImplementedError):
-                self.skipTest("host does not permit creating symlinks")
+        with patch("pathlib.Path.is_symlink", return_value=True):
             with self.assertRaises(b.BootstrapError):
-                spec(install_root=link)
+                spec(install_root=Path("/opt/sse"))
 
     def test_rejects_unit_injection_or_system_directories(self):
         for unsafe in ("/etc/sse", "/opt/sse\\nExecStart=/bin/sh", "/tmp/sse"):

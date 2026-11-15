@@ -89,13 +89,16 @@ def make_spec(*, revision: str, node_id: str, role_names: str, rpc_url: str,
         or (port is not None and not 1 <= port <= 65535)):
         raise BootstrapError("RPC requires HTTPS or loopback HTTP, no URL credentials/path/query")
     root = Path(install_root)
-    if (not root.is_absolute() or root == Path("/")
+    # Validate a POSIX install target even when this DRY_RUN is reviewed from
+    # Windows/Git Bash. --apply independently requires Ubuntu.
+    posix_root = root.as_posix()
+    if (not posix_root.startswith("/") or posix_root == "/"
         or ".." in root.parts or len(root.parts) < 3
         or root.parts[1] not in ("opt", "srv")
-        or not re.fullmatch(r"/(?:[a-zA-Z0-9._-]+/)*[a-zA-Z0-9._-]+", str(root))):
+        or not re.fullmatch(r"/(?:[a-zA-Z0-9._-]+/)*[a-zA-Z0-9._-]+", posix_root)):
         raise BootstrapError("install root must be safe absolute path below /opt or /srv")
     # Check each preexisting ancestor: a symlink may bypass the intended root.
-    if any(p.is_symlink() for p in (root, *root.parents)):
+    if os.name == "posix" and any(p.is_symlink() for p in (root, *root.parents)):
         raise BootstrapError("symlink install paths are forbidden")
     return InstallSpec(revision.lower(), node_id, role_tuple, rpc_url, chain_id,
                        settlement.lower(), root, None if wallet is None else wallet.lower())
@@ -107,7 +110,7 @@ def describe(spec: InstallSpec) -> dict:
         "mode": "DRY_RUN",
         "repository": REPOSITORY,
         "approvedCommit": spec.revision,
-        "installRoot": str(spec.install_root),
+        "installRoot": spec.install_root.as_posix(),
         "nodeId": spec.node_id,
         "rolesConfigured": list(spec.roles),
         "chainId": spec.chain_id,
@@ -134,13 +137,13 @@ def systemd_unit(spec: InstallSpec) -> str:
         "[Unit]\nDescription=SSE experimental read-only VM role heartbeat\n"
         "After=network-online.target\nWants=network-online.target\n\n"
         "[Service]\nType=simple\nUser=sseagent\nGroup=sseagent\n"
-        "WorkingDirectory=" + str(script.parent) + "\n"
+        "WorkingDirectory=" + script.parent.as_posix() + "\n"
         "Environment=SSE_NODE_ID=" + spec.node_id + "\n"
         "Environment=SSE_ROLES=" + ",".join(spec.roles) + "\n"
         "Environment=SSE_REVISION=" + spec.revision + "\n"
         "Environment=SSE_AGENT_HOST=127.0.0.1\n"
         "Environment=SSE_AGENT_PORT=8765\n"
-        "ExecStart=/usr/bin/python3 " + str(script) + "\n"
+        "ExecStart=/usr/bin/python3 " + script.as_posix() + "\n"
         "Restart=on-failure\nRestartSec=4\n"
         "NoNewPrivileges=yes\nProtectSystem=strict\nProtectHome=yes\n"
         "PrivateTmp=yes\nCapabilityBoundingSet=\n\n"
