@@ -28,6 +28,14 @@ class OverlayTests(unittest.TestCase):
         self.assertFalse(plan["tailnetJoined"])
         self.assertFalse(plan["ethereumRoleActivated"])
 
+    def test_posix_credential_path_round_trips_on_all_host_platforms(self):
+        plan = overlay.validate("node-a", "provider", "/run/sse/one-time.key")
+        self.assertEqual(plan["authFilePath"], "/run/sse/one-time.key")
+        for bad in ("/run/sse/", "/run/sse/../x", "/run/sse/a/b",
+                    "/run/sse/.hidden", "/run/sse/a\\b", "C:\\run\\sse\\key"):
+            with self.subTest(bad=bad), self.assertRaises(overlay.MeshJoinError):
+                overlay.validate("node-a", "provider", bad)
+
     def test_rejects_node_id_injection(self):
         for node in ("", "../escape", "a b", "a;rm", "-dash"):
             with self.subTest(node=node), self.assertRaises(overlay.MeshJoinError):
@@ -55,7 +63,7 @@ class OverlayTests(unittest.TestCase):
                                            "--auth-key-file", "/run/sse/key"]), 0)
 
     def test_apply_requires_ubuntu_root(self):
-        with patch.object(overlay.os, "geteuid", return_value=1000):
+        with patch.object(overlay.os, "geteuid", return_value=1000, create=True):
             with self.assertRaises(overlay.MeshJoinError):
                 overlay.apply(self.make_plan())
 
@@ -72,11 +80,12 @@ class OverlayTests(unittest.TestCase):
                                    "Self": {"Online": True, "TailscaleIPs": ["100.101.2.3"],
                                             "DNSName": "provider-vm-01.example.ts.net."}})
             return ""
+        plan = self.make_plan()
         with patch.object(overlay, "_require_ubuntu_root"), \
              patch.object(overlay, "_check_auth_file"), \
              patch.object(overlay.shutil, "which", return_value="/usr/bin/tailscale"), \
              patch.object(overlay, "Path", side_effect=lambda x: cred):
-            out = overlay.apply(self.make_plan(), command=run)
+            out = overlay.apply(plan, command=run)
         self.assertEqual(out["result"], "OVERLAY_ONLINE")
         self.assertTrue(cred.erased)
         self.assertIn("--auth-key=file:/run/sse/one-time.key", commands[0])
@@ -90,12 +99,13 @@ class OverlayTests(unittest.TestCase):
                 return json.dumps({"BackendState": "NeedsLogin", "Self": {"Online": False,
                                   "TailscaleIPs": []}})
             return ""
+        plan = self.make_plan()
         with patch.object(overlay, "_require_ubuntu_root"), \
              patch.object(overlay, "_check_auth_file"), \
              patch.object(overlay.shutil, "which", return_value="/usr/bin/tailscale"), \
              patch.object(overlay, "Path", side_effect=lambda x: FakeCredential()):
             with self.assertRaises(overlay.MeshJoinError):
-                overlay.apply(self.make_plan(), command=run)
+                overlay.apply(plan, command=run)
 
 if __name__ == "__main__":
     unittest.main()
