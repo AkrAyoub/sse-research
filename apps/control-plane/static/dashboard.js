@@ -19,6 +19,25 @@ function renderTable(rootId, cols, rows) {
   rows.forEach(items=>{const row=document.createElement('tr');items.forEach(v=>row.append(el('td',v)));tbody.append(row);});
   table.append(tbody);root.append(table);
 }
+async function refreshChain() {
+  try {
+    const overview=await api('/v1/chain/overview');
+    $('chainStatus').textContent='Chain '+overview.chainId+' · block '+overview.headNumber+
+      ' · '+overview.contractAddresses.filter(x=>x.hasCode).length+' configured contracts with code';
+    const blocks=await api('/v1/chain/blocks?limit=10');
+    renderTable('chainBlocks',['Block','Hash','Transactions','Gas used','Finality'],
+      blocks.blocks.map(b=>[b.number,b.hash,b.transactionCount,b.gasUsed,b.finality]));
+    const from=Math.max(0,overview.headNumber-31);
+    const events=await api('/v1/chain/events?start_block='+from+'&end_block='+overview.headNumber);
+    renderTable('chainEvents',['Block','Contract','Event topic','Transaction'],
+      events.events.slice(-25).reverse().map(e=>[
+        e.blockNumber,e.address,(e.topics||[])[0]||'—',e.transactionHash]));
+  }catch(e){
+    $('chainStatus').textContent='Unavailable: '+e.message;
+    $('chainBlocks').textContent='No verified RPC response; contract state not displayed.';
+    $('chainEvents').textContent='No live contract event data.';
+  }
+}
 async function refresh() {
   try {
     const [inv,prop,audit,scenarios] = await Promise.all([api('/v1/nodes'),api('/v1/proposals'),api('/v1/audit'),api('/v1/settlement-scenarios')]);
@@ -36,10 +55,20 @@ async function refresh() {
     if(!prop.proposals.length)root.append(el('p','No proposals yet.'));
     renderTable('audit',['Time','Action','Node'],audit.events.slice(-12).reverse().map(e=>[e.time,e.event,e.node_id]));
     renderTable('model',['Evidence','Provider','Consumer','Unresolved'],scenarios.results.map(r=>[r.scenario,r.provider_credit,r.consumer_refund,r.unresolved]));
-    message('Authenticated — showing local desired state.');
+    await refreshChain();
+    message('Authenticated — showing inventory and configured read-only chain data.');
   }catch(e){message(e.message,true);}
 }
 $('connect').addEventListener('click',()=>{bearer=$('token').value;$('token').value='';refresh();});
+$('lookupTx').addEventListener('click',async()=>{
+  try {
+    const hash=$('txhash').value.trim();
+    if(!/^0x[0-9a-fA-F]{64}$/.test(hash))throw new Error('Enter a 32-byte transaction hash.');
+    const result=await api('/v1/chain/transactions/'+encodeURIComponent(hash));
+    $('txDetail').textContent=JSON.stringify(result,null,2);
+  }catch(e){$('txDetail').textContent='Lookup failed: '+e.message;}
+});
+
 $('enroll').addEventListener('submit',async (ev)=>{
   ev.preventDefault();
   try {
