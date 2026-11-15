@@ -66,6 +66,12 @@ def config(environ=None):
     if not re.fullmatch(r"[a-zA-Z0-9._-]{1,80}", revision):
         raise ValueError("invalid revision")
     token = env.get("SSE_NODE_UI_TOKEN", "")
+    cred_dir = env.get("CREDENTIALS_DIRECTORY", "")
+    if not token and cred_dir:
+        credential = Path(cred_dir) / "ui-token"
+        if credential.is_symlink():
+            raise ValueError("console credential symlink forbidden")
+        token = credential.read_text(encoding="utf-8").strip()
     settings_file = env.get("SSE_NODE_SETTINGS_FILE", "")
     if bool(token) != bool(settings_file):
         raise ValueError("local writes require both token and settings file")
