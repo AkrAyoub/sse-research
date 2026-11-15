@@ -121,12 +121,19 @@ def write_preferences(conf, data):
     parent = path.parent
     if not parent.is_dir() or parent.is_symlink() or path.is_symlink():
         raise ValueError("settings directory missing or symlinked")
-    if parent.stat().st_mode & 0o022:
+    # Mode bits have different meanings under Windows' ACL emulation.
+    # Enforce the POSIX permission boundary when actually running on Ubuntu.
+    if os.name == "posix" and parent.stat().st_mode & 0o022:
         raise ValueError("settings directory must not be group/world writable")
     fd, stage = tempfile.mkstemp(prefix=".sse-settings-", dir=parent)
     try:
         with os.fdopen(fd, "w", encoding="utf-8") as out:
-            os.fchmod(out.fileno(), 0o600)
+            if hasattr(os, "fchmod"):
+                os.fchmod(out.fileno(), 0o600)
+            else:
+                # Windows-only offline functional testing; Ubuntu always uses
+                # the secure POSIX fchmod path.
+                os.chmod(stage, 0o600)
             json.dump(data, out, sort_keys=True)
             out.write("\n")
             out.flush()
