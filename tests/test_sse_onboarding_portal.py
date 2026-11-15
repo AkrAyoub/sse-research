@@ -49,8 +49,20 @@ class OnboardingPortalTests(unittest.TestCase):
         self.assertIn("Review the dry-run", self.source)
 
     def test_only_public_configuration_inputs_collected(self):
-        inputs = {d.get("id") for tag, d in self.tags.tag_attrs if tag == "input"}
-        self.assertEqual(inputs, {"nodeId", "rpc", "settlement", "wallet"})
+        inputs = [d for tag, d in self.tags.tag_attrs if tag == "input"]
+        public_fields = [d for d in inputs if d.get("id") is not None]
+        role_fields = [d for d in inputs if d.get("id") is None]
+        self.assertEqual(
+            {d["id"] for d in public_fields}, {"nodeId", "rpc", "settlement", "wallet"}
+        )
+        self.assertEqual(len(public_fields), 4)
+        self.assertTrue(all(d.get("type", "text") == "text" for d in public_fields))
+        self.assertEqual(len(role_fields), 4)
+        self.assertEqual(
+            {(d.get("name"), d.get("type"), d.get("value")) for d in role_fields},
+            {("role", "checkbox", r) for r in
+             ("provider", "monitor", "consumer", "observer")},
+        )
         self.assertNotIn('<input type="password"', self.source)
         self.assertNotIn("<form", self.source)
         self.assertNotIn("localStorage", self.source)
