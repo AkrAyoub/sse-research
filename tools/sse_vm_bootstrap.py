@@ -45,6 +45,8 @@ class InstallSpec:
     settlement: str
     install_root: Path
     wallet: str | None = None
+    broker_url: str | None = None
+    enrollment_token_file: Path | None = None
 
     @property
     def release(self) -> Path:
@@ -57,7 +59,8 @@ class InstallSpec:
 
 def make_spec(*, revision: str, node_id: str, role_names: str, rpc_url: str,
               chain_id: int, settlement: str, install_root: Path,
-              wallet: str | None = None) -> InstallSpec:
+              wallet: str | None = None, broker_url: str | None = None,
+              enrollment_token_file: Path | None = None) -> InstallSpec:
     if type(revision) is not str or not COMMIT_RE.fullmatch(revision):
         raise BootstrapError("requires externally approved full 40-character commit SHA")
     if type(node_id) is not str or not NAME_RE.fullmatch(node_id):
@@ -102,8 +105,20 @@ def make_spec(*, revision: str, node_id: str, role_names: str, rpc_url: str,
     # Check each preexisting ancestor: a symlink may bypass the intended root.
     if os.name == "posix" and any(p.is_symlink() for p in (root, *root.parents)):
         raise BootstrapError("symlink install paths are forbidden")
+    if bool(broker_url) != bool(enrollment_token_file):
+        raise BootstrapError("mesh broker and token file must be configured together")
+    if broker_url:
+        host = urlsplit(broker_url)
+        if (host.scheme != "https" or not host.hostname or
+            host.username or host.password or host.path not in ("", "/") or
+            host.query or host.fragment):
+            raise BootstrapError("mesh broker must be an HTTPS origin")
+        if Path(enrollment_token_file).as_posix() != "/run/sse/enrollment.token":
+            raise BootstrapError("mesh enrollment token requires /run/sse/enrollment.token")
     return InstallSpec(revision.lower(), node_id, role_tuple, rpc_url, chain_id,
-                       settlement.lower(), root, None if wallet is None else wallet.lower())
+                       settlement.lower(), root, None if wallet is None else wallet.lower(),
+                       broker_url.rstrip("/") if broker_url else None,
+                       Path(enrollment_token_file) if enrollment_token_file else None)
 
 
 def describe(spec: InstallSpec) -> dict:
@@ -118,6 +133,8 @@ def describe(spec: InstallSpec) -> dict:
         "chainId": spec.chain_id,
         "settlement": spec.settlement,
         "publicWallet": spec.wallet,
+        "meshBrokerConfigured": spec.broker_url is not None,
+        "meshBrokerOrigin": spec.broker_url,
         "actionsIfApplied": [
             "fetch immutable commit and verify checkout HEAD",
             "install isolated pinned cryptographic dependency",
@@ -277,6 +294,14 @@ def apply(spec: InstallSpec) -> dict:
             "--chain-id", str(spec.chain_id),
             "--settlement", spec.settlement,
         ]
+        if spec.broker_url is not None:
+            # Mesh is required before chain preflight when the RPC lives in the
+            # private overlay. Abort on invalid/missing one-time credentials.
+            _run(["python3", str(spec.release / "tools" / "sse_vm_enroll.py"),
+                  "--node-id", spec.node_id, "--roles", ",".join(spec.roles),
+                  "--broker-url", spec.broker_url,
+                  "--token-file", str(spec.enrollment_token_file), "--apply"])
+
         if spec.wallet is not None:
             preflight.extend(["--wallet", spec.wallet])
         try:
@@ -323,6 +348,9 @@ def main(argv: list[str] | None = None) -> int:
     p.add_argument("--chain-id", required=True, type=int)
     p.add_argument("--settlement", required=True)
     p.add_argument("--wallet", help="optional public wallet, NEVER private key")
+    p.add_argument("--broker-url", help="optional HTTPS SSE mesh enrollment broker origin")
+    p.add_argument("--enrollment-token-file", type=Path,
+                   help="root-only one-time node token at /run/sse/enrollment.token")
     p.add_argument("--install-root", type=Path, default=Path("/opt/sse"))
     p.add_argument("--apply", action="store_true",
                    help="explicitly allow local Ubuntu Git/venv/systemd changes")
@@ -331,7 +359,9 @@ def main(argv: list[str] | None = None) -> int:
         spec = make_spec(revision=args.revision, node_id=args.node_id,
                          role_names=args.roles, rpc_url=args.rpc_url,
                          chain_id=args.chain_id, settlement=args.settlement,
-                         install_root=args.install_root, wallet=args.wallet)
+                         install_root=args.install_root, wallet=args.wallet,
+                         broker_url=args.broker_url,
+                         enrollment_token_file=args.enrollment_token_file)
         print(json.dumps(apply(spec) if args.apply else describe(spec),
                          sort_keys=True, indent=2))
         return 0
