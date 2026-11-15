@@ -141,8 +141,7 @@ def page(conf):
 <meta name="viewport" content="width=device-width,initial-scale=1">
 <meta name="referrer" content="no-referrer"><title>SSE Node Console</title><style>"""
             + STYLE + """</style></head><body><small>SSE INTERCLOUD / UBUNTU NODE</small><h1>"""
-            + html.escape(conf["node_id"]) + """</h1><p>Local, role-owned console. Draft settings do
-not submit transactions or change running workloads.</p><div class="grid">"""
+            + html.escape(conf["node_id"]) + """</h1><p>Local, role-owned console. Draft settings do not submit transactions or change running workloads.</p><div class="grid">"""
             + cards + """</div><section><h2>Node status</h2><pre id="status">Loading...</pre></section>
 <section><h2>Local preferences (draft)</h2>
 <p>Only role-specific non-secret numeric preferences are accepted. Changes are
