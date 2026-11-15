@@ -189,7 +189,8 @@ def systemd_unit(spec: InstallSpec) -> str:
         + chain_env +
         "LoadCredential=ui-token:/etc/sse/node-ui.token\n"
         "StateDirectory=sse-role-agent\n"
-        "ExecStart=/usr/bin/python3 " + script.as_posix() + "\n"
+        "ExecStart=" + (spec.runtime / "bin" / "python").as_posix() + " "
+        + script.as_posix() + "\n"
         "Restart=on-failure\nRestartSec=4\n"
         "NoNewPrivileges=yes\nProtectSystem=strict\nProtectHome=yes\n"
         "PrivateTmp=yes\nCapabilityBoundingSet=\n\n"
