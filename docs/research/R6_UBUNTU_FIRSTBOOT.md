@@ -16,9 +16,10 @@ application roles, RPC URL, chain ID and SSESettlement address, the installer:
 3. Creates a separate Python virtual environment under the same revision,
    installs pinned `pycryptodome==3.23.0`, and runs
    `tools/sse_vm_join_preflight.py` against the specified chain and contract.
-4. Creates the restricted `sseagent` system user if missing, then starts a
-   **read-only local heartbeat** as that unprivileged identity. Existing users
-   with unsafe permissions/shells are rejected.
+4. Creates the restricted `sseagent` system user if missing, provisions
+   a private node-local UI token using systemd `LoadCredential`, and starts a
+   **loopback-only role console and heartbeat** as that unprivileged identity.
+   Its authenticated preference edits are drafts, not on-chain transactions.
 5. Does **not** read/generate private keys, send transactions, provision
    compute capacity, expose network ports, join the Ethereum validator set,
    register/bond monitors, or interpret evidence as contractual truth.
@@ -74,6 +75,8 @@ sudo python3 /tmp/sse_vm_bootstrap.py \
 
 sudo systemctl status sse-vm-role-agent.service
 curl --fail http://127.0.0.1:8765/v1/status
+# Node UI at http://127.0.0.1:8765/ui (use authenticated tunnel to browse remotely)
+# Owner-only: sudo cat /etc/sse/node-ui.token
 ```
 
 Choose `--roles monitor` or another explicit combination for the second VM.
@@ -83,7 +86,9 @@ keys and permissions; a monitoring role is not eligible until it has
 successfully registered and posted its bond on chain.
 
 The installer refuses to overwrite an existing systemd unit automatically
-and does not support silent upgrades. Existing release directories are reused
+and does not support silent upgrades. The experimental mesh primitive
+`tools/sse_vm_overlay.py` is not yet wired to bootstrap: an approved Tailscale
+package source and short-lived key broker are prerequisites. Existing release directories are reused
 only if their HEAD matches the trusted pin. On failure it can leave a
 downloaded release/runtime but will not install the service unless the
 chain preflight passes.
