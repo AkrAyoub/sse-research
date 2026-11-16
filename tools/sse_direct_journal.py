@@ -20,13 +20,20 @@ import sqlite3
 import stat
 from pathlib import Path
 
-from sse_direct_delivery import json_bytes
+from sse_direct_wire import WireError, wire_json_bytes
 
 NONCE = re.compile(r"0x[0-9a-f]{64}\Z")
 
 
 class DirectJournalError(ValueError):
     pass
+
+
+def _journal_bytes(item):
+    try:
+        return wire_json_bytes(item)
+    except WireError as exc:
+        raise DirectJournalError(str(exc)) from exc
 
 
 def _key(key):
@@ -96,7 +103,7 @@ class DirectJournal:
 
     def reserve(self, key, consumer_request):
         lease,epoch,nonce = _key(key)
-        data=json_bytes(consumer_request)
+        data=_journal_bytes(consumer_request)
         try:
             with self._connect() as db:
                 db.execute("BEGIN IMMEDIATE")
@@ -111,7 +118,7 @@ class DirectJournal:
 
     def record_response(self,key,response):
         lease,epoch,nonce = _key(key)
-        body=json_bytes(response)
+        body=_journal_bytes(response)
         try:
             with self._connect() as db:
                 db.execute("BEGIN IMMEDIATE")
@@ -143,7 +150,7 @@ class DirectJournal:
 
     def record_receipt(self,key,consumer_receipt):
         lease,epoch,nonce = _key(key)
-        body=json_bytes(consumer_receipt)
+        body=_journal_bytes(consumer_receipt)
         try:
             with self._connect() as db:
                 db.execute("BEGIN IMMEDIATE")
