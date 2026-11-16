@@ -77,6 +77,7 @@ class EvaluationTests(unittest.TestCase):
         report=evaluate(POLICY,[sample(1),sample(2,timeout=True),sample(3,timeout=True)])
         self.assertEqual(report["localTimeouts"],2)
         self.assertEqual(report["observedSuccessBps"],10000)
+        self.assertEqual(report["provisionalAssessment"],"PARTIAL_VISIBILITY_INCONCLUSIVE")
         self.assertFalse(report["timeoutsAreSlaFailures"])
         self.assertFalse(report["independentWitnessesVerified"])
         self.assertFalse(report["suitableForOnChainSlaFailureVote"])
