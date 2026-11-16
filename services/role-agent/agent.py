@@ -96,9 +96,22 @@ def config(environ=None):
     if settings_file and (not Path(settings_file).is_absolute()
                           or ".." in Path(settings_file).parts):
         raise ValueError("settings file path must be absolute and safe")
+    monitor_snapshot = env.get("SSE_MONITOR_WORK_SNAPSHOT_FILE", "")
+    monitor_wallet = env.get("SSE_MONITOR_WALLET", "")
+    if bool(monitor_snapshot) != bool(monitor_wallet):
+        raise ValueError("monitor display requires both snapshot path and public monitor wallet")
+    if monitor_snapshot:
+        if ("monitor" not in roles or not token or
+                not Path(monitor_snapshot).is_absolute() or
+                ".." in Path(monitor_snapshot).parts or
+                re.fullmatch(r"0x[0-9a-fA-F]{40}", monitor_wallet) is None or
+                int(monitor_wallet,16) == 0):
+            raise ValueError("monitor display requires owner-authenticated local monitor role")
     return {"node_id": name, "roles": roles, "port": port, "host": host,
             "revision": revision, "admin_token": token,
-            "settings_file": settings_file, "chain": chain}
+            "settings_file": settings_file, "chain": chain,
+            "monitor_snapshot": monitor_snapshot,
+            "monitor_wallet": monitor_wallet.lower()}
 
 
 def validate_preferences(roles, payload):
@@ -161,6 +174,12 @@ def write_preferences(conf, data):
 
 
 def page(conf):
+    monitor_panel = ("""<section><h2>Monitor work review (read-only)</h2>
+<p>Owner-authenticated local snapshot only. No signing, voting, confirmation,
+execution, or SLA certification. Review tasks can become stale between checks.</p>
+<button id="monitor-review">View recent monitor tasks</button>
+<pre id="monitor-review-result">No review loaded. Enter local admin token before viewing.</pre>
+</section>""" if "monitor" in conf["roles"] else "")
     cards = "".join(
         "<article><strong>" + html.escape(PAGES[r][0]) +
         "</strong><p>" + html.escape(PAGES[r][1]) + "</p></article>"
@@ -171,7 +190,7 @@ def page(conf):
 <meta name="referrer" content="no-referrer"><title>SSE Node Console</title><style>"""
             + STYLE + """</style></head><body><small>SSE INTERCLOUD / UBUNTU NODE</small><h1>"""
             + html.escape(conf["node_id"]) + """</h1><p>Local, role-owned console. Draft settings do not submit transactions or change running workloads.</p><div class="grid">"""
-            + cards + """</div><section><h2>Node status</h2><pre id="status">Loading...</pre></section>
+            + cards + """</div>""" + monitor_panel + """<section><h2>Node status</h2><pre id="status">Loading...</pre></section>
 <section><h2>Local preferences (draft)</h2>
 <p>Only role-specific non-secret numeric preferences are accepted. Changes are
 stored locally but not activated on-chain. Use a separate network-wide dashboard
@@ -190,6 +209,23 @@ contract call for review by the owner of this Ubuntu VM.</p>
 <pre id="txresult">No transaction submitted.</pre>
 </section><script>
 const out=document.getElementById('message'), area=document.getElementById('preferences');
+const monitorReviewButton=document.getElementById('monitor-review');
+if(monitorReviewButton){
+ monitorReviewButton.addEventListener('click',async()=>{
+  const target=document.getElementById('monitor-review-result');
+  const token=document.getElementById('token').value;
+  document.getElementById('token').value='';
+  try {
+   const response=await fetch('/v1/monitor-work',{
+     headers:{'Authorization':'Bearer '+token},
+     cache:'no-store'
+   });
+   const data=await response.json();
+   target.textContent=response.ok?JSON.stringify(data,null,2):
+      (data.error||'Monitor review unavailable');
+  }catch(_){target.textContent='Monitor review unavailable';}
+ });
+}
 async function refresh(){
  const [s,p]=await Promise.all([fetch('/v1/status'),fetch('/v1/preferences')]);
  document.getElementById('status').textContent=JSON.stringify(await s.json(),null,2);
@@ -326,6 +362,25 @@ def make_server(conf):
                         "blockchain_synced": None, "monitor_eligible": None,
                         "provider_capacity_verified": None,
                         "checked_at": datetime.now(timezone.utc).isoformat()}
+            elif self.path == "/v1/monitor-work":
+                if "monitor" not in conf["roles"]:
+                    return self.send_payload(404, {"error": "not found"})
+                if not self._local_owner():
+                    return self.reject_unauthorized_owner()
+                if not conf.get("monitor_snapshot"):
+                    return self.send_payload(503, {"error": "monitor review snapshot not configured"})
+                try:
+                    root = Path(__file__).resolve().parents[2] / "tools"
+                    if str(root) not in sys.path:
+                        sys.path.insert(0, str(root))
+                    from sse_monitor_public_snapshot import read_snapshot
+                    snapshot=read_snapshot(
+                        conf["monitor_snapshot"],node_id=conf["node_id"],
+                        monitor_address=conf["monitor_wallet"])
+                except (OSError, ValueError, TypeError):
+                    return self.send_payload(503, {
+                        "error": "monitor work review unavailable or stale; refresh on monitor node"})
+                return self.send_payload(200, {**snapshot, "displayOnly": True})
             elif self.path == "/v1/preferences":
                 try:
                     with guard:
