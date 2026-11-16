@@ -14,6 +14,7 @@ from __future__ import annotations
 import os
 import subprocess
 import sys
+import tempfile
 import threading
 import time
 import unittest
@@ -36,6 +37,7 @@ from sse_direct_delivery import (ExchangeError, prepare_request, authenticate_re
                                  verify_receipt, post_json)
 from compute_workload import compute_result
 from direct_work_service import make_server
+from sse_direct_journal import DirectJournal
 from test_sse_node_marketplace_anvil import (
     AVAILABLE, ENABLE, CHAIN, MNEMONIC, _data, _deploy, _unlocked,
     _address_words, _loopback_port
@@ -54,6 +56,7 @@ class ChainBackedDirectDelivery(unittest.TestCase):
             cwd=ROOT,stdout=subprocess.DEVNULL,stderr=subprocess.DEVNULL)
         server=None
         worker=None
+        private_journal_dir=None
         try:
             rpc=RPC("http://127.0.0.1:"+str(port))
             for _ in range(100):
@@ -173,11 +176,15 @@ class ChainBackedDirectDelivery(unittest.TestCase):
             with self.assertRaises(ExchangeError):
                 prepare_request(active,policy,endpoint,losing_provider,nonce)
 
-            server=make_server(service_port,winner,policy,endpoint,inspected)
+            private_journal_dir=tempfile.TemporaryDirectory()
+            journal=DirectJournal(Path(private_journal_dir.name)/"provider-evidence.sqlite")
+            server=make_server(service_port,winner,policy,endpoint,inspected,
+                               journal=journal)
             worker=threading.Thread(target=server.serve_forever,daemon=True)
             worker.start()
             exchange=submit_work_request(endpoint,active,policy,consumer,nonce)
             self.assertTrue(exchange["receiptAcceptedByProvider"])
+            self.assertEqual(journal.counts(),{"RECEIVED":1})
             self.assertFalse(exchange["onChainSettlementSubmitted"])
             self.assertFalse(exchange["physicalDeadlineCertified"])
             response=exchange["response"]
@@ -220,6 +227,8 @@ class ChainBackedDirectDelivery(unittest.TestCase):
                 server.server_close()
             if worker is not None:
                 worker.join(timeout=5)
+            if private_journal_dir is not None:
+                private_journal_dir.cleanup()
             if process.poll() is None:
                 process.terminate()
                 try:
