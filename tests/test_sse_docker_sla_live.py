@@ -56,11 +56,40 @@ def _docker_local_only():
         raise AssertionError("real Docker test requires a local Unix/npipe Docker context")
 
 
+def require_local_docker_engine(image):
+    """Never run integration Docker commands without a local Linux engine.
+
+    Missing daemon/image is an explicit skipped prerequisite, NOT a passed
+    Docker performance/attestation result. Remote contexts fail closed.
+    """
+    if not isinstance(image, str) or not IMAGE_RE.fullmatch(image):
+        raise unittest.SkipTest(
+            "Build local Docker image first and export SSE_DOCKER_WORKER_IMAGE")
+    if shutil.which("docker") is None:
+        raise unittest.SkipTest("Docker CLI not installed")
+    _docker_local_only()
+    try:
+        info = subprocess.run(["docker", "info", "--format", "{{.OSType}}"],
+                              capture_output=True, text=True, timeout=15,
+                              check=False)
+        if info.returncode != 0 or info.stdout.strip() != "linux":
+            raise unittest.SkipTest(
+                "Local Docker Linux Engine unavailable: start Docker Desktop")
+        found = subprocess.run(
+            ["docker", "image", "inspect", "--format", "{{.Id}}", image],
+            capture_output=True, text=True, timeout=15, check=False)
+    except (FileNotFoundError, OSError, subprocess.TimeoutExpired) as exc:
+        raise unittest.SkipTest("Local Docker Linux Engine not reachable") from exc
+    if found.returncode != 0 or found.stdout.strip().lower() != image:
+        raise unittest.SkipTest(
+            "Pinned Docker image unavailable; run docker build then re-export ID")
+
+
 @unittest.skipUnless(ENABLED, "real Docker test requires explicit opt-in")
 @unittest.skipUnless(AVAILABLE, "local Docker CLI and pinned image ID required")
 class RealDockerWorker(unittest.TestCase):
     def test_immutable_image_under_strict_limits_produces_exact_result(self):
-        _docker_local_only()
+        require_local_docker_engine(IMAGE)
         port=_port()
         endpoint="http://127.0.0.1:"+str(port)
         name="sse-compute-"+secrets.token_hex(5)
