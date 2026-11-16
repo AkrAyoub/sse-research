@@ -37,6 +37,17 @@ ACTIONS = {
     "monitor-register": ("monitor", "pool", "register()"),
     "monitor-confirm": ("monitor", "settlement", "confirmMonitorAssignment(uint256)"),
     "admit-epoch": ("consumer", "settlement", "admitEpoch(uint256,bytes32)"),
+    # Lab evidence pathway: a nonzero hash is NOT proof of independent SLA truth.
+    "monitor-vote": ("monitor", "settlement",
+                     "submitMonitorVoteDirect(uint256,uint256,uint8,bytes32)"),
+    # Permissionless on-chain actions deliberately offered to participant
+    # identities, never to the network-wide dashboard.
+    "seal-epoch": ("any", "settlement", "sealMonitoring(uint256,uint256)"),
+    "settle-epoch": ("any", "settlement", "settleEpoch(uint256,uint256)"),
+    "close-evidence": ("any", "settlement", "closeEpochEvidence(uint256,uint256)"),
+    "close-lease": ("consumer", "settlement", "closeLease(uint256)"),
+    "release-committee": ("any", "settlement", "releaseCommitteeAfterEvidence(uint256)"),
+    "withdraw": ("any", "settlement", "withdraw()"),
 }
 MAX_GAS = 9_000_000
 
@@ -87,6 +98,8 @@ def _word(value, kind: str) -> bytes:
         value = int(hash32(value), 16)
     elif kind == "uint64":
         value = uint(value, "uint64", 64)
+    elif kind == "uint8":
+        value = uint(value, "uint8", 8)
     else:
         value = uint(value, "uint256")
     return value.to_bytes(32, "big")
@@ -122,7 +135,8 @@ class Plan:
 
 def make_plan(action: str, role: str, *, chain_id: int, board: str,
               settlement: str, pool: str, params: dict) -> Plan:
-    if action not in ACTIONS or role != ACTIONS[action][0]:
+    if (action not in ACTIONS or role not in ("consumer", "provider", "monitor")
+            or ACTIONS[action][0] not in ("any", role)):
         raise NodeTxError("action requires the owning SSE participant role")
     if type(params) is not dict:
         raise NodeTxError("action arguments must be a JSON object")
@@ -143,6 +157,14 @@ def make_plan(action: str, role: str, *, chain_id: int, board: str,
         "monitor-register": tuple(),
         "monitor-confirm": (("leaseId", "uint256"),),
         "admit-epoch": (("leaseId", "uint256"), ("requestHash", "bytes32")),
+        "monitor-vote": (("leaseId", "uint256"), ("epochId", "uint256"),
+                         ("outcome", "uint8"), ("evidenceHash", "bytes32")),
+        "seal-epoch": (("leaseId", "uint256"), ("epochId", "uint256")),
+        "settle-epoch": (("leaseId", "uint256"), ("epochId", "uint256")),
+        "close-evidence": (("leaseId", "uint256"), ("epochId", "uint256")),
+        "close-lease": (("leaseId", "uint256"),),
+        "release-committee": (("leaseId", "uint256"),),
+        "withdraw": tuple(),
     }
     expected = {key for key, _ in specs[action]}
     if action == "fund":
@@ -181,6 +203,12 @@ def make_plan(action: str, role: str, *, chain_id: int, board: str,
             uint(params[field], field, minimum=1)
     if action == "request" and params["biddingClose"] == 0:
         raise NodeTxError("bidding close must be positive")
+    if action == "monitor-vote":
+        if type(params["outcome"]) is not int or params["outcome"] not in (1, 2):
+            raise NodeTxError("monitor outcome must be 1=Success or 2=Failure")
+        uint(params["epochId"], "epochId")
+    if "epochId" in params:
+        uint(params["epochId"], "epochId")
     selector = keccak256(sig.encode("ascii"))[:4]
     payload = selector + b"".join(_word(values[key], kind) for key, kind in specs[action])
     dest = {"board": board, "settlement": settlement, "pool": pool}[target_kind]
