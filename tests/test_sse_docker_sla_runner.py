@@ -179,9 +179,9 @@ class DockerSlaTests(unittest.TestCase):
                 "--port","8881","--serve",
             ]
             with patch.object(provider_service,"make_server",
-                              side_effect=AssertionError("must not launch")), \\
+                              side_effect=AssertionError("must not launch")), \
                  patch.object(provider_service,"_load_signer",
-                              side_effect=AssertionError("must not read signer")), \\
+                              side_effect=AssertionError("must not read signer")), \
                  redirect_stdout(StringIO()), redirect_stderr(StringIO()):
                 self.assertEqual(provider_service.main(args),1)
 
