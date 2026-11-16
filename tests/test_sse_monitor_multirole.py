@@ -32,7 +32,7 @@ from sse_evidence_wire_v1 import EvidenceScope, VerificationContext, Authenticat
 from sse_http_signed_delivery_v1 import (
     EvidenceArchive, capture_response, fetch_provider_payload)
 from sse_challenge import expected_response_hash
-from sse_direct_delivery import post_json, submit_work_request
+from sse_direct_delivery import ExchangeError, post_json, submit_work_request
 from typed_evidence import Domain
 from direct_work_service import make_server
 from sse_sla_manifest import canonical_policy
