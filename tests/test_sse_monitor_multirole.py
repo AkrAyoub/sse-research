@@ -10,6 +10,7 @@ import sys
 import socket
 from contextlib import redirect_stdout, redirect_stderr
 from io import StringIO
+from unittest.mock import patch
 import tempfile
 import threading
 import unittest
@@ -28,7 +29,8 @@ from test_sse_sla_direct_delivery import setup
 from sse_node_role_policy import RolePolicyError, role_manifest, authorize_selected_monitor
 from sse_monitor_challenge import signed_challenge, ChallengeError
 from sse_evidence_wire_v1 import EvidenceScope, VerificationContext
-from sse_http_signed_delivery_v1 import EvidenceArchive, capture_response
+from sse_http_signed_delivery_v1 import (
+    EvidenceArchive, capture_response, fetch_provider_payload)
 from sse_challenge import expected_response_hash
 from sse_direct_delivery import post_json, submit_work_request
 from typed_evidence import Domain
@@ -113,6 +115,40 @@ class MultiRoleMonitorTests(unittest.TestCase):
                 signed_challenge(mutated,state,policy,endpoint,p)
         with self.assertRaises(ChallengeError):
             signed_challenge(request,state,policy,endpoint,c)
+
+    def test_overlay_https_transport_rejects_public_hosts_and_redirect_targets(self):
+        _,c,p,policy,state,monitors,node=fixture()
+        scope=EvidenceScope(policy["chainId"],policy["settlement"],1,0,
+                            state["lease"]["slaPolicyHash"],
+                            state["lease"]["resourceProfileHash"],
+                            state["epoch"]["requestHash"])
+        for origin in ("https://attacker.example.org",
+                       "http://provider.mesh.ts.net",
+                       "https://provider.mesh.ts.net.evil.org",
+                       "https://user:pass@provider.mesh.ts.net",
+                       "https://provider.mesh.ts.net:9443",
+                       "https://provider.mesh.ts.net/path"):
+            with self.subTest(origin=origin),self.assertRaises(ValueError):
+                fetch_provider_payload(origin,scope,allow_tailnet=True)
+        class FakeResponse:
+            status=200
+            headers={"Content-Length":"2"}
+            def __enter__(self): return self
+            def __exit__(self,*args): return False
+            def read(self,n): return b"{}"
+        class FakeOpener:
+            def open(self,request,timeout):
+                self.request=request
+                return FakeResponse()
+        opener=FakeOpener()
+        with patch("sse_http_signed_delivery_v1.build_opener",
+                   return_value=opener) as built:
+            raw=fetch_provider_payload("https://provider.mesh.ts.net",scope,
+                                       allow_tailnet=True)
+        self.assertEqual(raw,b"{}")
+        self.assertEqual(opener.request.full_url,
+                         "https://provider.mesh.ts.net/v1/challenge")
+        self.assertEqual(built.call_count,1)
 
     def test_real_loopback_challenge_archives_two_authentic_signatures(self):
         endpoint,c,p,policy,state,monitors,node=fixture()
@@ -209,7 +245,7 @@ class MonitorCLIPlanTests(unittest.TestCase):
             self.assertEqual(monitor_capture_once.main(self.args()+["--capture"]),1)
 
     def test_nonprivate_service_transport_not_activated(self):
-        args=self.args();args[args.index("--endpoint")+1]="https://provider.example.ts.net"
+        args=self.args();args[args.index("--endpoint")+1]="https://public.example.org"
         with redirect_stderr(StringIO()):
             self.assertEqual(monitor_capture_once.main(args+["--capture"]),1)
 
