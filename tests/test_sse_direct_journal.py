@@ -1,7 +1,9 @@
 """Durable provider replay/receipt state: offline SQLite and restart tests."""
 from __future__ import annotations
 
+import json
 import sqlite3
+import subprocess
 from contextlib import closing
 import sys
 import tempfile
@@ -11,6 +13,7 @@ from pathlib import Path
 ROOT=Path(__file__).resolve().parents[1]
 sys.path.insert(0,str(ROOT/"tools"))
 from sse_direct_journal import DirectJournal,DirectJournalError
+from sse_direct_wire import WireError, wire_json_bytes
 
 KEY=(1,0,"0x"+"ab"*32)
 ORDER={"schema":"sse-direct-request-v1","message":{"leaseId":1,"epochId":0},
@@ -78,6 +81,37 @@ class DirectJournalTests(unittest.TestCase):
             DirectJournal(Path("not-absolute.sqlite"))
         with self.assertRaises(DirectJournalError):
             DirectJournal(self.path.parent/"does-not-exist"/"a.sqlite")
+
+    def test_import_in_fresh_isolated_interpreter(self):
+        # Suite ordering must not be allowed to provide typed_evidence
+        # implicitly via another test's sys.path modification.
+        code = (
+            "import sys; from pathlib import Path; "
+            "sys.path.insert(0, " + repr(str(ROOT / "tools")) + "); "
+            "from sse_direct_journal import DirectJournal; "
+            "assert 'sse_direct_delivery' not in sys.modules; "
+            "assert 'typed_evidence' not in sys.modules; "
+            "print('journal-import-isolated: OK')"
+        )
+        completed = subprocess.run([sys.executable, "-I", "-c", code],
+                                   capture_output=True, text=True, timeout=15,
+                                   check=False)
+        self.assertEqual(completed.returncode, 0, completed.stderr)
+        self.assertIn("journal-import-isolated: OK", completed.stdout)
+
+    def test_stored_json_bytes_are_canonical_and_bounded(self):
+        sample = {"z": "word", "a": [2, 3]}
+        expected = json.dumps(sample, sort_keys=True, separators=(",", ":"),
+                              ensure_ascii=True, allow_nan=False).encode("ascii")
+        self.assertEqual(wire_json_bytes(sample), expected)
+        with self.assertRaises(WireError):
+            wire_json_bytes({"large": "x" * 9000})
+        with self.assertRaises(WireError):
+            wire_json_bytes({"invalid": float("nan")})
+        journal = DirectJournal(self.path)
+        with self.assertRaises(DirectJournalError):
+            journal.reserve(KEY, {"large": "x" * 9000})
+        self.assertEqual(journal.counts(), {})
 
     def test_duplicate_sqlite_key_is_atomic(self):
         j=DirectJournal(self.path)
