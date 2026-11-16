@@ -62,6 +62,21 @@ async function refresh() {
   }catch(e){message(e.message,true);}
 }
 $('connect').addEventListener('click',()=>{bearer=$('token').value;$('token').value='';refresh();});
+$('inspectLease').addEventListener('click',async()=>{
+  try {
+    const lease=Number($('leaseId').value),epoch=Number($('epochId').value);
+    if(!Number.isSafeInteger(lease)||lease<1||!Number.isSafeInteger(epoch)||epoch<0)
+      throw new Error('Enter valid lease and epoch IDs.');
+    const result=await api('/v1/chain/leases/'+lease+'/epochs/'+epoch);
+    $('leaseDetail').textContent=JSON.stringify({
+      chainHead:result.inspection.blockNumber,
+      blockHash:result.inspection.blockHash,
+      lease:result.inspection.lease,
+      epoch:result.inspection.epoch,
+      settlementExplanation:result.explanation
+    },null,2);
+  }catch(e){$('leaseDetail').textContent='Inspection unavailable: '+e.message;}
+});
 $('lookupTx').addEventListener('click',async()=>{
   try {
     const hash=$('txhash').value.trim();
