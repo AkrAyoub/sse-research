@@ -102,6 +102,11 @@ def inspect_container(profile: dict, endpoint: str, container_name: str,
                     not any(x in ('no-new-privileges', 'no-new-privileges:true')
                             for x in opts)):
                 raise ComputeError('worker must prevent privilege escalation')
+            if 'seccomp=builtin' not in opts:
+                raise ComputeError('worker requires built-in seccomp syscall filter')
+            if any(x in ('seccomp=unconfined', 'apparmor=unconfined',
+                         'systempaths=unconfined', 'label=disable') for x in opts):
+                raise ComputeError('worker may not disable confinement')
             if host.get('CapAdd') or host.get('Devices') or host.get('Binds'):
                 raise ComputeError('worker cannot add capabilities, devices or mounts')
             if host.get('NetworkMode') == 'host' or host.get('PidMode') == 'host':
