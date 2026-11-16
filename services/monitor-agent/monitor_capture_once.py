@@ -8,8 +8,10 @@ raw positive challenge bytes with monitor-signed block provenance. It NEVER
 submits a Solidity vote, qualifies a negative timeout as physical failure,
 releases escrow or starts Docker.
 
-This initial adapter supports LOOPBACK provider challenge HTTP only. Cross-VM
-authenticated Tailscale Serve HTTPS needs a reviewed transport extension.
+The adapter supports localhost HTTP in tests and lease-committed Tailscale
+Serve HTTPS for multi-VM probes, with redirects/proxies disabled. It does not
+install Tailscale, configure ACLs, independently authenticate node operators,
+or independently verify chain finality or physical SLA truth.
 """
 from __future__ import annotations
 
