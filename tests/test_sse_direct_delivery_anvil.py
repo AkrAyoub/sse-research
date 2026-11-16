@@ -221,6 +221,39 @@ class ChainBackedDirectDelivery(unittest.TestCase):
             exchange=submit_work_request(endpoint,active,policy,consumer,nonce)
             self.assertTrue(exchange["receiptAcceptedByProvider"])
             self.assertEqual(journal.counts(),{"RECEIVED":1})
+            # R4: a genuinely selected monitor now probes this SAME winning
+            # provider over HTTP, verifies provider EIP-712 and archives its
+            # OWN EIP-712 observation with a pinned real-chain block anchor.
+            from sse_node_role_policy import authorize_selected_monitor
+            from sse_evidence_wire_v1 import EvidenceScope
+            from sse_http_signed_delivery_v1 import EvidenceArchive, capture_response
+            from sse_wp08c_chain_binding import bind_capture_to_chain
+            from typed_evidence import Domain
+            selected_monitor=known[selected[0]]
+            node_roles={
+                "schema":"sse-node-roles-v1","nodeId":"lab-monitor-node-one",
+                "roles":["monitor","observer"],
+                "wallets":{"monitor":selected_monitor.address.lower()}}
+            self.assertTrue(authorize_selected_monitor(
+                node_roles,inspected(1,0),selected_monitor.address)["selectedForLease"])
+            scope=EvidenceScope(CHAIN,settlement,1,0,policy_digest,
+                                profile_digest,challenge)
+            chain_binding=bind_capture_to_chain(
+                rpc,scope,endpoint,winner.address.lower(),pin_block_hash=True)
+            evidence_archive=EvidenceArchive(
+                Path(private_journal_dir.name)/"selected-monitor-evidence.sqlite")
+            captured=capture_response(
+                endpoint,Domain(CHAIN,settlement),winner.address.lower(),scope,
+                "0x"+bytes(selected_monitor.key).hex(),chain_binding.context,
+                evidence_archive,chain_binding=chain_binding,rpc=rpc)
+            self.assertTrue(captured.stored_new)
+            self.assertEqual(evidence_archive.count(),1)
+            envelope,raw,anchor=evidence_archive.load_anchored(
+                captured.evidence_id,chain_binding.context,Domain(CHAIN,settlement),
+                winner.address.lower(),rpc)
+            self.assertEqual(envelope["signer"],selected_monitor.address.lower())
+            self.assertEqual(anchor.block_hash,chain_binding.block_hash)
+            self.assertIn(b"providerSignature",raw)
             self.assertFalse(exchange["onChainSettlementSubmitted"])
             self.assertFalse(exchange["physicalDeadlineCertified"])
             response=exchange["response"]
