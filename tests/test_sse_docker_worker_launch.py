@@ -86,11 +86,11 @@ class LocalLauncherTest(unittest.TestCase):
             with self.assertRaises(launcher.LaunchError):
                 launcher.ensure_local_docker()
         with patch.object(launcher.sys,"platform","linux"), \
-             patch.object(launcher.os,"geteuid",return_value=0):
+             patch.object(launcher.os,"geteuid",return_value=0,create=True):
             with self.assertRaises(launcher.LaunchError):
                 launcher.ensure_local_docker()
         with patch.object(launcher.sys,"platform","linux"), \
-             patch.object(launcher.os,"geteuid",return_value=10001), \
+             patch.object(launcher.os,"geteuid",return_value=10001,create=True), \
              patch.object(launcher.shutil,"which",return_value="/usr/bin/docker"), \
              patch.dict(launcher.os.environ,{"DOCKER_HOST":"tcp://example.org:2375"}):
             with self.assertRaises(launcher.LaunchError):
