@@ -5,6 +5,8 @@ No Ethereum transaction, Docker, private signing key or remote system.
 from __future__ import annotations
 
 import json
+import os
+import stat
 import sys
 import tempfile
 import unittest
@@ -163,6 +165,19 @@ class MonitorDiscoveryTests(unittest.TestCase):
         self.assertEqual(len(result["new"]),1)
         self.assertEqual(result["new"][0]["kind"],"COMMITTEE_ASSIGNED")
         self.assertEqual(result["status"]["lastBlock"],8)
+
+    def test_new_journal_is_restart_safe_and_owner_only_on_posix(self):
+        second=MonitorDiscovery(self.db,ROLES,CHAIN,SETTLEMENT,5,
+                                confirmations=2,max_blocks=4)
+        self.assertEqual(second.status()["lastBlock"],4)
+        if os.name=="posix":
+            self.assertEqual(stat.S_IMODE(self.db.stat().st_mode) & 0o077,0)
+
+    def test_oversized_event_ids_are_refused_before_sqlite(self):
+        huge=event(TOPIC_EPOCH,7,lease=2**63)
+        with self.assertRaises(DiscoveryError):
+            parse_log(huge,SETTLEMENT,5,8)
+        self.assertEqual(self.scanner.status()["lastBlock"],4)
 
     def test_wrong_journal_identity_and_chain_rejected(self):
         with self.assertRaises(DiscoveryError):
