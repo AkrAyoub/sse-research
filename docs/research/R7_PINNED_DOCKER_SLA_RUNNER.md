@@ -93,11 +93,15 @@ python -m unittest discover -s tests -p 'test_sse_docker_worker_launch.py' -v
 python -m unittest discover -s tests -q
 ```
 
-Optional local Docker Desktop or Ubuntu Docker Engine functional test. It will start and clean up a **real Docker container** on your current local Docker context; do not enable for a remote daemon:
+Optional local Docker Desktop or Ubuntu Docker Engine functional test. It will start and clean up a **real Docker container** on your current local Docker context; do not enable for a remote daemon.
+
+**Windows Docker Desktop preflight:** The CLI can be present even if Docker Desktop's Linux Engine is stopped. Start Docker Desktop and select the Linux containers engine, then check `docker info --format '{{.OSType}}'` returns `linux`. If the error mentions `//./pipe/dockerDesktopLinuxEngine`, the engine is not reachable; don't proceed to image ID export or Anvil+Docker. The opt-in tests now skip with a clear prerequisite message when a local engine or immutable image ID is unavailable. The independent unit test for `os.geteuid` uses portable mocks on Windows.
 
 ```bash
-docker build -f Dockerfile.sse-compute -t sse-compute:r7 .
-export SSE_DOCKER_WORKER_IMAGE="$(docker image inspect --format '{{.Id}}' sse-compute:r7)"
+docker info --format '{{.OSType}}'
+docker build -f Dockerfile.sse-compute -t sse-compute:r7 . &&
+  export SSE_DOCKER_WORKER_IMAGE="$(docker image inspect --format '{{.Id}}' sse-compute:r7)"
+test -n "$SSE_DOCKER_WORKER_IMAGE" || { echo 'Docker image not built'; exit 1; }
 SSE_RUN_DOCKER_INTEGRATION=1 python -m unittest discover -s tests -p 'test_sse_docker_sla_live.py' -v
 ```
 
