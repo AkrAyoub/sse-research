@@ -20,6 +20,8 @@ sys.path.insert(0,str(ROOT/"services"/"monitor-agent"))
 from sse_challenge import keccak256, expected_response_hash
 from sse_sla_manifest import (SLAError, proposed_policy, policy_hash,
                               canonical_policy, compare_to_lease)
+from sse_resource_profile_v2 import (
+    ResourceProfileError, make_profile, resource_hash, compare_policy)
 from sse_direct_delivery import (ExchangeError, prepare_request, authenticate_request,
     create_response, validate_response, create_receipt, verify_receipt,
     submit_work_request, validate_endpoint_url, REQ_TYPE, sign, parse_bytes)
@@ -64,6 +66,34 @@ class SlaManifestTests(unittest.TestCase):
         self.assertEqual(len(policy_hash(a)),66)
         self.assertEqual(a["reservationPolicy"],"DELIVERY_ONLY_ZERO_RESERVATION_V1")
         self.assertEqual(a["timeoutPolicy"],"TIMEOUT_IS_INCONCLUSIVE_V1")
+
+    def test_resource_profile_committed_to_service_specific_sla(self):
+        http=make_profile("http_challenge","https://provider.demo.ts.net")
+        digest=resource_hash(http)
+        self.assertEqual(len(digest),66)
+        policy=proposed_policy(service_kind="http_challenge",chain_id=CHAIN,
+                               settlement=SETTLEMENT,resource_profile_hash=digest)
+        self.assertTrue(compare_policy(http,policy))
+        wrong=make_profile("deterministic_compute","https://provider.demo.ts.net",
+                           image_digest="sha256:"+"ab"*32,
+                           cpu_milli=500,memory_bytes=512*2**20)
+        self.assertNotEqual(resource_hash(wrong),digest)
+        with self.assertRaises(ResourceProfileError):
+            compare_policy(wrong,policy)
+
+    def test_compute_resource_limits_and_public_endpoint(self):
+        for kwargs in (
+            {"image_digest":None,"cpu_milli":500,"memory_bytes":512*2**20},
+            {"image_digest":"sha256:"+"ab"*32,"cpu_milli":0,"memory_bytes":512*2**20},
+            {"image_digest":"sha256:"+"ab"*32,"cpu_milli":500,"memory_bytes":10},
+        ):
+            with self.subTest(kwargs=kwargs),self.assertRaises(ResourceProfileError):
+                make_profile("deterministic_compute","https://provider.demo.ts.net",**kwargs)
+        with self.assertRaises(ResourceProfileError):
+            make_profile("http_challenge","https://external.example")
+        with self.assertRaises(ResourceProfileError):
+            make_profile("http_challenge","https://provider.demo.ts.net",
+                         image_digest="sha256:"+"ab"*32)
 
     def test_unknown_service_and_metrics_refused(self):
         with self.assertRaises(SLAError):
