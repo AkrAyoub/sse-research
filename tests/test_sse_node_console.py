@@ -86,9 +86,17 @@ class RoleConsoleTests(unittest.TestCase):
         self.assertFalse(Path(self.conf["settings_file"]).exists())
 
     def test_cross_origin_refused(self):
-        status, _ = self.put({"provider": {"offered_capacity_units": 2}}, self.token,
-                             "https://attacker.example")
-        self.assertEqual(status, 403)
+        # These PUTs have real JSON bodies; on Windows, returning 403 before
+        # consuming the body can reset TCP instead of delivering HTTP 403.
+        # Exercise repeated rejection and verify server still serves requests.
+        for _ in range(4):
+            status, _ = self.put({"provider": {"offered_capacity_units": 2}}, self.token,
+                                 "https://attacker.example")
+            self.assertEqual(status, 403)
+        self.assertFalse(Path(self.conf["settings_file"]).exists())
+        status, raw, _ = self.get("/healthz")
+        self.assertEqual(status, 200)
+        self.assertTrue(json.loads(raw)["ok"])
 
     def test_local_role_preferences_persist_without_chain_activation(self):
         p = {"provider": {"offered_capacity_units": 3, "min_epoch_fee_wei": 20},
