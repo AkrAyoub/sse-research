@@ -236,6 +236,18 @@ class ChainBackedDirectDelivery(unittest.TestCase):
                 "wallets":{"monitor":selected_monitor.address.lower()}}
             self.assertTrue(authorize_selected_monitor(
                 node_roles,inspected(1,0),selected_monitor.address)["selectedForLease"])
+            # Read-only monitor scheduler now discovers this real contract
+            # committee/epoch from logs; it is not given lease IDs to scan.
+            from sse_monitor_discovery import MonitorDiscovery
+            discovery=MonitorDiscovery(
+                Path(private_journal_dir.name)/"monitor-events.sqlite",
+                node_roles,CHAIN,settlement,0,confirmations=0,max_blocks=256)
+            new_events=discovery.scan(rpc)["new"]
+            self.assertIn("COMMITTEE_ASSIGNED",[e["kind"] for e in new_events])
+            self.assertIn("EPOCH_ADMITTED",[e["kind"] for e in new_events])
+            self.assertTrue(all(e["monitor"] == selected_monitor.address.lower()
+                                and not e["monitorVoteAuthorized"] for e in new_events))
+            self.assertEqual(discovery.scan(rpc)["new"],[])
             scope=EvidenceScope(CHAIN,settlement,1,0,policy_digest,
                                 profile_digest,challenge)
             chain_binding=bind_capture_to_chain(
