@@ -6,7 +6,10 @@ launched, no host mounts are modified, and no blockchain transaction is sent.
 from __future__ import annotations
 
 import json
+import tempfile
 import sys
+from contextlib import redirect_stdout, redirect_stderr
+from io import StringIO
 import unittest
 from pathlib import Path
 from unittest.mock import patch
@@ -25,6 +28,11 @@ from sse_docker_sla_runner import (DockerSLAError, validate_setup,
 from sse_compute_docker import inspect_container, ComputeError
 from sse_direct_delivery import (ExchangeError, prepare_request, create_response,
                                  validate_response)
+from sse_sla_manifest import canonical_policy
+from sse_resource_profile_v2 import canonical_profile
+
+sys.path.insert(0,str(ROOT/"services"/"provider-agent"))
+import direct_work_service as provider_service
 
 ENDPOINT="https://provider.demo.ts.net"
 WORKER="http://127.0.0.1:8877"
@@ -154,6 +162,28 @@ class DockerSlaTests(unittest.TestCase):
                    side_effect=ComputeError("no trusted container")):
             with self.assertRaises(DockerSLAError):
                 runner(1,0,HASH)
+
+    def test_real_provider_serve_fails_closed_without_docker_worker(self):
+        with tempfile.TemporaryDirectory() as temp:
+            policy_path=Path(temp)/"policy.json"
+            profile_path=Path(temp)/"resource.json"
+            policy_path.write_bytes(canonical_policy(self.policy))
+            profile_path.write_bytes(canonical_profile(self.profile))
+            args=[
+                "--policy",str(policy_path),
+                "--resource-profile",str(profile_path),
+                "--endpoint",ENDPOINT,
+                "--rpc-url","http://127.0.0.1:8545",
+                "--signer-file","/run/sse/test-provider.key",
+                "--journal-file",str(Path(temp)/"journal.sqlite"),
+                "--port","8881","--serve",
+            ]
+            with patch.object(provider_service,"make_server",
+                              side_effect=AssertionError("must not launch")), \\
+                 patch.object(provider_service,"_load_signer",
+                              side_effect=AssertionError("must not read signer")), \\
+                 redirect_stdout(StringIO()), redirect_stderr(StringIO()):
+                self.assertEqual(provider_service.main(args),1)
 
     def test_validated_result_is_actually_signed_but_tamper_rejected(self):
         consumer,provider=Account.create(),Account.create()
