@@ -32,10 +32,14 @@ class DirectJournalTests(unittest.TestCase):
         a=DirectJournal(self.path)
         a.reserve(KEY,ORDER)
         self.assertEqual(a.counts(),{"RESERVED":1})
+        self.assertFalse(a.has_verified_receipt(1,0))
         a.record_response(KEY,RESULT)
+        self.assertFalse(a.has_verified_receipt(1,0))
         b=DirectJournal(self.path)  # Simulated process restart.
         self.assertEqual(b.pending_receipt(KEY),(ORDER,RESULT))
         b.record_receipt(KEY,RECEIPT)
+        self.assertTrue(DirectJournal(self.path).has_verified_receipt(1,0))
+        self.assertFalse(DirectJournal(self.path).has_verified_receipt(1,1))
         self.assertEqual(DirectJournal(self.path).counts(),{"RECEIVED":1})
         with self.assertRaises(DirectJournalError):
             b.pending_receipt(KEY)
