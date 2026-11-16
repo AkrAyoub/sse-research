@@ -128,7 +128,7 @@ def candidate_for_event(node, record, snapshot, *, chain_id, settlement):
         return None
     if record["kind"] == "COMMITTEE_ASSIGNED":
         if (lease.get("assignmentId") != record["assignmentId"] or
-                lease.get("stateName") not in ("Accepted", "Active")):
+                lease.get("stateName") not in ("Accepted", "Ready", "Active")):
             return None
         state = "REVIEW_CONFIRMATION"
     else:
