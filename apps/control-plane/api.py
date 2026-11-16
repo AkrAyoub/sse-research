@@ -19,6 +19,8 @@ from validate_inventory import validate
 from plan_deploy import plan
 from settlement_scenarios import report as settlement_report
 from sse_chain_observer import Observer, ObserverError, read_config
+from sse_chain_read import ChainReadError, inspect_chain
+from sse_settlement_explain import SettlementExplainError, explain_inspection
 
 app = FastAPI(title='SSE Control Plane', docs_url=None, redoc_url=None)
 STATIC = Path(__file__).parent / 'static'
@@ -254,3 +256,35 @@ def chain_events(start_block: int = Query(ge=0),
     _authorize(authorization)
     observer = _chain_observer()
     return _observed(lambda: observer.events(start_block, end_block))
+
+
+@app.get("/v1/chain/leases/{lease_id}/epochs/{epoch_id}")
+def inspect_sse_lease_epoch(lease_id: int, epoch_id: int,
+                            authorization: str | None = Header(None)):
+    """Read chain-pinned lease/epoch and derive conditional SSE payout bounds.
+
+    The configured settlement MUST be explicitly allowlisted. Never use a
+    user-supplied contract address, user-controlled RPC, or an unpinned view.
+    """
+    _authorize(authorization)
+    if lease_id < 1 or epoch_id < 0:
+        raise HTTPException(status_code=422, detail="invalid lease or epoch index")
+    observer = _chain_observer()
+    settlement = os.environ.get("SSE_OBSERVER_SETTLEMENT_ADDRESS", "").lower()
+    if settlement not in observer.config["contracts"]:
+        raise HTTPException(status_code=503, detail="settlement inspector not configured")
+    class ReadOnlyChainAdapter:
+        def request(self, method, params):
+            return observer.rpc(method, params)
+    try:
+        snapshot = inspect_chain(
+            ReadOnlyChainAdapter(), settlement, lease_id, epoch_id,
+            expected_chain_id=observer.config["chain_id"],
+            pin_block_hash=True,
+        )
+        explanation = explain_inspection(snapshot)
+    except (ChainReadError, SettlementExplainError, ObserverError, OSError, ValueError):
+        raise HTTPException(status_code=502,
+                            detail="SSE lease inspection unavailable or inconsistent") from None
+    return {"inspection": snapshot, "explanation": explanation,
+            "readOnly": True, "participantActionsAvailable": False}
