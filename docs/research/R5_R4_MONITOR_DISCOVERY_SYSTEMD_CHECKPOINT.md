@@ -67,7 +67,7 @@ python -m unittest discover -s tests -p 'test_sse_monitor_multirole.py' -v
 python -m unittest discover -s tests -q
 ```
 
-The new tests use injected RPC/inspector fixtures and temporary SQLite journals to cover bounded event indexing, confimation delay, restart/replay, reorg stop, bad signatures/topics, conflict checks, source provenance and read-only CLI behavior. The new combined-Anvil assertion additionally reads *real* `CommitteeAssigned` and `EpochAdmitted` events from the temporary lease, discovers its selected monitor and checks duplicate scans produce no new notifications.
+The new tests use injected RPC/inspector fixtures and temporary SQLite journals to cover bounded event indexing, confimation delay, restart/replay, reorg stop, malformed event topics and log hashes, conflict checks, source provenance and read-only CLI behavior. The new combined-Anvil assertion additionally reads *real* `CommitteeAssigned` and `EpochAdmitted` events from the temporary lease, discovers its selected monitor and checks duplicate scans produce no new notifications.
 
 ```bash
 SSE_RUN_ANVIL_INTEGRATION=1 python -m unittest discover -s tests -p 'test_sse_direct_delivery_anvil.py' -v
