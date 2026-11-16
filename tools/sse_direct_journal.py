@@ -164,6 +164,23 @@ class DirectJournal:
         except sqlite3.Error as exc:
             raise DirectJournalError("could not record consumer receipt") from exc
 
+    def has_verified_receipt(self, lease_id, epoch_id):
+        """True only after consumer's authenticated receipt was durably stored.
+
+        A signed consumer receipt is not an independent physical-clock proof.
+        """
+        if (type(lease_id) is not int or type(epoch_id) is not int or
+                not 1 <= lease_id < 2**63 or not 0 <= epoch_id < 2**63):
+            raise DirectJournalError("invalid journal lease/epoch")
+        try:
+            with self._connect() as db:
+                row=db.execute("""SELECT 1 FROM direct_exchange WHERE
+                    lease_id=? AND epoch_id=? AND status='RECEIVED' LIMIT 1""",
+                    (lease_id,epoch_id)).fetchone()
+            return row is not None
+        except sqlite3.Error as exc:
+            raise DirectJournalError("cannot inspect verified consumer receipt") from exc
+
     def counts(self):
         try:
             with self._connect() as db:
