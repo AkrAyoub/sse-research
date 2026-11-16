@@ -51,6 +51,13 @@ from test_sse_node_marketplace_anvil import (
 class ChainBackedDirectDelivery(unittest.TestCase):
     def test_two_provider_bids_selected_provider_delivers_signed_compute(self):
         Account.enable_unaudited_hdwallet_features()
+        use_docker=os.environ.get("SSE_DIRECT_ANVIL_USE_DOCKER") == "1"
+        docker_image=os.environ.get("SSE_DOCKER_WORKER_IMAGE", "")
+        if use_docker:
+            # Check local Docker and immutable image BEFORE deploying any
+            # temporary Anvil chain or touching the Docker daemon.
+            from test_sse_docker_sla_live import require_local_docker_engine
+            require_local_docker_engine(docker_image)
         port=_loopback_port()
         process=subprocess.Popen(
             ["anvil","--silent","--host","127.0.0.1",
@@ -107,10 +114,6 @@ class ChainBackedDirectDelivery(unittest.TestCase):
             # Endpoint is committed BEFORE bids; test only uses loopback HTTP.
             service_port=_loopback_port()
             endpoint="http://127.0.0.1:"+str(service_port)
-            use_docker=os.environ.get("SSE_DIRECT_ANVIL_USE_DOCKER") == "1"
-            docker_image=os.environ.get("SSE_DOCKER_WORKER_IMAGE", "")
-            if use_docker and not re.fullmatch(r"sha256:[0-9a-f]{64}",docker_image):
-                self.fail("real-Docker Anvil mode requires SSE_DOCKER_WORKER_IMAGE")
             profile=make_profile("deterministic_compute",endpoint,
                                  image_digest=(docker_image if use_docker else
                                                "sha256:"+"a1"*32),
