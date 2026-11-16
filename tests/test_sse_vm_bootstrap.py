@@ -33,6 +33,11 @@ class BootstrapPlanTests(unittest.TestCase):
         self.assertFalse(plan["ethereumTransactionsSent"])
         self.assertNotIn("privateKey", json.dumps(plan))
 
+    def test_isolated_runtime_includes_local_ethereum_signing_library(self):
+        self.assertIn("pycryptodome==3.23.0", b.VERSIONED_DEPENDENCIES)
+        self.assertIn("eth-account==0.14.0", b.VERSIONED_DEPENDENCIES)
+        self.assertEqual(len(b.VERSIONED_DEPENDENCIES), 2)
+
     def test_service_unit_is_loopback_nonprivileged_and_has_no_rpc_secret(self):
         unit = b.systemd_unit(spec())
         for required in ("User=sseagent", "Environment=SSE_AGENT_HOST=127.0.0.1",
