@@ -13,6 +13,8 @@ import re
 from urllib.parse import urlsplit
 from urllib.request import HTTPRedirectHandler, Request, build_opener
 
+from sse_event_decoder import EventDecodeError, decode_sse_event
+
 ADDR = re.compile(r"0x[0-9a-fA-F]{40}\Z")
 TX = re.compile(r"0x[0-9a-fA-F]{64}\Z")
 HEX = re.compile(r"0x(?:[0-9a-fA-F]{2})*\Z")
@@ -189,13 +191,23 @@ class Observer:
                 "logsTruncated": len(logs) > 100,
                 "finality": "UNVERIFIED", "transactionWasSentByObserver": False}
 
-    @staticmethod
-    def _log(item):
+    def _log(self, item):
         if type(item) is not dict:
             raise ObserverError("invalid contract event log")
-        return {k: item.get(k) for k in ("address", "topics", "data", "blockNumber",
-                                         "blockHash", "transactionHash", "logIndex",
-                                         "removed")}
+        log = {k: item.get(k) for k in ("address", "topics", "data", "blockNumber",
+                                        "blockHash", "transactionHash", "logIndex",
+                                        "removed")}
+        address = log.get("address")
+        if type(address) is not str:
+            raise ObserverError("contract log has no valid emitter")
+        if address.lower() in self.config["contracts"]:
+            try:
+                log["sseDecoded"] = decode_sse_event(log)
+            except EventDecodeError:
+                raise ObserverError("SSE event failed ABI validation") from None
+        else:
+            log["sseDecoded"] = None
+        return log
 
     def events(self, start: int, end: int):
         if (type(start) is not int or type(end) is not int or start < 0 or
