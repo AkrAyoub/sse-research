@@ -169,9 +169,26 @@ def validate_snapshot(data, *, node_id, monitor_address, now=None):
     return data
 
 
-def write_snapshot(path, review, *, generated_at=None):
-    """Atomic public snapshot export only after fresh verified queue review."""
+def write_snapshot(path, review, *, generated_at=None, shared_group_read=False):
+    """Atomic public export. Explicit POSIX mode allows vetted group *read* only.
+
+    Default 0600 stays unchanged. Opt-in 0640 requires a locked down directory
+    owned by the exporting UID, group-owned by the *effective* GID, with
+    exactly owner rwx / group rx / no world access. The systemd service
+    must set Group=ssemonitor-display; the node UI must never gain group
+    access to the private monitor database, wallet or evidence archive.
+    """
     target = _check_path(path, writing=True)
+    if type(shared_group_read) is not bool:
+        raise SnapshotError("shared group-read flag must be boolean")
+    if shared_group_read:
+        if os.name != "posix":
+            raise SnapshotError("group-read export requires POSIX permissions")
+        parent=target.parent.stat()
+        mode=stat.S_IMODE(parent.st_mode)
+        if (parent.st_uid != os.geteuid() or parent.st_gid != os.getegid()
+                or mode & 0o027 or mode & 0o750 != 0o750):
+            raise SnapshotError("shared export directory must be owner-rwx, group-rx and non-world")
     data = make_snapshot(review, generated_at=generated_at)
     raw = (json.dumps(data,sort_keys=True,separators=(",",":"),
                       ensure_ascii=True,allow_nan=False)+"\n").encode("ascii")
@@ -180,10 +197,13 @@ def write_snapshot(path, review, *, generated_at=None):
     fd, staged = tempfile.mkstemp(prefix=".sse-monitor-display-",dir=target.parent)
     try:
         with os.fdopen(fd,"wb") as stream:
+            perms=0o640 if shared_group_read else 0o600
             if hasattr(os,"fchmod"):
-                os.fchmod(stream.fileno(),0o600)
+                os.fchmod(stream.fileno(),perms)
             else:
-                os.chmod(staged,0o600)
+                os.chmod(staged,perms)
+            if shared_group_read and os.fstat(stream.fileno()).st_gid != os.getegid():
+                raise SnapshotError("snapshot stage did not inherit expected service group")
             stream.write(raw)
             stream.flush()
             os.fsync(stream.fileno())
