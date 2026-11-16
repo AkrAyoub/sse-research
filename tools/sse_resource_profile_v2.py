@@ -13,8 +13,26 @@ import json
 import re
 
 from sse_challenge import keccak256
-from sse_direct_delivery import validate_endpoint_url
+from urllib.parse import urlsplit
 from sse_sla_manifest import WORKLOAD_BY_SERVICE
+
+def _private_endpoint(endpoint):
+    if type(endpoint) is not str or not 1 <= len(endpoint) <= 255:
+        raise ResourceProfileError("invalid endpoint")
+    u = urlsplit(endpoint)
+    try:
+        port = u.port
+    except ValueError:
+        raise ResourceProfileError("invalid endpoint port") from None
+    if (u.username or u.password or u.query or u.fragment or u.path not in ("", "/")):
+        raise ResourceProfileError("resource endpoint cannot contain credentials or paths")
+    if (u.scheme == "http" and u.hostname == "127.0.0.1" and
+            port is not None and 1 <= port <= 65535):
+        return endpoint.rstrip("/")
+    if (u.scheme == "https" and u.hostname and u.hostname.endswith(".ts.net")
+            and port in (None, 443)):
+        return endpoint.rstrip("/")
+    raise ResourceProfileError("resource endpoint must be loopback or Tailscale HTTPS")
 
 SCHEMA = "sse-resource-profile-v2"
 PREFIX = b"SSE_RESOURCE_PROFILE_V2\x00"
@@ -35,10 +53,7 @@ def validate_profile(profile):
         raise ResourceProfileError("unsupported resource service type")
     if profile["workloadSpec"] != WORKLOAD_BY_SERVICE[kind]:
         raise ResourceProfileError("resource workload mismatch")
-    try:
-        validate_endpoint_url(profile["endpoint"])
-    except Exception as exc:
-        raise ResourceProfileError("resource endpoint must be a private service origin") from exc
+    _private_endpoint(profile["endpoint"])
     if profile["endpoint"].endswith("/"):
         raise ResourceProfileError("resource endpoint must have canonical origin")
     if kind == "http_challenge":
