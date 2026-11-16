@@ -12,6 +12,8 @@ authenticates only the V1 challenge responseHash, not compute output bytes.
 from __future__ import annotations
 
 import os
+import re
+import secrets
 import subprocess
 import sys
 import tempfile
@@ -38,6 +40,7 @@ from sse_direct_delivery import (ExchangeError, prepare_request, authenticate_re
 from compute_workload import compute_result
 from direct_work_service import make_server
 from sse_direct_journal import DirectJournal
+from sse_docker_sla_runner import docker_launch_argv, make_docker_runner
 from test_sse_node_marketplace_anvil import (
     AVAILABLE, ENABLE, CHAIN, MNEMONIC, _data, _deploy, _unlocked,
     _address_words, _loopback_port
@@ -57,6 +60,7 @@ class ChainBackedDirectDelivery(unittest.TestCase):
         server=None
         worker=None
         private_journal_dir=None
+        docker_container_id=None
         try:
             rpc=RPC("http://127.0.0.1:"+str(port))
             for _ in range(100):
@@ -103,8 +107,13 @@ class ChainBackedDirectDelivery(unittest.TestCase):
             # Endpoint is committed BEFORE bids; test only uses loopback HTTP.
             service_port=_loopback_port()
             endpoint="http://127.0.0.1:"+str(service_port)
+            use_docker=os.environ.get("SSE_DIRECT_ANVIL_USE_DOCKER") == "1"
+            docker_image=os.environ.get("SSE_DOCKER_WORKER_IMAGE", "")
+            if use_docker and not re.fullmatch(r"sha256:[0-9a-f]{64}",docker_image):
+                self.fail("real-Docker Anvil mode requires SSE_DOCKER_WORKER_IMAGE")
             profile=make_profile("deterministic_compute",endpoint,
-                                 image_digest="sha256:"+"a1"*32,
+                                 image_digest=(docker_image if use_docker else
+                                               "sha256:"+"a1"*32),
                                  cpu_milli=500,memory_bytes=512*2**20)
             profile_digest=resource_hash(profile)
             policy=proposed_policy(service_kind="deterministic_compute",
@@ -178,8 +187,32 @@ class ChainBackedDirectDelivery(unittest.TestCase):
 
             private_journal_dir=tempfile.TemporaryDirectory()
             journal=DirectJournal(Path(private_journal_dir.name)/"provider-evidence.sqlite")
+            compute_runner=None
+            if use_docker:
+                docker_port=_loopback_port()
+                docker_endpoint="http://127.0.0.1:"+str(docker_port)
+                docker_name="sse-compute-"+secrets.token_hex(5)
+                command=docker_launch_argv(profile,policy,docker_endpoint,docker_name)
+                started=subprocess.run(command,capture_output=True,text=True,
+                                       timeout=45,check=False)
+                self.assertEqual(started.returncode,0,started.stderr)
+                docker_container_id=started.stdout.strip()
+                self.assertRegex(docker_container_id,r"^[0-9a-f]{64}$")
+                from urllib.request import urlopen
+                for _ in range(100):
+                    try:
+                        with urlopen(docker_endpoint+"/healthz",timeout=.5) as health:
+                            if health.status==200:
+                                break
+                    except (OSError,TimeoutError):
+                        pass
+                    time.sleep(.2)
+                else:
+                    self.fail("real Docker worker did not expose loopback service")
+                compute_runner=make_docker_runner(
+                    profile,policy,docker_endpoint,docker_name)
             server=make_server(service_port,winner,policy,endpoint,inspected,
-                               journal=journal)
+                               journal=journal,compute_runner=compute_runner)
             worker=threading.Thread(target=server.serve_forever,daemon=True)
             worker.start()
             exchange=submit_work_request(endpoint,active,policy,consumer,nonce)
@@ -229,6 +262,10 @@ class ChainBackedDirectDelivery(unittest.TestCase):
                 worker.join(timeout=5)
             if private_journal_dir is not None:
                 private_journal_dir.cleanup()
+            if docker_container_id is not None:
+                subprocess.run(["docker","stop",docker_container_id],
+                               capture_output=True,text=True,timeout=20,
+                               check=False)
             if process.poll() is None:
                 process.terminate()
                 try:
