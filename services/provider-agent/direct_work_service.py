@@ -23,17 +23,20 @@ sys.path.insert(0, str(ROOT / "services" / "monitor-agent"))
 from sse_chain_read import inspect_chain, ChainReadError
 from sse_node_marketplace import RPC, _load_signer
 from sse_sla_manifest import validate_policy
+from sse_direct_journal import DirectJournal, DirectJournalError
 from sse_direct_delivery import (
     ExchangeError, MAX_WIRE, authenticate_request, create_response,
     parse_bytes, json_bytes, verify_receipt,
 )
 
-def make_server(port, signer, policy, endpoint, chain_inspector):
+def make_server(port, signer, policy, endpoint, chain_inspector, journal=None):
     if type(port) is not int or not 0 <= port <= 65535:
         raise ValueError("bad provider port")
     validate_policy(policy)
     if not callable(chain_inspector):
         raise ValueError("chain inspector required")
+    if journal is not None and not isinstance(journal, DirectJournal):
+        raise ValueError("journal must be a real durable local SSE journal")
     lock = threading.RLock()
     pending = {}
     receipts = {}
@@ -71,7 +74,9 @@ def make_server(port, signer, policy, endpoint, chain_inspector):
                 "role": "provider", "online": True,
                 "chosenProviderAuthRequired": True,
                 "chainLeaseVerification": "PER_REQUEST_PINNED",
-                "processed": len(pending), "receipts": len(receipts),
+                "processed": (sum(journal.counts().values()) if journal else len(pending)),
+                "receipts": (journal.counts().get("RECEIVED",0) if journal else len(receipts)),
+                "persistentReplayProtection": journal is not None,
                 "physicalSlaQualified": False,
             })
 
@@ -88,31 +93,45 @@ def make_server(port, signer, policy, endpoint, chain_inspector):
                     raise ExchangeError("invalid lease epoch indices")
                 if self.path == "/v1/work":
                     with lock:
-                        if len(pending) >= 1000:
+                        if journal is None and len(pending) >= 1000:
                             raise ExchangeError("provider replay cache full")
                         state = inspect(lease, epoch)
                         authenticate_request(payload, state, policy, endpoint, signer)
                         key = (lease, epoch, msg["nonce"])
-                        if key in pending:
-                            raise ExchangeError("duplicate consumer workload nonce")
+                        if journal is None:
+                            if key in pending:
+                                raise ExchangeError("duplicate consumer workload nonce")
+                        else:
+                            # Reserve before computing: after a crash, ambiguity
+                            # is explicitly unresolved rather than replayed.
+                            journal.reserve(key, payload)
                         reply = create_response(payload, state, policy, endpoint, signer)
-                        pending[key] = (payload, reply)
+                        if journal is not None:
+                            journal.record_response(key, reply)
+                        else:
+                            pending[key] = (payload, reply)
                     return self.respond(200, reply)
                 with lock:
                     key = (lease, epoch, msg.get("nonce"))
-                    if key not in pending or key in receipts:
-                        raise ExchangeError("unknown or duplicate consumer receipt")
-                    original, response = pending[key]
+                    if journal is None:
+                        if key not in pending or key in receipts:
+                            raise ExchangeError("unknown or duplicate consumer receipt")
+                        original, response = pending[key]
+                    else:
+                        original, response = journal.pending_receipt(key)
                     state = inspect(lease, epoch)
                     # Verify the original provider reply and consumer signature
                     # under this fresh pinned chain view before acknowledging.
                     from sse_direct_delivery import validate_response
                     validate_response(response, original, state, policy, endpoint)
                     verified = verify_receipt(payload, response, state, policy, endpoint)
-                    receipts[key] = payload
+                    if journal is None:
+                        receipts[key] = payload
+                    else:
+                        journal.record_receipt(key, payload)
                 return self.respond(200, {"receiptSignatureVerified": verified["validSignature"],
                                           "physicalDeliveryTimeCertified": False})
-            except (ExchangeError, ChainReadError, OSError, ValueError, TypeError):
+            except (ExchangeError, DirectJournalError, ChainReadError, OSError, ValueError, TypeError):
                 return self.respond(422, {"error": "invalid or unauthorized exchange"})
         def log_message(self, fmt, *args):
             return
@@ -128,6 +147,8 @@ def main(argv=None):
     parser.add_argument("--rpc-url", required=True)
     parser.add_argument("--signer-file", required=True)
     parser.add_argument("--port", type=int, default=8881)
+    parser.add_argument("--journal-file", type=Path,
+                        help="owner-only durable SQLite path; required for --serve")
     parser.add_argument("--serve", action="store_true",
                         help="explicitly start loopback-only signer-backed service")
     args = parser.parse_args(argv)
@@ -144,6 +165,9 @@ def main(argv=None):
                               "slaPolicyHash": __import__("sse_sla_manifest").policy_hash(policy),
                               "running": False, "ethereumTransactionsSent": False}))
             return 0
+        if args.journal_file is None:
+            raise ValueError("real provider service requires --journal-file for crash-safe replay")
+        journal = DirectJournal(args.journal_file)
         signer = _load_signer(args.signer_file)
         rpc = RPC(args.rpc_url)
         if int(rpc.request("eth_chainId", []), 16) != policy["chainId"]:
@@ -152,7 +176,8 @@ def main(argv=None):
                              lambda lease, epoch: inspect_chain(
                                  rpc, policy["settlement"], lease, epoch,
                                  expected_chain_id=policy["chainId"],
-                                 pin_block_hash=True))
+                                 pin_block_hash=True),
+                             journal=journal)
         print("SSE provider work responder on http://127.0.0.1:" + str(server.server_port),
               flush=True)
         try:
