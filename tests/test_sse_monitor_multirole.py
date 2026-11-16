@@ -5,8 +5,11 @@ and monitor signatures and real loopback HTTP. No live on-chain vote is sent.
 """
 from __future__ import annotations
 
+import json
 import sys
 import socket
+from contextlib import redirect_stdout, redirect_stderr
+from io import StringIO
 import tempfile
 import threading
 import unittest
@@ -30,6 +33,10 @@ from sse_challenge import expected_response_hash
 from sse_direct_delivery import post_json
 from typed_evidence import Domain
 from direct_work_service import make_server
+from sse_sla_manifest import canonical_policy
+from sse_resource_profile_v2 import make_profile, canonical_profile, resource_hash
+from sse_sla_manifest import proposed_policy
+import monitor_capture_once
 
 
 def port():
@@ -137,6 +144,57 @@ class MultiRoleMonitorTests(unittest.TestCase):
                                  expected_response_hash(scope.request_hash))
         finally:
             server.shutdown();server.server_close();thread.join(timeout=5)
+
+
+class MonitorCLIPlanTests(unittest.TestCase):
+    def setUp(self):
+        self.temp=tempfile.TemporaryDirectory()
+        self.addCleanup(self.temp.cleanup)
+        self.dir=Path(self.temp.name)
+        self.endpoint="http://127.0.0.1:8877"
+        self.profile=make_profile("http_challenge",self.endpoint)
+        self.policy=proposed_policy(service_kind="http_challenge",
+            chain_id=31337,settlement="0x"+"12"*20,
+            resource_profile_hash=resource_hash(self.profile))
+        self.monitor=Account.create()
+        self.roles={"schema":"sse-node-roles-v1","nodeId":"monitor-combined-node",
+                    "roles":["monitor","observer"],
+                    "wallets":{"monitor":self.monitor.address.lower()}}
+        (self.dir/"roles.json").write_text(json.dumps(self.roles))
+        (self.dir/"sla.json").write_bytes(canonical_policy(self.policy))
+        (self.dir/"resource.json").write_bytes(canonical_profile(self.profile))
+
+    def args(self):
+        return ["--node-roles-file",str(self.dir/"roles.json"),
+                "--policy",str(self.dir/"sla.json"),
+                "--resource-profile",str(self.dir/"resource.json"),
+                "--endpoint",self.endpoint,"--lease-id","1","--epoch-id","0",
+                "--rpc-url","http://127.0.0.1:8545",
+                "--archive",str(self.dir/"monitor-evidence.sqlite")]
+
+    def test_default_dry_run_is_no_rpc_no_signer_no_archive(self):
+        with redirect_stdout(StringIO()) as out:
+            self.assertEqual(monitor_capture_once.main(self.args()),0)
+        data=json.loads(out.getvalue())
+        self.assertFalse(data["probePerformed"])
+        self.assertFalse(data["chainVerified"])
+        self.assertFalse(data["monitorVoteSubmitted"])
+        self.assertFalse((self.dir/"monitor-evidence.sqlite").exists())
+
+    def test_node_without_monitor_role_fails_before_network(self):
+        self.roles["roles"]=["observer"];self.roles["wallets"]={}
+        (self.dir/"roles.json").write_text(json.dumps(self.roles))
+        with redirect_stderr(StringIO()):
+            self.assertEqual(monitor_capture_once.main(self.args()),1)
+
+    def test_missing_signer_file_refused_before_rpc(self):
+        with redirect_stderr(StringIO()):
+            self.assertEqual(monitor_capture_once.main(self.args()+["--capture"]),1)
+
+    def test_nonprivate_service_transport_not_activated(self):
+        args=self.args();args[args.index("--endpoint")+1]="https://provider.example.ts.net"
+        with redirect_stderr(StringIO()):
+            self.assertEqual(monitor_capture_once.main(args+["--capture"]),1)
 
 
 if __name__=="__main__":
