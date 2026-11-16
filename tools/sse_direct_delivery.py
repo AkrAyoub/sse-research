@@ -24,6 +24,7 @@ from sse_challenge import bytes32, expected_response_hash, keccak256
 from sse_sla_manifest import compare_to_lease, policy_hash, validate_policy
 from compute_workload import compute_result
 from typed_evidence import Domain, typed_message, verify_provider_response
+from sse_direct_wire import MAX_WIRE, WireError, wire_json_bytes
 
 REQ_TYPE = "SSEConsumerWorkRequest"
 RESULT_TYPE = "SSEProviderWorkResult"
@@ -33,7 +34,6 @@ RESPONSE_SCHEMA = "sse-direct-response-v1"
 RECEIPT_SCHEMA = "sse-direct-receipt-v1"
 RESPONSE_DOMAIN = "SSEWorkExchange"
 DOMAIN_VERSION = "1"
-MAX_WIRE = 8192
 HASH = re.compile(r"0x[0-9a-f]{64}\Z")
 SIGNATURE = re.compile(r"0x[0-9a-fA-F]{130}\Z")
 ADDR = re.compile(r"0x[0-9a-fA-F]{40}\Z")
@@ -92,14 +92,12 @@ def _unique(pairs):
 
 
 def json_bytes(item):
+    # Preserve the original public exception type while sharing exactly
+    # one bounded canonical byte encoder with the crash-replay journal.
     try:
-        raw = json.dumps(item, sort_keys=True, separators=(",", ":"), ensure_ascii=True,
-                         allow_nan=False).encode("ascii")
-    except (ValueError, TypeError, UnicodeError) as exc:
-        raise ExchangeError("invalid exchange JSON") from exc
-    if not 1 <= len(raw) <= MAX_WIRE:
-        raise ExchangeError("exchange envelope too large")
-    return raw
+        return wire_json_bytes(item)
+    except WireError as exc:
+        raise ExchangeError(str(exc)) from exc
 
 
 def parse_bytes(raw):
