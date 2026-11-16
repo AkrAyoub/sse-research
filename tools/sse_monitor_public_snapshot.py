@@ -153,12 +153,15 @@ def validate_snapshot(data, *, node_id, monitor_address, now=None):
     age = (current - stamp).total_seconds()
     if not -15 <= age <= MAX_AGE_SECONDS:
         raise SnapshotError("monitor snapshot expired or clock skewed; refresh before review")
+    if type(data["tasks"]) is not list:
+        raise SnapshotError("invalid monitor display task list")
     if (type(data["cursorBlock"]) is not int or data["cursorBlock"] < -1 or
             type(data["totalNotifications"]) is not int or
             data["totalNotifications"] < 0 or
             data["totalNotifications"] < len(data["tasks"])):
         raise SnapshotError("invalid monitor display counts")
-    _clean_tasks(data["tasks"])
+    if _clean_tasks(data["tasks"]) != data["tasks"]:
+        raise SnapshotError("monitor display contains unapproved task fields")
     if (type(data["moreNotificationsExist"]) is not bool or
             data["moreNotificationsExist"] != (
                 data["totalNotifications"] > len(data["tasks"]))):
