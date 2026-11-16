@@ -223,9 +223,24 @@ def result_hash(result):
     return "0x" + keccak256(b"SSE_DIRECT_WORK_RESULT_V1\x00" + json_bytes(result)).hex()
 
 
-def create_response(envelope, inspection, policy, endpoint, provider_signer):
+def create_response(envelope, inspection, policy, endpoint, provider_signer,
+                    compute_runner=None):
     request = authenticate_request(envelope, inspection, policy, endpoint, provider_signer)
-    result = _result(request, policy["serviceKind"])
+    expected = _result(request, policy["serviceKind"])
+    if policy["serviceKind"] == "deterministic_compute" and compute_runner is not None:
+        if not callable(compute_runner):
+            raise ExchangeError("invalid approved Docker workload runner")
+        try:
+            result = compute_runner(request["leaseId"], request["epochId"],
+                                    request["requestHash"])
+        except (ValueError, OSError, TimeoutError) as exc:
+            raise ExchangeError("provider compute worker rejected workload") from exc
+        if type(result) is not dict or result != expected:
+            raise ExchangeError("Docker compute result does not match agreed workload")
+    else:
+        # Historical local mock/unit path only. The real provider --serve
+        # entrypoint MUST require an explicitly configured Docker runner.
+        result = expected
     digest = result_hash(result)
     msg = {**request, "resultHash": digest}
     # Solidity V1 ProviderResponse signs the challenge/response commitment,
