@@ -148,6 +148,55 @@ class MarketplacePlans(unittest.TestCase):
         self.assertFalse(conf.public()["physicalServiceVerified"])
         self.assertFalse(conf.public()["ethereumTransactionsSent"])
 
+    def test_direct_monitor_vote_uses_exact_contract_signature(self):
+        evidence = "0x" + "99" * 32
+        p = m.make_plan("monitor-vote", "monitor", chain_id=31337,
+                        board=BOARD, settlement=SETTLEMENT, pool=POOL,
+                        params={"leaseId": 1, "epochId": 0,
+                                "outcome": 2, "evidenceHash": evidence})
+        self.assertEqual(p.data[:10], "0x" + keccak256(
+            b"submitMonitorVoteDirect(uint256,uint256,uint8,bytes32)")[:4].hex())
+        self.assertEqual(p.target, SETTLEMENT)
+        self.assertEqual(int(p.data[10+2*64:10+3*64], 16), 2)
+
+    def test_out_of_range_outcomes_rejected(self):
+        for bad in (-1, 0, 3, 256, True):
+            with self.subTest(outcome=bad), self.assertRaises(m.NodeTxError):
+                m.make_plan("monitor-vote", "monitor", chain_id=31337,
+                            board=BOARD, settlement=SETTLEMENT, pool=POOL,
+                            params={"leaseId": 1, "epochId": 0,
+                                    "outcome": bad, "evidenceHash": D1})
+
+    def test_permissionless_settlement_calls_still_require_participant(self):
+        for action, args in (
+            ("seal-epoch", {"leaseId": 1, "epochId": 0}),
+            ("settle-epoch", {"leaseId": 1, "epochId": 0}),
+            ("close-evidence", {"leaseId": 1, "epochId": 0}),
+            ("release-committee", {"leaseId": 1}),
+            ("withdraw", {}),
+        ):
+            with self.subTest(action=action):
+                p = m.make_plan(action, "monitor", chain_id=31337,
+                                board=BOARD, settlement=SETTLEMENT, pool=POOL,
+                                params=args)
+                self.assertEqual(p.target, SETTLEMENT)
+                self.assertFalse(p.public()["ethereumTransactionsSent"])
+                with self.assertRaises(m.NodeTxError):
+                    m.make_plan(action, "observer", chain_id=31337,
+                                board=BOARD, settlement=SETTLEMENT, pool=POOL,
+                                params=args)
+
+    def test_only_consumer_can_prepare_close_lease(self):
+        p = m.make_plan("close-lease", "consumer", chain_id=31337,
+                        board=BOARD, settlement=SETTLEMENT, pool=POOL,
+                        params={"leaseId": 7})
+        self.assertEqual(p.data[:10], "0x" + keccak256(
+            b"closeLease(uint256)")[:4].hex())
+        with self.assertRaises(m.NodeTxError):
+            m.make_plan("close-lease", "provider", chain_id=31337,
+                        board=BOARD, settlement=SETTLEMENT, pool=POOL,
+                        params={"leaseId": 7})
+
     def test_untrusted_rpc_and_signer_url_rejected(self):
         for url in ("http://example.org:8545","https://u:p@node.example",
                     "https://rpc.example/secret", "https://rpc.example?token=x",
