@@ -258,6 +258,15 @@ class ChainBackedDirectDelivery(unittest.TestCase):
                 t["status"]=="REVIEW_EVIDENCE_CAPTURE" for t in reviewed["tasks"]))
             self.assertTrue(all(t["proposal"] is None for t in reviewed["tasks"]
                 if t["kind"]=="COMMITTEE_ASSIGNED"))
+            from sse_monitor_public_snapshot import write_snapshot,read_snapshot
+            public_display=Path(private_journal_dir.name)/"monitor-public-review.json"
+            published=write_snapshot(public_display,reviewed)
+            displayed=read_snapshot(public_display,node_id=node_roles["nodeId"],
+                                    monitor_address=selected_monitor.address)
+            self.assertEqual(displayed,published)
+            self.assertFalse(displayed["ownerApprovalGranted"])
+            self.assertFalse(displayed["votesSubmitted"])
+            self.assertNotIn("proposal",displayed["tasks"][0])
             scope=EvidenceScope(CHAIN,settlement,1,0,policy_digest,
                                 profile_digest,challenge)
             chain_binding=bind_capture_to_chain(
