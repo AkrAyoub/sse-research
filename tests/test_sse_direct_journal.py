@@ -2,6 +2,7 @@
 from __future__ import annotations
 
 import sqlite3
+from contextlib import closing
 import sys
 import tempfile
 import unittest
@@ -81,9 +82,13 @@ class DirectJournalTests(unittest.TestCase):
     def test_duplicate_sqlite_key_is_atomic(self):
         j=DirectJournal(self.path)
         j.reserve(KEY,ORDER)
-        with sqlite3.connect(self.path) as con:
+        # sqlite3.Connection.__exit__ commits/rolls back but does NOT close.
+        # Explicit close is mandatory before TemporaryDirectory cleanup on Windows.
+        with closing(sqlite3.connect(self.path)) as con:
             count=con.execute("SELECT COUNT(*) FROM direct_exchange").fetchone()[0]
         self.assertEqual(count,1)
+        with self.assertRaises(sqlite3.ProgrammingError):
+            con.execute("SELECT 1")
 
 
 if __name__=="__main__":
