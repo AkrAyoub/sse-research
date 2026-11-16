@@ -71,6 +71,10 @@ def evaluate(policy, samples):
     enough = len(samples) >= policy["minProbeCount"]
     if not enough or not denominator:
         provisional = "INSUFFICIENT_OBSERVATIONS"
+    elif timeout_count:
+        # Positive observed replies do not erase the unknown outcomes of
+        # unreachable witnesses; no overall compliance claim is justified.
+        provisional = "PARTIAL_VISIBILITY_INCONCLUSIVE"
     elif observed_bps >= policy["minSuccessBps"] and p95 <= policy["maxResponseLatencyMs"]:
         provisional = "OBSERVED_PASS_CONDITIONAL"
     else:
