@@ -28,7 +28,7 @@ sys.path.insert(0,str(ROOT/"services"/"provider-agent"))
 from test_sse_sla_direct_delivery import setup
 from sse_node_role_policy import RolePolicyError, role_manifest, authorize_selected_monitor
 from sse_monitor_challenge import signed_challenge, ChallengeError
-from sse_evidence_wire_v1 import EvidenceScope, VerificationContext
+from sse_evidence_wire_v1 import EvidenceScope, VerificationContext, AuthenticationError
 from sse_http_signed_delivery_v1 import (
     EvidenceArchive, capture_response, fetch_provider_payload)
 from sse_challenge import expected_response_hash
@@ -149,6 +149,23 @@ class MultiRoleMonitorTests(unittest.TestCase):
         self.assertEqual(opener.request.full_url,
                          "https://provider.mesh.ts.net/v1/challenge")
         self.assertEqual(built.call_count,1)
+
+    def test_remote_capture_requires_pinned_provenance(self):
+        endpoint,c,p,policy,state,monitors,node=fixture()
+        scope=EvidenceScope(policy["chainId"],policy["settlement"],1,0,
+                            state["lease"]["slaPolicyHash"],
+                            state["lease"]["resourceProfileHash"],
+                            state["epoch"]["requestHash"])
+        context=VerificationContext(scope,frozenset(state["lease"]["monitors"]))
+        with tempfile.TemporaryDirectory() as td:
+            archive=EvidenceArchive(Path(td)/"remote-observations.sqlite")
+            with self.assertRaises(AuthenticationError):
+                capture_response("https://provider.mesh.ts.net",
+                    Domain(policy["chainId"],policy["settlement"]),
+                    p.address.lower(),scope,
+                    "0x"+bytes(monitors[0].key).hex(),context,archive,
+                    allow_tailnet=True)
+            self.assertEqual(archive.count(),0)
 
     def test_real_loopback_challenge_archives_two_authentic_signatures(self):
         endpoint,c,p,policy,state,monitors,node=fixture()
