@@ -43,6 +43,7 @@ def setup(kind="deterministic_compute", endpoint="http://127.0.0.1:8945"):
     lease={"stateName":"Active","consumer":consumer.address.lower(),
            "provider":provider.address.lower(),"slaPolicyHash":policy_hash(policy),
            "resourceProfileHash":PROFILE,"reservationFee":0,
+           "marketplaceRequestId":1,"totalEscrow":25,
            "serviceEndpointHash":"0x"+keccak256(endpoint.encode("ascii")).hex()}
     state={"schema":"sse-onchain-inspection-v1","chainId":CHAIN,
            "settlementAddress":SETTLEMENT,"domainSeparatorMatches":True,
@@ -88,6 +89,8 @@ class SlaManifestTests(unittest.TestCase):
             lambda x:x["lease"].update(reservationFee=5),
             lambda x:x.update(blockHashPinned=False),
             lambda x:x["lease"].update(stateName="Ready"),
+            lambda x:x["lease"].update(marketplaceRequestId=0),
+            lambda x:x["lease"].update(totalEscrow=0),
             lambda x:x.update(epoch=None),
         ):
             x=deepcopy(state);change(x)
