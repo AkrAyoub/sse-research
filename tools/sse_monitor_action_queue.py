@@ -36,7 +36,8 @@ def _safe_snapshot(snapshot, *, chain_id, settlement, lease_id):
             snapshot.get("domainSeparatorMatches") is not True or
             snapshot.get("blockHashPinned") is not True or
             snapshot.get("chainId") != chain_id or
-            snapshot.get("settlementAddress", "").lower() != settlement.lower() or
+            type(snapshot.get("settlementAddress")) is not str or
+            snapshot["settlementAddress"].lower() != settlement.lower() or
             snapshot.get("leaseId") != lease_id):
         raise DiscoveryError("work-queue inspection is not chain-bound")
     lease = snapshot.get("lease")
@@ -154,8 +155,10 @@ class MonitorActionQueue:
                 type(row[3]) is not int or type(row[4]) is not str):
             raise DiscoveryError("review journal belongs to another chain or monitor")
         decoded=[]
+        valid_state={"COMMITTEE_ASSIGNED":"REVIEW_CONFIRMATION",
+                     "EPOCH_ADMITTED":"REVIEW_EVIDENCE_CAPTURE"}
         for kind,lease,seq,state,n,h in entries:
-            if (kind not in KINDS or state not in STATES or
+            if (kind not in KINDS or state != valid_state.get(kind) or
                     type(lease) is not int or lease < 1 or
                     type(seq) is not int or seq < 0 or
                     type(n) is not int or n < 0 or
