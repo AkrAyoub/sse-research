@@ -29,9 +29,11 @@ async function refreshChain() {
       blocks.blocks.map(b=>[b.number,b.hash,b.transactionCount,b.gasUsed,b.finality]));
     const from=Math.max(0,overview.headNumber-31);
     const events=await api('/v1/chain/events?start_block='+from+'&end_block='+overview.headNumber);
-    renderTable('chainEvents',['Block','Contract','Event topic','Transaction'],
+    renderTable('chainEvents',['Block','Contract','Event','Details','Transaction'],
       events.events.slice(-25).reverse().map(e=>[
-        e.blockNumber,e.address,(e.topics||[])[0]||'—',e.transactionHash]));
+        e.blockNumber,e.address,e.sseDecoded?.name||(e.topics||[])[0]||'—',
+        e.sseDecoded?JSON.stringify(e.sseDecoded.parameters):'Raw event (unknown ABI)',
+        e.transactionHash]));
   }catch(e){
     $('chainStatus').textContent='Unavailable: '+e.message;
     $('chainBlocks').textContent='No verified RPC response; contract state not displayed.';
