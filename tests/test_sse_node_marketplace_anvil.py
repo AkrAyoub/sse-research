@@ -294,6 +294,25 @@ class RealAnvilNodeMarketplace(unittest.TestCase):
             self.assertEqual(int(credit_after, 16), 0)
             self.assertEqual(len(recorded), 23)
             self.assertEqual(len(set(recorded)), len(recorded))
+            # Cross-validate R8's event decoder against actual EVM log topics,
+            # not only handcrafted ABI fixtures.
+            from sse_event_decoder import decode_sse_event
+            decoded_names = set()
+            for txhash in recorded:
+                receipt = rpc.request("eth_getTransactionReceipt", [txhash])
+                for log in receipt.get("logs", []):
+                    if log.get("address", "").lower() not in (pool, settlement, board):
+                        continue
+                    interpreted = decode_sse_event(log)
+                    if interpreted is not None:
+                        decoded_names.add(interpreted["name"])
+            self.assertTrue({
+                "Requested", "BidSubmitted", "BidChosen", "LeaseFunded",
+                "CandidateRegistered", "LeaseAccepted", "CommitteeReady",
+                "EpochAdmitted", "MonitorVoted", "MonitoringSealed",
+                "SettlementUpdated", "EpochEvidenceClosed", "LeaseClosed",
+                "Withdrawal",
+            }.issubset(decoded_names), decoded_names)
         finally:
             if proc.poll() is None:
                 proc.terminate()
