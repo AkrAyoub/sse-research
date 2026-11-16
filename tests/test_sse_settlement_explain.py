@@ -68,7 +68,10 @@ class ExplainTests(unittest.TestCase):
         d=explain_inspection(state(acknowledged=True))
         self.assertEqual(d["admissibleHistories"],["F","S"])
         self.assertFalse(d["monitoringSealed"])
-        self.assertFalse(d["onChainCreditsMatchCurrentBounds"])
+        self.assertTrue(d["onChainCreditsMatchCurrentBounds"])
+        # Matching numerical bounds alone does not prove a settlement call
+        # occurred; the epoch is still explicitly marked unsealed.
+        self.assertTrue(d["settlementExecutedNotProvenByBoundsAlone"])
 
     def test_invalid_or_contradictory_evidence_refused(self):
         for inp in (
