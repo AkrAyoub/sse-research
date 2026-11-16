@@ -30,7 +30,7 @@ from sse_monitor_challenge import signed_challenge, ChallengeError
 from sse_evidence_wire_v1 import EvidenceScope, VerificationContext
 from sse_http_signed_delivery_v1 import EvidenceArchive, capture_response
 from sse_challenge import expected_response_hash
-from sse_direct_delivery import post_json
+from sse_direct_delivery import post_json, submit_work_request
 from typed_evidence import Domain
 from direct_work_service import make_server
 from sse_sla_manifest import canonical_policy
@@ -122,6 +122,23 @@ class MultiRoleMonitorTests(unittest.TestCase):
         thread.start()
         try:
             authorize_selected_monitor(node,state,monitors[0].address)
+            challenge={"leaseId":1,"epochId":0,
+                       "requestHash":state["epoch"]["requestHash"]}
+            with self.assertRaises(ExchangeError):
+                post_json(endpoint,challenge)  # /v1/work is not the challenge API
+            import json as _json
+            from urllib.request import Request, urlopen
+            from urllib.error import HTTPError
+            # No provider monitor-facing signature is released before
+            # a verified consumer-signed receipt exists.
+            req=Request(endpoint+"/v1/challenge",
+                        data=_json.dumps(challenge).encode("ascii"),
+                        headers={"Content-Type":"application/json"},method="POST")
+            with self.assertRaises(HTTPError) as denied:
+                urlopen(req,timeout=3)
+            self.assertEqual(denied.exception.code,422)
+            self.assertTrue(submit_work_request(
+                endpoint,state,policy,c,"0x"+"aa"*32)["receiptAcceptedByProvider"])
             scope=EvidenceScope(policy["chainId"],policy["settlement"],1,0,
                                 state["lease"]["slaPolicyHash"],
                                 state["lease"]["resourceProfileHash"],
