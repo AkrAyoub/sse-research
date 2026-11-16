@@ -67,8 +67,13 @@ def main(argv=None):
             raise ValueError("endpoint not the committed resource origin")
         if type(args.lease_id) is not int or args.lease_id < 1 or args.epoch_id < 0:
             raise ValueError("invalid lease or epoch index")
-        if not args.endpoint.startswith("http://127.0.0.1:"):
-            raise ValueError("R4 capture transport currently requires loopback HTTP; Tailscale HTTPS pending")
+        from sse_direct_delivery import validate_endpoint_url
+        transport=validate_endpoint_url(args.endpoint)
+        if transport != args.endpoint.rstrip("/"):
+            raise ValueError("monitor origin must be canonical")
+        allow_tailnet=args.endpoint.startswith("https://")
+        if not allow_tailnet and not args.endpoint.startswith("http://127.0.0.1:"):
+            raise ValueError("only local HTTP or private Tailscale Serve HTTPS is permitted")
         if not args.capture:
             print(json.dumps({
                 "kind":"SSE_MONITOR_CHAIN_BOUND_CAPTURE_PLAN",
@@ -101,7 +106,7 @@ def main(argv=None):
             args.endpoint,Domain(policy["chainId"],policy["settlement"]),
             state["lease"]["provider"],scope,
             "0x"+bytes(monitor.key).hex(),binding.context,archive,
-            chain_binding=binding,rpc=rpc)
+            chain_binding=binding,rpc=rpc,allow_tailnet=allow_tailnet)
         print(json.dumps({
             "kind":"SSE_MONITOR_CHAIN_BOUND_CAPTURE",
             "nodeId":node["nodeId"],"evidenceId":signed.evidence_id,
