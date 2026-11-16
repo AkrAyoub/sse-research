@@ -106,8 +106,11 @@ def fetch_provider_payload(endpoint: str, scope: EvidenceScope,
         raise ValueError('expected evidence scope required')
     if allow_tailnet:
         from sse_direct_delivery import validate_endpoint_url
+        from urllib.parse import urlsplit
         validated = validate_endpoint_url(endpoint)
-        if not validated.startswith('https://') or not validated.endswith('.ts.net'):
+        hostname = urlsplit(validated).hostname
+        if (not validated.startswith('https://') or not hostname or
+                not hostname.endswith('.ts.net')):
             raise ValueError('monitor overlay requires HTTPS .ts.net origin')
         url = validated + '/v1/challenge'
     else:
