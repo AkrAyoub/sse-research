@@ -248,6 +248,16 @@ class ChainBackedDirectDelivery(unittest.TestCase):
             self.assertTrue(all(e["monitor"] == selected_monitor.address.lower()
                                 and not e["monitorVoteAuthorized"] for e in new_events))
             self.assertEqual(discovery.scan(rpc)["new"],[])
+            from sse_monitor_action_queue import MonitorActionQueue
+            reviewed=MonitorActionQueue(
+                node_roles, Path(private_journal_dir.name)/"monitor-events.sqlite",
+                CHAIN,settlement).review(rpc)
+            self.assertFalse(reviewed["signerLoaded"])
+            self.assertFalse(reviewed["transactionsSent"])
+            self.assertTrue(any(t["kind"]=="EPOCH_ADMITTED" and
+                t["status"]=="REVIEW_EVIDENCE_CAPTURE" for t in reviewed["tasks"]))
+            self.assertTrue(all(t["proposal"] is None for t in reviewed["tasks"]
+                if t["kind"]=="COMMITTEE_ASSIGNED"))
             scope=EvidenceScope(CHAIN,settlement,1,0,policy_digest,
                                 profile_digest,challenge)
             chain_binding=bind_capture_to_chain(
