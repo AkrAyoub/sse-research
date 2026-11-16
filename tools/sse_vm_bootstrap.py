@@ -28,7 +28,7 @@ NAME_RE = re.compile(r"[a-z][a-z0-9-]{0,62}\Z")
 ALLOWED_ROLES = frozenset(("consumer", "provider", "monitor", "observer"))
 SERVICE_NAME = "sse-vm-role-agent.service"
 UNIT_DIR = Path("/etc/systemd/system")
-VERSIONED_DEPENDENCY = "pycryptodome==3.23.0"
+VERSIONED_DEPENDENCIES = ("pycryptodome==3.23.0", "eth-account==0.14.0")
 
 
 class BootstrapError(ValueError):
@@ -152,7 +152,7 @@ def describe(spec: InstallSpec) -> dict:
         "marketplacePreviewConfigured": spec.board_address is not None,
         "actionsIfApplied": [
             "fetch immutable commit and verify checkout HEAD",
-            "install isolated pinned cryptographic dependency",
+            "install isolated pinned cryptographic and Ethereum signing dependencies",
             "run read-only chain/contract/wallet preflight",
             "create locked-down sseagent user and read-only systemd role heartbeat",
         ],
@@ -307,7 +307,7 @@ def apply(spec: InstallSpec) -> dict:
                 raise BootstrapError("unexpected partial Python runtime; refuse repair")
             _run(["python3", "-m", "venv", str(spec.runtime)])
             _run([str(spec.runtime / "bin" / "python"), "-m", "pip", "install",
-                  "--disable-pip-version-check", "--no-input", VERSIONED_DEPENDENCY])
+                  "--disable-pip-version-check", "--no-input", *VERSIONED_DEPENDENCIES])
 
         preflight = [
             str(spec.runtime / "bin" / "python"),
