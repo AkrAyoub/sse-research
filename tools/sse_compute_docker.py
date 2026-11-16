@@ -107,9 +107,11 @@ def inspect_container(profile: dict, endpoint: str, container_name: str,
             if any(x in ('seccomp=unconfined', 'apparmor=unconfined',
                          'systempaths=unconfined', 'label=disable') for x in opts):
                 raise ComputeError('worker may not disable confinement')
-            if host.get('CapAdd') or host.get('Devices') or host.get('Binds'):
+            if (host.get('CapAdd') or host.get('Devices') or
+                    host.get('Binds') or host.get('Mounts') or d.get('Mounts')):
                 raise ComputeError('worker cannot add capabilities, devices or mounts')
-            if host.get('NetworkMode') == 'host' or host.get('PidMode') == 'host':
+            if any(host.get(k) == 'host' for k in
+                   ('NetworkMode','PidMode','IpcMode','UTSMode','UsernsMode','CgroupnsMode')):
                 raise ComputeError('worker cannot share host namespaces')
             if set(host.get('PortBindings', {})) != {'8877/tcp'}:
                 raise ComputeError('worker cannot expose extra service ports')
