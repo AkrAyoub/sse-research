@@ -53,7 +53,7 @@ python services/monitor-agent/monitor_discovery.py \
   --review --export-review-snapshot /run/sse-monitor-display/tasks.json
 ```
 
-The last path's parent must **already exist**, be owned by the monitor exporter, not be world-writable, and its permissions must be approved. On Windows, use an actual absolute Windows path instead of the illustrative Ubuntu paths.
+The last path's parent must **already exist**, be owned by the monitor exporter, not be group/world-writable, and its permissions must be approved. On Windows, use an actual absolute Windows path instead of the illustrative Ubuntu paths.
 
 3. Configure the **local** `sseagent` process with its existing owner token and settings path, `SSE_ROLES` containing `monitor`, the same `SSE_NODE_ID` and `SSE_MONITOR_WALLET` public address, plus `SSE_MONITOR_WORK_SNAPSHOT_FILE=/run/sse-monitor-display/tasks.json`. The node console's `/ui` now contains a "View recent monitor tasks" button that uses the existing local owner token. It is not a "Confirm" or "Vote" button.
 
