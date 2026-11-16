@@ -45,6 +45,8 @@ def main(argv=None):
     p.add_argument("--review-limit", type=int, default=64)
     p.add_argument("--export-review-snapshot", type=Path,
                    help="only with --review: atomically publish bounded nonsecret node-local display file")
+    p.add_argument("--shared-display-group-read", action="store_true",
+                   help="only with explicit --review/export: opt-in to POSIX 0640 public snapshot")
     p.add_argument("--interval-seconds", type=float, default=5.0)
     args=p.parse_args(argv)
     try:
@@ -59,6 +61,9 @@ def main(argv=None):
             raise DiscoveryError("poll interval must be between 1 and 3600 seconds")
         if args.export_review_snapshot is not None and not args.review:
             raise DiscoveryError("--export-review-snapshot requires explicit --review")
+        if args.shared_display_group_read and (
+                not args.review or args.export_review_snapshot is None):
+            raise DiscoveryError("shared display group read requires reviewed snapshot export")
         if not (args.scan or args.watch or args.review):
             print(json.dumps({
                 "kind":"SSE_MONITOR_DISCOVERY_PLAN", "nodeId":node["nodeId"],
@@ -78,7 +83,8 @@ def main(argv=None):
                                      args.settlement,limit=args.review_limit)
             result=queue.review(RPC(args.rpc_url))
             if args.export_review_snapshot is not None:
-                write_snapshot(args.export_review_snapshot,result)
+                write_snapshot(args.export_review_snapshot,result,
+                               shared_group_read=args.shared_display_group_read)
             print(json.dumps(result,sort_keys=True,indent=2))
             return 0
         scanner=MonitorDiscovery(args.journal,node,args.chain_id,args.settlement,
