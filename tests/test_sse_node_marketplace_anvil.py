@@ -229,7 +229,70 @@ class RealAnvilNodeMarketplace(unittest.TestCase):
             self.assertEqual(after["lease"]["nextEpochId"], 1)
             self.assertTrue(after["epoch"]["exists"])
             self.assertEqual(after["epoch"]["requestHash"], req)
-            self.assertEqual(len(recorded), 5 + 1 + 1 + 1 + 1 + 4 + 1)
+            # Simulate FAILURE without pretending this is real off-chain
+            # qualification: no provider acknowledgment or response is sent.
+            # Each selected monitor submits a distinct on-chain signed vote.
+            from sse_chain_read import inspect_chain
+            epoch = after["epoch"]
+            observed_time = int(rpc.request("eth_getBlockByNumber", [
+                "latest", False])["timestamp"], 16)
+            rpc.request("evm_increaseTime", [
+                max(0, epoch["responseDeadline"] - observed_time + 1)])
+            rpc.request("evm_mine", [])
+            for i, member in enumerate(selected[:3]):
+                evidence = "0x" + keccak256(
+                    ("LAB_ONLY_MONITOR_FAILURE_" + str(i)).encode("ascii")).hex()
+                role_tx("monitor-vote", "monitor", {
+                    "leaseId": 1, "epochId": 0, "outcome": 2,
+                    "evidenceHash": evidence,
+                }, by_address[member])
+            voted_state = inspect_chain(rpc, settlement, 1, 0,
+                                        expected_chain_id=CHAIN)
+            self.assertEqual(voted_state["epoch"]["failureVotes"], 3)
+            self.assertEqual(voted_state["epoch"]["successVotes"], 0)
+            observed_time = int(rpc.request("eth_getBlockByNumber", [
+                "latest", False])["timestamp"], 16)
+            rpc.request("evm_increaseTime", [
+                max(0, epoch["monitoringClose"] - observed_time + 1)])
+            rpc.request("evm_mine", [])
+            role_tx("seal-epoch", "monitor",
+                    {"leaseId": 1, "epochId": 0}, by_address[selected[0]])
+            role_tx("settle-epoch", "monitor",
+                    {"leaseId": 1, "epochId": 0}, by_address[selected[0]])
+            settled = inspect_chain(rpc, settlement, 1, 0,
+                                    expected_chain_id=CHAIN)
+            ep = settled["epoch"]
+            self.assertEqual(ep["outcomeName"], "Failure")
+            # SSE N/F ambiguity: no acknowledgment, failure quorum.
+            # p(N)=reservation fee 5, p(F)=0:
+            # lower=0, upper=5, refund=25-5=20, retained=5.
+            self.assertEqual(ep["providerCredited"], 0)
+            self.assertEqual(ep["consumerCredited"], 20)
+            self.assertEqual(ep["unresolvedExposure"], 5)
+            observed_time = int(rpc.request("eth_getBlockByNumber", [
+                "latest", False])["timestamp"], 16)
+            rpc.request("evm_increaseTime", [
+                max(0, epoch["evidenceClose"] - observed_time + 1)])
+            rpc.request("evm_mine", [])
+            role_tx("close-evidence", "monitor",
+                    {"leaseId": 1, "epochId": 0}, by_address[selected[0]])
+            closed = inspect_chain(rpc, settlement, 1, 0,
+                                   expected_chain_id=CHAIN)
+            self.assertTrue(closed["epoch"]["evidenceClosed"])
+            self.assertEqual(closed["epoch"]["unresolvedExposure"], 5)
+            role_tx("close-lease", "consumer", {"leaseId": 1}, consumer)
+            role_tx("release-committee", "monitor", {"leaseId": 1},
+                    by_address[selected[0]])
+            credit_before = rpc.request("eth_call", [
+                {"to": settlement, "data":
+                 _data("withdrawable(address)", consumer.address)}, "latest"])
+            self.assertEqual(int(credit_before, 16), 20)
+            role_tx("withdraw", "consumer", {}, consumer)
+            credit_after = rpc.request("eth_call", [
+                {"to": settlement, "data":
+                 _data("withdrawable(address)", consumer.address)}, "latest"])
+            self.assertEqual(int(credit_after, 16), 0)
+            self.assertEqual(len(recorded), 23)
             self.assertEqual(len(set(recorded)), len(recorded))
         finally:
             if proc.poll() is None:
