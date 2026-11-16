@@ -152,10 +152,15 @@ def compare_to_lease(policy: dict, inspection: dict, *, endpoint: str | None = N
         raise SLAError("no active admitted service epoch")
     if (lease.get("stateName") != "Active" or lease.get("slaPolicyHash") != policy_hash(policy)
             or lease.get("resourceProfileHash") != policy["resourceProfileHash"]
-            or lease.get("reservationFee") != 0):
-        raise SLAError("lease terms violate versioned delivery-only SLA")
+            or lease.get("reservationFee") != 0
+            or type(lease.get("marketplaceRequestId")) is not int
+            or lease["marketplaceRequestId"] < 1
+            or type(lease.get("totalEscrow")) is not int
+            or lease["totalEscrow"] <= 0):
+        raise SLAError("lease was not an active funded marketplace-selected SLA")
     if endpoint is not None:
-        if type(endpoint) is not str or len(endpoint) > 255:
+        if (type(endpoint) is not str or not 1 <= len(endpoint) <= 255
+                or not endpoint.isascii()):
             raise SLAError("invalid committed endpoint")
         if lease.get("serviceEndpointHash") != (
                 "0x" + keccak256(endpoint.encode("ascii")).hex()):
