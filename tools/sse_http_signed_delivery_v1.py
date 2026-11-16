@@ -451,6 +451,8 @@ def capture_response(endpoint: str, domain, expected_provider: str, scope: Evide
     from eth_account import Account
     if scope.normalized() != context.scope.normalized():
         raise AuthenticationError('monitor verification scope differs from request')
+    if allow_tailnet and (chain_binding is None or rpc is None):
+        raise AuthenticationError('remote monitor capture requires pinned chain provenance')
     sender = Account.from_key(monitor_private_key).address.lower()
     if sender not in {x.lower() for x in context.authorized_monitors}:
         raise AuthenticationError('monitor key not authorized by supplied context')
