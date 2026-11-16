@@ -23,10 +23,12 @@ HASH = "0x" + "aa" * 32
 TOKEN = "w" * 40
 
 
-def config(roles="provider,consumer", enabled=True):
+def config(roles="provider,consumer", enabled=True, settings_file=None):
+    if settings_file is None:
+        settings_file = str(Path(tempfile.gettempdir()) / "sse-node-ui-preview-tests.json")
     env = {
         "SSE_NODE_ID": "ubuntu-node-a", "SSE_ROLES": roles, "SSE_AGENT_PORT": "8765",
-        "SSE_NODE_UI_TOKEN": TOKEN, "SSE_NODE_SETTINGS_FILE": "/tmp/sse-test-ui-settings.json",
+        "SSE_NODE_UI_TOKEN": TOKEN, "SSE_NODE_SETTINGS_FILE": settings_file,
     }
     if enabled:
         env.update(SSE_CHAIN_ID="31337", SSE_BOARD_ADDRESS=BOARD,
@@ -36,7 +38,12 @@ def config(roles="provider,consumer", enabled=True):
 
 class MarketplaceUiTests(unittest.TestCase):
     def setUp(self):
-        self.conf=config()
+        # Create an OS-native absolute path; '/tmp' is not absolute on Windows.
+        self.temp = tempfile.TemporaryDirectory()
+        self.addCleanup(self.temp.cleanup)
+        self.settings_file = str(Path(self.temp.name) / "preferences.json")
+        self.assertTrue(Path(self.settings_file).is_absolute())
+        self.conf=config(settings_file=self.settings_file)
         self.conf["port"]=0
         self.server=agent.make_server(self.conf)
         self.thread=threading.Thread(target=self.server.serve_forever,daemon=True)
@@ -94,7 +101,7 @@ class MarketplaceUiTests(unittest.TestCase):
 
     def test_without_chain_config_preview_is_disabled(self):
         self.server.shutdown();self.server.server_close();self.thread.join(timeout=3)
-        self.conf=config(enabled=False);self.conf["port"]=0
+        self.conf=config(enabled=False, settings_file=self.settings_file);self.conf["port"]=0
         self.server=agent.make_server(self.conf)
         self.thread=threading.Thread(target=self.server.serve_forever,daemon=True)
         self.thread.start()
