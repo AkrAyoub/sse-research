@@ -25,6 +25,7 @@ from sse_node_marketplace import RPC, _load_signer
 from sse_sla_manifest import validate_policy
 from sse_resource_profile_v2 import validate_profile, compare_policy
 from sse_docker_sla_runner import make_docker_runner, DockerSLAError
+from sse_monitor_challenge import signed_challenge, ChallengeError
 from sse_direct_journal import DirectJournal, DirectJournalError
 from sse_direct_delivery import (
     ExchangeError, MAX_WIRE, authenticate_request, create_response,
@@ -87,10 +88,20 @@ def make_server(port, signer, policy, endpoint, chain_inspector,
             })
 
         def do_POST(self):
-            if self.path not in ("/v1/work", "/v1/receipt"):
+            if self.path not in ("/v1/work", "/v1/receipt", "/v1/challenge"):
                 return self.respond(404, {"error": "not found"})
             try:
                 payload = self.body()
+                if self.path == "/v1/challenge":
+                    if type(payload) is not dict or set(payload) != {
+                            "leaseId","epochId","requestHash"}:
+                        raise ExchangeError("invalid monitor challenge")
+                    lease, epoch = payload.get("leaseId"), payload.get("epochId")
+                    if type(lease) is not int or type(epoch) is not int:
+                        raise ExchangeError("invalid monitor challenge scope")
+                    state = inspect(lease, epoch)
+                    signed = signed_challenge(payload, state, policy, endpoint, signer)
+                    return self.respond(200, signed)
                 if type(payload) is not dict or type(payload.get("message")) is not dict:
                     raise ExchangeError("invalid signed exchange envelope")
                 msg = payload["message"]
@@ -138,7 +149,8 @@ def make_server(port, signer, policy, endpoint, chain_inspector,
                         journal.record_receipt(key, payload)
                 return self.respond(200, {"receiptSignatureVerified": verified["validSignature"],
                                           "physicalDeliveryTimeCertified": False})
-            except (ExchangeError, DirectJournalError, ChainReadError, OSError, ValueError, TypeError):
+            except (ExchangeError, ChallengeError, DirectJournalError,
+                    ChainReadError, OSError, ValueError, TypeError):
                 return self.respond(422, {"error": "invalid or unauthorized exchange"})
         def log_message(self, fmt, *args):
             return
