@@ -50,8 +50,8 @@ def _check_path(path, *, writing):
         raise SnapshotError("monitor display path must be a regular file")
     if writing and os.name == "posix":
         parent = value.parent.stat()
-        if parent.st_uid != os.geteuid() or stat.S_IMODE(parent.st_mode) & 0o002:
-            raise SnapshotError("monitor display export parent must be owned and not world writable")
+        if parent.st_uid != os.geteuid() or stat.S_IMODE(parent.st_mode) & 0o022:
+            raise SnapshotError("monitor display export parent must be owner-controlled, not group/world writable")
     return value
 
 
