@@ -99,8 +99,14 @@ def make_server(port, signer, policy, endpoint, chain_inspector,
                     lease, epoch = payload.get("leaseId"), payload.get("epochId")
                     if type(lease) is not int or type(epoch) is not int:
                         raise ExchangeError("invalid monitor challenge scope")
-                    state = inspect(lease, epoch)
-                    signed = signed_challenge(payload, state, policy, endpoint, signer)
+                    with lock:
+                        acknowledged = (journal.has_verified_receipt(lease, epoch)
+                            if journal is not None else
+                            any(k[0] == lease and k[1] == epoch for k in receipts))
+                        if not acknowledged:
+                            raise ExchangeError("no completed consumer-signed work receipt")
+                        state = inspect(lease, epoch)
+                        signed = signed_challenge(payload, state, policy, endpoint, signer)
                     return self.respond(200, signed)
                 if type(payload) is not dict or type(payload.get("message")) is not dict:
                     raise ExchangeError("invalid signed exchange envelope")
