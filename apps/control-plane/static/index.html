@@ -20,6 +20,14 @@ body{margin:0;min-height:100vh}header{border-bottom:1px solid #344256;background
 <section class="wide"><h2>Recent Ethereum blocks</h2><p>Live RPC read-only view. Confirmation depth is not verified finality.</p><div id="chainBlocks">Configure observer RPC to view blocks.</div></section>
 <section><h2>Contract event logs</h2><p>Recent events from allowed SSE contracts only.</p><div id="chainEvents">Configure observer RPC to view logs.</div></section>
 <section><h2>Transaction receipt lookup</h2><label for="txhash">Ethereum transaction hash</label><input id="txhash" placeholder="0x… (64 hex digits)"><button id="lookupTx">Inspect transaction</button><pre id="txDetail">No transaction selected.</pre></section>
+<section class="wide"><h2>Lease and settlement explanation</h2>
+<p>Read-only pinned chain state. N/F/S payout bounds are conditional on the recorded
+on-chain evidence; monitor votes do not independently certify physical service.</p>
+<label for="leaseId">Lease ID</label><input id="leaseId" inputmode="numeric" type="number" min="1" step="1" value="1">
+<label for="epochId">Epoch ID</label><input id="epochId" inputmode="numeric" type="number" min="0" step="1" value="0">
+<button id="inspectLease">Inspect lease and payout bounds</button>
+<pre id="leaseDetail">No lease inspected.</pre>
+</section>
 <section class="wide"><h2>Managed node records</h2><div id="nodes">Connect to view inventory.</div></section>
 <section><h2>Register an Ubuntu VM</h2>
 <form id="enroll"><label for="node_id">Node ID</label><input id="node_id" required pattern="[a-z][a-z0-9-]{0,62}" placeholder="cloud-c-01">
