@@ -13,6 +13,7 @@ do NOT make the DB Byzantine immutable or externally available evidence.
 from __future__ import annotations
 
 import json
+from contextlib import contextmanager
 import os
 import re
 import sqlite3
@@ -81,13 +82,17 @@ class DirectJournal:
             )""")
             db.commit()
 
+    @contextmanager
     def _connect(self):
         try:
             db = sqlite3.connect(self.path,timeout=5,isolation_level=None)
             db.execute("PRAGMA synchronous=FULL")
-            return db
         except sqlite3.Error as exc:
             raise DirectJournalError("journal database unavailable") from exc
+        try:
+            yield db
+        finally:
+            db.close()
 
     def reserve(self, key, consumer_request):
         lease,epoch,nonce = _key(key)
