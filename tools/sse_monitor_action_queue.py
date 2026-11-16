@@ -13,6 +13,7 @@ canonicality is distinct from independently verified PoS finality.
 from __future__ import annotations
 
 import os
+import re
 import sqlite3
 import stat
 from contextlib import closing
@@ -48,8 +49,9 @@ def _task(node, record, snapshot, chain_id, settlement):
     lease = _safe_snapshot(snapshot,chain_id=chain_id,
                            settlement=settlement,lease_id=record["leaseId"])
     parties = [lease.get("consumer"),lease.get("provider")]
-    if any(type(x) is not str or len(x) != 42 or
-           not x.lower().startswith("0x") for x in parties):
+    if any(type(x) is not str or
+           re.fullmatch(r"0x[0-9a-fA-F]{40}",x) is None or
+           int(x,16) == 0 for x in parties):
         raise DiscoveryError("invalid lease counterparties")
     owners = {x.lower() for x in parties}
     me = node["wallets"]["monitor"]
@@ -74,7 +76,7 @@ def _task(node, record, snapshot, chain_id, settlement):
                 lease["monitorConfirmations"] < 4):
             action = "REVIEW_CONFIRMATION"
             proposal = {"role": "monitor", "action": "monitor-confirm",
-                        "params": {"lease_id":record["leaseId"]}}
+                        "params": {"leaseId":record["leaseId"]}}
     elif usable and record["kind"] == "EPOCH_ADMITTED":
         epoch = snapshot.get("epoch")
         if (snapshot.get("status") == "EPOCH_FOUND" and
@@ -112,7 +114,8 @@ class MonitorActionQueue:
             raise DiscoveryError("monitor role not configured on this VM")
         if (type(chain_id) is not int or not 0 < chain_id < 2**63 or
                 type(settlement) is not str or
-                not settlement.startswith("0x") or len(settlement) != 42 or
+                re.fullmatch(r"0x[0-9a-fA-F]{40}", settlement) is None or
+                int(settlement, 16) == 0 or
                 type(limit) is not int or not 1 <= limit <= MAX_ITEMS):
             raise DiscoveryError("invalid monitor queue chain, contract or limit")
         self.chain_id,self.settlement,self.limit=chain_id,settlement.lower(),limit
