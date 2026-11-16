@@ -283,6 +283,28 @@ def make_server(conf):
                     secrets.compare_digest(auth, "Bearer " + token) and
                     (not origin or origin == "http://127.0.0.1:" + str(conf["port"])))
 
+        def reject_unauthorized_owner(self):
+            """Send a stable 403 after draining only a small declared request body.
+
+            An early rejection with unread PUT/POST bytes may make Windows TCP
+            reset the connection before the client receives the 403. Keep the
+            input size bounded and use a short deadline: untrusted callers
+            must never be able to stall the node-local UI.
+            """
+            declared = self.headers.get("Content-Length")
+            if declared is not None:
+                try:
+                    if len(declared) <= 8:
+                        size = int(declared)
+                        if 0 < size <= 4096:
+                            self.connection.settimeout(1.0)
+                            self.rfile.read(size)
+                except (ValueError, OSError, OverflowError):
+                    pass
+            self.close_connection = True
+            return self.send_payload(
+                403, {"error": "local owner authorization required"})
+
         def send_payload(self, code, body, content_type="application/json; charset=utf-8"):
             raw = (json.dumps(body, sort_keys=True).encode("utf-8")
                    if not isinstance(body, str) else body.encode("utf-8"))
@@ -323,7 +345,7 @@ def make_server(conf):
             if self.path != "/v1/transaction-plans":
                 return self.send_payload(404, {"error": "not found"})
             if not self._local_owner():
-                return self.send_payload(403, {"error": "local owner authorization required"})
+                return self.reject_unauthorized_owner()
             if not conf.get("chain"):
                 return self.send_payload(503, {"error": "node marketplace not configured"})
             if self.headers.get("Content-Type", "").split(";")[0].strip() != "application/json":
@@ -342,7 +364,7 @@ def make_server(conf):
             if self.path != "/v1/preferences":
                 return self.send_payload(404, {"error": "not found"})
             if not self._local_owner():
-                return self.send_payload(403, {"error": "local owner authorization required"})
+                return self.reject_unauthorized_owner()
             if self.headers.get("Content-Type", "").split(";")[0].strip() != "application/json":
                 return self.send_payload(415, {"error": "JSON required"})
             try:
