@@ -23,13 +23,16 @@ sys.path.insert(0, str(ROOT / "services" / "monitor-agent"))
 from sse_chain_read import inspect_chain, ChainReadError
 from sse_node_marketplace import RPC, _load_signer
 from sse_sla_manifest import validate_policy
+from sse_resource_profile_v2 import validate_profile, compare_policy
+from sse_docker_sla_runner import make_docker_runner, DockerSLAError
 from sse_direct_journal import DirectJournal, DirectJournalError
 from sse_direct_delivery import (
     ExchangeError, MAX_WIRE, authenticate_request, create_response,
     parse_bytes, json_bytes, verify_receipt,
 )
 
-def make_server(port, signer, policy, endpoint, chain_inspector, journal=None):
+def make_server(port, signer, policy, endpoint, chain_inspector,
+                journal=None, compute_runner=None):
     if type(port) is not int or not 0 <= port <= 65535:
         raise ValueError("bad provider port")
     validate_policy(policy)
@@ -37,6 +40,8 @@ def make_server(port, signer, policy, endpoint, chain_inspector, journal=None):
         raise ValueError("chain inspector required")
     if journal is not None and not isinstance(journal, DirectJournal):
         raise ValueError("journal must be a real durable local SSE journal")
+    if compute_runner is not None and not callable(compute_runner):
+        raise ValueError("invalid provider compute runner")
     lock = threading.RLock()
     pending = {}
     receipts = {}
@@ -77,6 +82,7 @@ def make_server(port, signer, policy, endpoint, chain_inspector, journal=None):
                 "processed": (sum(journal.counts().values()) if journal else len(pending)),
                 "receipts": (journal.counts().get("RECEIVED",0) if journal else len(receipts)),
                 "persistentReplayProtection": journal is not None,
+                "dockerComputeRunnerConfigured": compute_runner is not None,
                 "physicalSlaQualified": False,
             })
 
@@ -105,7 +111,8 @@ def make_server(port, signer, policy, endpoint, chain_inspector, journal=None):
                             # Reserve before computing: after a crash, ambiguity
                             # is explicitly unresolved rather than replayed.
                             journal.reserve(key, payload)
-                        reply = create_response(payload, state, policy, endpoint, signer)
+                        reply = create_response(payload, state, policy, endpoint,
+                                                signer, compute_runner=compute_runner)
                         if journal is not None:
                             journal.record_response(key, reply)
                         else:
@@ -149,6 +156,12 @@ def main(argv=None):
     parser.add_argument("--port", type=int, default=8881)
     parser.add_argument("--journal-file", type=Path,
                         help="owner-only durable SQLite path; required for --serve")
+    parser.add_argument("--resource-profile", type=Path,
+                        help="canonical committed V2 resource manifest; required for --serve")
+    parser.add_argument("--worker-endpoint",
+                        help="Docker CPU worker internal host-loopback HTTP origin")
+    parser.add_argument("--compute-container",
+                        help="prelaunched pinned Docker worker container name")
     parser.add_argument("--serve", action="store_true",
                         help="explicitly start loopback-only signer-backed service")
     args = parser.parse_args(argv)
@@ -165,8 +178,23 @@ def main(argv=None):
                               "slaPolicyHash": __import__("sse_sla_manifest").policy_hash(policy),
                               "running": False, "ethereumTransactionsSent": False}))
             return 0
-        if args.journal_file is None:
-            raise ValueError("real provider service requires --journal-file for crash-safe replay")
+        if args.journal_file is None or args.resource_profile is None:
+            raise ValueError("--serve requires durable journal and committed resource profile")
+        if args.resource_profile.stat().st_size > 8192:
+            raise ValueError("resource profile too large")
+        profile = json.loads(args.resource_profile.read_text("utf-8"))
+        validate_profile(profile)
+        compare_policy(profile, policy)
+        if profile["endpoint"] != args.endpoint:
+            raise ValueError("provider endpoint differs from committed resource manifest")
+        docker_runner = None
+        if policy["serviceKind"] == "deterministic_compute":
+            if not args.worker_endpoint or not args.compute_container:
+                raise ValueError("compute --serve requires inspected Docker worker and loopback endpoint")
+            docker_runner = make_docker_runner(
+                profile, policy, args.worker_endpoint, args.compute_container)
+        elif args.worker_endpoint or args.compute_container:
+            raise ValueError("HTTP challenge cannot accept Docker compute settings")
         journal = DirectJournal(args.journal_file)
         signer = _load_signer(args.signer_file)
         rpc = RPC(args.rpc_url)
@@ -177,7 +205,7 @@ def main(argv=None):
                                  rpc, policy["settlement"], lease, epoch,
                                  expected_chain_id=policy["chainId"],
                                  pin_block_hash=True),
-                             journal=journal)
+                             journal=journal, compute_runner=docker_runner)
         print("SSE provider work responder on http://127.0.0.1:" + str(server.server_port),
               flush=True)
         try:
@@ -185,7 +213,7 @@ def main(argv=None):
         finally:
             server.server_close()
         return 0
-    except (ValueError, OSError, json.JSONDecodeError) as exc:
+    except (ValueError, OSError, json.JSONDecodeError, DockerSLAError) as exc:
         print("SSE_PROVIDER_WORK_FAILED: " + str(exc), file=sys.stderr)
         return 1
 
