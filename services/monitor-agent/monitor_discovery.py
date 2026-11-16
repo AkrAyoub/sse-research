@@ -19,6 +19,7 @@ sys.path.insert(0,str(ROOT/"tools"))
 from sse_node_marketplace import RPC
 from sse_monitor_discovery import MonitorDiscovery, DiscoveryError
 from sse_monitor_action_queue import MonitorActionQueue
+from sse_monitor_public_snapshot import write_snapshot
 from sse_node_role_policy import role_manifest
 
 
@@ -42,6 +43,8 @@ def main(argv=None):
     mode.add_argument("--review", action="store_true",
                       help="read existing event journal only; recheck proposed owner tasks")
     p.add_argument("--review-limit", type=int, default=64)
+    p.add_argument("--export-review-snapshot", type=Path,
+                   help="only with --review: atomically publish bounded nonsecret node-local display file")
     p.add_argument("--interval-seconds", type=float, default=5.0)
     args=p.parse_args(argv)
     try:
@@ -54,6 +57,8 @@ def main(argv=None):
             raise DiscoveryError("monitor role not configured on this node")
         if args.interval_seconds < 1 or args.interval_seconds > 3600:
             raise DiscoveryError("poll interval must be between 1 and 3600 seconds")
+        if args.export_review_snapshot is not None and not args.review:
+            raise DiscoveryError("--export-review-snapshot requires explicit --review")
         if not (args.scan or args.watch or args.review):
             print(json.dumps({
                 "kind":"SSE_MONITOR_DISCOVERY_PLAN", "nodeId":node["nodeId"],
@@ -71,8 +76,10 @@ def main(argv=None):
             # It does not mutate the event cursor or load role signing keys.
             queue=MonitorActionQueue(node,args.journal,args.chain_id,
                                      args.settlement,limit=args.review_limit)
-            print(json.dumps(queue.review(RPC(args.rpc_url)),
-                             sort_keys=True,indent=2))
+            result=queue.review(RPC(args.rpc_url))
+            if args.export_review_snapshot is not None:
+                write_snapshot(args.export_review_snapshot,result)
+            print(json.dumps(result,sort_keys=True,indent=2))
             return 0
         scanner=MonitorDiscovery(args.journal,node,args.chain_id,args.settlement,
                                  args.start_block,args.confirmations,args.max_blocks)
