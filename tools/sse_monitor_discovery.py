@@ -67,8 +67,10 @@ def parse_log(item, settlement, start, end):
     if sig not in KIND or any(type(t) is not str or not HASH.fullmatch(t) for t in topics):
         raise DiscoveryError("unknown or malformed SSE event signature")
     lease, value = int(topics[1], 16), int(topics[2], 16)
-    if not 0 < lease < 2**256 or not 0 <= value < 2**256:
-        raise DiscoveryError("invalid indexed lease/epoch/assignment")
+    # SQLite INTEGER is signed int64; reject huge EVM indices rather than
+    # silently corrupting the local cursor/notification state.
+    if not 0 < lease < 2**63 or not 0 <= value < 2**63:
+        raise DiscoveryError("indexed lease/epoch/assignment exceeds journal range")
     payload = item.get("data")
     if type(payload) is not str or (len(payload) != (66 if sig == TOPIC_EPOCH else 2)) or (
             sig == TOPIC_EPOCH and (not HASH.fullmatch(payload) or payload.lower() == ZERO)) or (
@@ -90,9 +92,11 @@ def parse_log(item, settlement, start, end):
 
 
 def _locally_unconflicted(node, lease):
-    counterparty = {lease.get("consumer", "").lower(), lease.get("provider", "").lower()}
-    return (all(ADDRESS.fullmatch(x) for x in counterparty)
-            and not counterparty.intersection(node["wallets"].values()))
+    parties = [lease.get("consumer"), lease.get("provider")]
+    if any(type(x) is not str or not ADDRESS.fullmatch(x) for x in parties):
+        raise DiscoveryError("invalid lease counterparty address")
+    counterparty = {x.lower() for x in parties}
+    return not counterparty.intersection(node["wallets"].values())
 
 
 def candidate_for_event(node, record, snapshot, *, chain_id, settlement):
@@ -182,6 +186,16 @@ class MonitorDiscovery:
                 if (not stat.S_ISREG(st.st_mode) or st.st_uid != os.geteuid()
                         or stat.S_IMODE(st.st_mode) & 0o077):
                     raise DiscoveryError("monitor journal must be owner-only regular file")
+        if not self.path.exists():
+            flags = os.O_CREAT | os.O_EXCL | os.O_WRONLY
+            if hasattr(os, "O_NOFOLLOW"):
+                flags |= os.O_NOFOLLOW
+            try:
+                fd = os.open(self.path, flags, 0o600)
+            except FileExistsError as exc:
+                raise DiscoveryError("monitor journal created concurrently") from exc
+            else:
+                os.close(fd)
         self._init_db()
 
     def _connect(self):
@@ -217,11 +231,14 @@ class MonitorDiscovery:
     def status(self):
         with closing(self._connect()) as db:
             last = db.execute("SELECT last_block,last_hash FROM cursor WHERE id=1").fetchone()
+            total = db.execute("SELECT COUNT(*) FROM monitor_notifications").fetchone()[0]
             notifications = db.execute(
                 "SELECT kind,lease_id,sequence_id,state,block_number,block_hash "
-                "FROM monitor_notifications ORDER BY block_number,lease_id,sequence_id"
+                "FROM monitor_notifications ORDER BY block_number DESC,lease_id DESC,"
+                "sequence_id DESC LIMIT 128"
             ).fetchall()
         return {"lastBlock": last[0], "lastBlockHash": last[1],
+                "totalNotifications": total,
                 "notifications": [
                     dict(zip(("kind","leaseId","sequenceId","state","blockNumber","blockHash"), x))
                     for x in notifications]}
