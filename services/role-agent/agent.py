@@ -212,9 +212,12 @@ const roleSelect=document.getElementById('txrole');
 const actSelect=document.getElementById('txaction');
 const txOutput=document.getElementById('txresult');
 const actionRoles={
- consumer:['request','fund','admit-epoch'],
- provider:['bid','accept'],
- monitor:['monitor-register','monitor-confirm']
+ consumer:['request','fund','admit-epoch','close-lease','withdraw',
+           'seal-epoch','settle-epoch','close-evidence','release-committee'],
+ provider:['bid','accept','withdraw',
+           'seal-epoch','settle-epoch','close-evidence','release-committee'],
+ monitor:['monitor-register','monitor-confirm','monitor-vote','withdraw',
+          'seal-epoch','settle-epoch','close-evidence','release-committee']
 };
 const ownedRoles=""" + json.dumps([r for r in conf["roles"] if r in ("consumer", "provider", "monitor")]) + """;
 for(const role of ownedRoles.filter(r=>actionRoles[r])) {
