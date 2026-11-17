@@ -42,6 +42,16 @@ class LocalLauncherTest(unittest.TestCase):
                 "--worker-endpoint",WORKER,
                 "--container-name",NAME,*extra]
 
+    def test_dockerfile_makes_copied_python_readable_by_nonroot_worker(self):
+        """Handoff may preserve 0600 source modes: COPY alone is insufficient."""
+        dockerfile=(ROOT/"Dockerfile.sse-compute").read_text(encoding="utf-8")
+        copied=dockerfile.index("COPY services/provider-agent/compute_http_service.py")
+        readable=dockerfile.index("RUN chmod -R a+rX /app/tools /app/services")
+        nonroot=dockerfile.index("USER 10001:10001")
+        self.assertLess(copied,readable)
+        self.assertLess(readable,nonroot)
+        self.assertNotIn("chmod -R 777",dockerfile)
+
     def test_dryrun_does_not_probe_or_launch_docker(self):
         output=StringIO()
         with patch.object(launcher,"ensure_local_docker",
