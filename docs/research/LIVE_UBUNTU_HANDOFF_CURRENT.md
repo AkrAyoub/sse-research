@@ -7,6 +7,9 @@
 
 ## 0. NEW CHAT: READ THIS FIRST / EXACT CONTINUATION POINT
 
+> **LATEST 2026-11-17 MONITOR RPC KEY PREP + FUNDING FAILURE:** Controller VM `ayoubakrvm4693@10.50.56.8` attempted dev-funding all 5 monitors using `cast balance "$A" --wei --rpc-url "$RPC"`, but installed Foundry `cast` rejected `--wei` with `error: unexpected argument '--wei' found`. The very first balance query failed; loop stopped before its `eth_sendTransaction`. **ZERO test ETH transfers were executed in this batch**, despite misleading `FUNDING BATCH FINISHED` label. Use `eth_getBalance` RPC directly, enforce 31337, verify amounts/receipts and stop on failures. Controller then used host-key-pinned restricted SSH to generate **five distinct VM-local Ed25519 client keys at `~/.ssh/sse_rpc_tunnel_ed25519`**, printing only their public keys, all five successful; the public keys in §5. Next: install five source-IP-restricted `port-forwarding,permitopen="127.0.0.1:8545"` public key entries on Anvil VM `ayoubakrvm4695@10.50.56.20`, pin its verified SSH host fingerprint from each Monitor, start secure loopback RPC tunnels, fund five monitor EOAs and register 1 Gwei bonds. No bonds or tunnels confirmed yet.
+
+
 > **LATEST LIVE RESULT — 2026-11-17 ~16:45 UTC: 5/5 secure R7 source handoffs and 5/5 encrypted monitor wallet initializations PASSED.** From controller VM `ayoubakrvm4693@10.50.56.8`, `tools/sse_lab_release_handoff.py --apply` returned `VERIFIED_PRIVATE_VM_RELEASE_INSTALLED` individually on all five new Monitor VMs, at **exact same approved source Git revision `c9c3afa3b9c3016c9e4ca5a7ad7437e8959e850c`**. Each receiver confirmed `pythonEnvironmentInstalled:true`, `walletKeysInstalled:false`, `githubCredentialsInstalled:false`, `roleActivated:false`, `ethereumTransactionsSent:false` at release-install time. Then each VM independently ran `sse_vm_role_setup.py init --roles monitor,observer` (interactive encrypted wallet creation) and `status`, both successful. Public monitor wallets and unique node IDs in the fleet table in §2. **No 5-VM dev funding, SSH RPC tunnel, on-chain monitor bond, monitor observer process, lease selection or settlement has yet been observed.** Do NOT repeat first-install release, nor `init`; those are non-idempotent by design. Next: controller funds the five PUBLIC monitor EOAs using unlocked dev Anvil account on chain 31337, provision 5 individually restricted SSH RPC tunnels to blockchain VM, register 1 Gwei bonds from each locally encrypted monitor signer, verify actual on-chain active roster >=5 external candidates, and remove Consumer-co-located candidate by authorized exit before any independent committee claim. Retain existing marketplace request #1 and bid #0.
 
 
@@ -121,6 +124,19 @@ Previously verified Anvil host key, supervisor `sse-rpc-tunnel.service` active/e
 
 ### VM4693 → VM4696 private code release
 On VM4693 created dedicated Ed25519 SSH private provisioning key at `~/.ssh/sse_vm_provision_ed25519`, **NEVER share contents**; Provider independently verified Ed25519 fingerprint `mRUhz...` and VM4693 pinned it in `~/.ssh/known_hosts`. Public key (not secret) starts `ssh-ed25519 AAAAC3NzaC1lZDI1NTE5AAAAIK/851YudMkf77lEOSoJ1qMxhZFCmJw7k/NmwBkEpXMP`. On VM4696 added to `~/.ssh/authorized_keys` restricted to **`from="10.50.56.8",restrict`**. VM4693 verified `ssh -T -i ... -o IdentitiesOnly=yes -o BatchMode=yes -o StrictHostKeyChecking=yes ayoubakrvm4696@10.50.56.2 'whoami'` → correct user. Actual secure handoff from VM4693 clean pinned R7 worktree to new VM used `tools/sse_lab_release_handoff.py --source ~/sse-r7-onboarding --revision c9c3afa... --dest-ip 10.50.56.2 --dest-user ayoubakrvm4696 --ssh-key ... --roles provider,observer --apply` → **`VERIFIED_PRIVATE_VM_RELEASE_INSTALLED`**, archive SHA-256 `b9df7255833530bc450537a333b017e60faab542989571bfaeccb70051606c0a`. Receiver declared `pythonEnvironmentInstalled:true, walletKeysInstalled:false, githubCredentialsInstalled:false, roleActivated:false` (correct at that point).
+
+**Five NEW monitor-to-Anvil RPC SSH public keys, generated on owning Monitor VMs after first install (2026-11-17), no private-key sharing:**
+
+| Monitor VM | From IP | SSH Ed25519 public key data (comment omitted) |
+|---|---|---|
+| `ayoubakrvm4699` | `10.50.56.14` | `AAAAC3NzaC1lZDI1NTE5AAAAIGRTM1gQHbWX1668bjIowKUGXI5FMyGduQ2HCadMfAov` |
+| `ayoubakrvm4700` | `10.50.56.18` | `AAAAC3NzaC1lZDI1NTE5AAAAIJLyzhRL3wkWOHTCzazpuGnqvBI1/+wJbEgka5VLPQrz` |
+| `ayoubakrvm4701` | `10.50.56.21` | `AAAAC3NzaC1lZDI1NTE5AAAAINjxkyfszOpkE9I3u2bxMwXafVrK2Dxo7xZ2aq4GNajC` |
+| `ayoubakrvm4702` | `10.50.56.22` | `AAAAC3NzaC1lZDI1NTE5AAAAINvLE8MHyrgQYP7HkPcw+PShR2pY9KoB0YNb4P1V0oWz` |
+| `ayoubakrvm4703` | `10.50.56.23` | `AAAAC3NzaC1lZDI1NTE5AAAAIF4VoGJPUN5qVJY2KpM0hRiQHerzyUn1AXoXQJG05Mnv` |
+
+Key private parts remain at `~/.ssh/sse_rpc_tunnel_ed25519` **only on their owning Monitor VM**, no passphrase provided. These public keys have NOT yet been added to Blockchain VM's authorized_keys as of this checkpoint. Portal SSH key `~/.ssh/sse_vm_provision_ed25519` is separate and restricted to 4693 controller source.
+
 ### VM4696 local role
 `python tools/sse_vm_role_setup.py init --roles provider,observer` prompted twice for a 16+ character secret and generated encrypted Provider wallet `0x5B0488...`, unique `nodeId=sse-81322ab79a2ee6a795952306` and owner-only local files; `status` succeeded. A first attempted init failed `ModuleNotFoundError: Crypto`, then `python -m pip install -r requirements.txt` showed dependencies including `pycryptodome==3.23.0` installed; subsequent init succeeded. Don't repeat init.
 ### VM4696 → VM4695 chain
@@ -289,8 +305,10 @@ Source references: `docs/research/MASTER_TRACKER.md`; `docs/research/PHASES_TRAC
 | 2026-11-17, later | VMs4699,4700,4701,4702,4703 | Portal identified distinct private IPs, Linux users, host ED25519 fingerprints, machine-id hashes, Python3.12.3 | New **unprovisioned** monitor hosts; no wallet/RPC/bond installed yet |
 | 2026-11-17, later | VM4693 → all 5 Monitor VMs | Pinned exact SSH server fingerprints, `StrictHostKeyChecking=yes`, authenticated via source-IP-restricted controller public key; exact remote user/git/python3-venv verified | **5/5 SSH + preinstall preflights PASSED**; not yet installed SSE |
 | 2026-11-17 ~16:45 UTC | VM4693→VM4699/4700/4701/4702/4703 | 5/5 approved release installs and monitor wallet generation | Git c9c3afa, five unique node IDs + encrypted monitor EOAs, 5/5 LOCAL_ROLE_STATUS; no RPC/funds/bonds yet |
+| 2026-11-17, later | VM4693 controller | Dev wallet funding script halted at first `cast balance --wei` | Foundry balance --wei unsupported; no transfers initiated; do not count 5 funded |
+| 2026-11-17, later | 5 new Monitor VMs via restricted controller SSH | Generated individual `sse_rpc_tunnel_ed25519` and returned only public keys | 5/5 keys ready; Anvil authorization and tunnel not yet configured |
 
-**Next append here after the next user command output**, update §0 current state, inspect any changed branch code, revise issue #28 or new issue as needed, commit file update. Avoid stale attributions. Existing VM, wallet, contract and transaction facts are durable; current health status is a last observation, not a guarantee. Latest transcript ends with five successful R7 first installs and locally encrypted Monitor wallet/status checks. No new Ethereum transactions, monitor RPC tunnels or monitor registrations.
+**Next append here after the next user command output**, update §0 current state, inspect any changed branch code, revise issue #28 or new issue as needed, commit file update. Avoid stale attributions. Existing VM, wallet, contract and transaction facts are durable; current health status is a last observation, not a guarantee. Latest transcript ends with attempted funding failing before first transfer and five successfully generated local Monitor→Anvil SSH tunnel client keys. No new Ethereum transactions, monitor RPC tunnels or registrations.
 
 ## 13. Handoff safety invariants
 
