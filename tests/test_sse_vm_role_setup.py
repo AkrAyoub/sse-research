@@ -80,6 +80,23 @@ class OperatorTests(unittest.TestCase):
                 s.init_wallets(target, os.uname().nodename, "monitor",
                                "at least sixteen characters", "at least sixteen characters")
 
+    def test_duplicate_portal_hostnames_get_distinct_node_id(self):
+        with tempfile.TemporaryDirectory() as temp:
+            first = Path(temp) / "first"
+            second = Path(temp) / "second"
+            a = s.init_wallets(first, None, "observer",
+                               "at least sixteen characters", "at least sixteen characters")
+            b = s.init_wallets(second, None, "observer",
+                               "at least sixteen characters", "at least sixteen characters")
+            self.assertEqual(a["hostname"], b["hostname"])
+            self.assertNotEqual(a["nodeId"], b["nodeId"])
+            self.assertTrue(a["nodeId"].startswith("sse-"))
+            self.assertEqual(s.load_manifest(first)["nodeId"], a["nodeId"])
+            self.assertEqual((first / "node-binding.json").stat().st_mode & 0o777, 0o600)
+            with patch.object(s, "machine_fingerprint", return_value="0" * 64):
+                with self.assertRaises(s.SetupError):
+                    s.load_manifest(first)
+
     def test_invalid_init_rejected_before_keys_created(self):
         with tempfile.TemporaryDirectory() as temp:
             directory = Path(temp) / "private"
