@@ -7,6 +7,9 @@
 
 ## 0. NEW CHAT: READ THIS FIRST / EXACT CONTINUATION POINT
 
+> **LATEST LIVE RESULT — 2026-11-17 ~16:45 UTC: 5/5 secure R7 source handoffs and 5/5 encrypted monitor wallet initializations PASSED.** From controller VM `ayoubakrvm4693@10.50.56.8`, `tools/sse_lab_release_handoff.py --apply` returned `VERIFIED_PRIVATE_VM_RELEASE_INSTALLED` individually on all five new Monitor VMs, at **exact same approved source Git revision `c9c3afa3b9c3016c9e4ca5a7ad7437e8959e850c`**. Each receiver confirmed `pythonEnvironmentInstalled:true`, `walletKeysInstalled:false`, `githubCredentialsInstalled:false`, `roleActivated:false`, `ethereumTransactionsSent:false` at release-install time. Then each VM independently ran `sse_vm_role_setup.py init --roles monitor,observer` (interactive encrypted wallet creation) and `status`, both successful. Public monitor wallets and unique node IDs in the fleet table in §2. **No 5-VM dev funding, SSH RPC tunnel, on-chain monitor bond, monitor observer process, lease selection or settlement has yet been observed.** Do NOT repeat first-install release, nor `init`; those are non-idempotent by design. Next: controller funds the five PUBLIC monitor EOAs using unlocked dev Anvil account on chain 31337, provision 5 individually restricted SSH RPC tunnels to blockchain VM, register 1 Gwei bonds from each locally encrypted monitor signer, verify actual on-chain active roster >=5 external candidates, and remove Consumer-co-located candidate by authorized exit before any independent committee claim. Retain existing marketplace request #1 and bid #0.
+
+
 > **LATEST MONITOR SSH VERIFY — 2026-11-17:** On **controller/Consumer VM `ayoubakrvm4693@10.50.56.8`**, the operator first installed the existing dedicated controller SSH **public** key (restricted to source IP) in all five newly identified Monitor VM accounts, then matched each `ssh-keyscan` ED25519 host key fingerprint against the independently observed portal-console fingerprint, pinned key in `~/.ssh/known_hosts`, and executed **real authenticated noninteractive SSH** with `-i ~/.ssh/sse_vm_provision_ed25519 -o BatchMode=yes -o IdentitiesOnly=yes -o StrictHostKeyChecking=yes`. All five returned the exact user and `git version 2.43.0`, `python3-venv 3.12.3-0ubuntu2.1`: `ayoubakrvm4699@10.50.56.14`, `ayoubakrvm4700@10.50.56.18`, `ayoubakrvm4701@10.50.56.21`, `ayoubakrvm4702@10.50.56.22`, `ayoubakrvm4703@10.50.56.23`. Console ended `CONTROLLER CHECK FINISHED` after all five, so all SSH preflights **PASSED**. **No Git handoff, Python venv, role wallets, RPC tunnels, monitor bonds or monitor services are yet reported as installed on these five.** Next: one controller-side batch `tools/sse_lab_release_handoff.py --apply` from the already approved clean c9c3afa R7 source (requires explicit HEAD verification), then unique encrypted wallets locally on each VM. All five distinct Linux machine instances are not scientifically independent operators by themselves.
 
 
@@ -71,6 +74,19 @@ Environment: private subnet `10.50.56.0/24`; SSH reachability proved VM4693→46
 | `ayoubakrvm4703` | `10.50.56.23` | `YQYN8sJsKQ0kczgPKcLY2vp6WHoYshZNE0QI3YGBVhA` | `e24d48d10763954b` |
 
 **Interpretation:** separate VM/SSH/Machine identities support infrastructure separation, not independently controlled administrative organizations; single portal owner/operator may have control over all machines. The scientific claim of operator independence remains unproven and must not be inferred merely from five VMs.
+
+
+**Monitor fleet — source installation and wallet evidence from each VM (2026-11-17):** All five `~/sse-research` received **identical Git commit `c9c3afa...`** as verified SHA-matched shallow release, Python venv installed successfully, public `sse-node-roles-v1` status verified locally. Source handoff artifact digests are not expected to be equal because receiver archives may contain nondeterministic tar metadata; they are separately digest-verified by sender/receiver and Git SHA identical.
+
+| VM user | IP | Unique persistent SSE node ID | Local monitor wallet public EOA | Verified handoff archive SHA-256 |
+|---|---|---|---|---|
+| `ayoubakrvm4699` | `10.50.56.14` | `sse-19d4b72d8558a4a489d7bef6` | `0x40c9443877D85140e5f234Fa8A4f28F319F04C0f` | `a1af3a9e599dc35d460fe5bfe30079118cf2e7e495d1cfaa6cec94dc005dd624` |
+| `ayoubakrvm4700` | `10.50.56.18` | `sse-896e7f9985c94b5473f4366a` | `0x7d2D2f9EcdB2318fD6C3dEA03b1fD4faaDdaD531` | `052f20a2dc6b578a4453ef464507db15c64d3053d9e4e1b989c6b9424e759199` |
+| `ayoubakrvm4701` | `10.50.56.21` | `sse-e17d7a162ac90cd111654c5a` | `0x700Cb6794eA891bfea21e01C4cf3F1aa2584c18d` | `36fa6d62f8345e36670f18f930a580a7f09e1961c54d9df5f4b34cd86ab88f08` |
+| `ayoubakrvm4702` | `10.50.56.22` | `sse-9cac2364f4f44f27294eeb38` | `0x658DAc80B4697B2ab68d692a07A14b050B76b86d` | `53e562bc43d86fcb62b6957190da7f9924bd3fa3819f7be2e1cdc3b56ce317a7` |
+| `ayoubakrvm4703` | `10.50.56.23` | `sse-5937804f63bcb31b8bf1f443` | `0x01aEB0bc34b3C5b19Bd76cb904b940515029dF9F` | `7a6ee8bce1f66133e3967bb38059c90075845381c28597b9e5f9a3c8bddec9b5` |
+
+**Security/independence:** all unique Ethereum addresses and VM machine identities, but all five VMs are under same overarching portal/user control unless separate operators are proven. Different VMs are separate infrastructure nodes, **not proof of separate administrative operators**. Wallet passphrases and private key material remain VM-local. Bond amounts, balances and chain status are **not yet observed** on these five; do not mark monitoring ready. The original Consumer co-hosted monitor remains on the registry (count1 at last read). Public VMs already have restricted controller SSH access, but still need independent monitor→Anvil restricted RPC tunnel enrollment (and any independent signed monitoring agent).
 
 ## 3. Repo versions, worktrees, history and sources of truth
 
@@ -272,8 +288,9 @@ Source references: `docs/research/MASTER_TRACKER.md`; `docs/research/PHASES_TRAC
 | 2026-11-17, later | VM4696 Provider | Up 45min Docker c2 worker on port8877 with successful local health response | Running/healthy at observation, not signed delivery or readiness-poll source acceptance |
 | 2026-11-17, later | VMs4699,4700,4701,4702,4703 | Portal identified distinct private IPs, Linux users, host ED25519 fingerprints, machine-id hashes, Python3.12.3 | New **unprovisioned** monitor hosts; no wallet/RPC/bond installed yet |
 | 2026-11-17, later | VM4693 → all 5 Monitor VMs | Pinned exact SSH server fingerprints, `StrictHostKeyChecking=yes`, authenticated via source-IP-restricted controller public key; exact remote user/git/python3-venv verified | **5/5 SSH + preinstall preflights PASSED**; not yet installed SSE |
+| 2026-11-17 ~16:45 UTC | VM4693→VM4699/4700/4701/4702/4703 | 5/5 approved release installs and monitor wallet generation | Git c9c3afa, five unique node IDs + encrypted monitor EOAs, 5/5 LOCAL_ROLE_STATUS; no RPC/funds/bonds yet |
 
-**Next append here after the next user command output**, update §0 current state, inspect any changed branch code, revise issue #28 or new issue as needed, commit file update. Avoid stale attributions. Existing VM, wallet, contract and transaction facts are durable; current health status is a last observation, not a guarantee. Latest transcript ends with the Provider's successful port8877 HTTP check and five new Monitor VM portal identity outputs; no new Ethereum transactions or monitor registrations.
+**Next append here after the next user command output**, update §0 current state, inspect any changed branch code, revise issue #28 or new issue as needed, commit file update. Avoid stale attributions. Existing VM, wallet, contract and transaction facts are durable; current health status is a last observation, not a guarantee. Latest transcript ends with five successful R7 first installs and locally encrypted Monitor wallet/status checks. No new Ethereum transactions, monitor RPC tunnels or monitor registrations.
 
 ## 13. Handoff safety invariants
 
