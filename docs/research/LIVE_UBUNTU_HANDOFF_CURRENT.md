@@ -7,6 +7,9 @@
 
 ## 0. NEW CHAT: READ THIS FIRST / EXACT CONTINUATION POINT
 
+> **LATEST OPERATOR OUTPUT — 2026-11-17, after request/bid read check:** Provider VM `ayoubakrvm4696@10.50.56.2` reports `sse-compute-lease01` **Up 45 minutes**, Docker container `57e2f3e4ab64`, image `c2aba72e4543`, loopback publish `127.0.0.1:8877->8877/tcp`; `curl --noproxy '*' --max-time 3 http://127.0.0.1:8877/healthz` returned `{"localComputeWorker":true,"ok":true,"onChainAuthenticated":false,"service":"sse-local-challenge"}`. This confirms official-port HTTP health, **not** signed service/delivery or new launcher source deployment. **FIVE NEW MONITOR VM SHELLS CREATED/IDENTIFIED ONLY** (see §2); no source, signer, RPC, bond or monitor service installed on them yet. The known committee `candidateCount=1` is unchanged pending registrations. Next: install authenticated Provider/Consumer controller-to-Monitor SSH provisioning authorized key with restricted `from=10.50.56.8`, pin each host key against portal output, batch first-install release handoff, securely bootstrap monitor wallet/SSH RPC tunnel and bond. No new blockchain transactions in this latest user output.
+
+
 > **LATEST READ-ONLY CHAIN CHECK — 2026-11-17 ~14:03 UTC:** From Consumer/controller VM `ayoubakrvm4693@10.50.56.8`, `cast call` verified `OpenResourceBoard.requests(1)`: Consumer `0xCC595b02Ff79315E5036f3B978bA081600C8201B`, resource hash `0x7182ffec1ceba3c569714de05ca441bdc17b114c7ae98e9f91fcb9e6a858abf0`, SLA hash `0xffc573392c83037e18907bfaea6234dfc6b2d58081f3e1c21950f00108d1f147`, maxEpochFeeWei `100000000000000`, biddingClose **`1794923778` (2026-11-17T13:56:18.000Z)**, `selected=false`; `bidCount(1)=1`; `getBid(1,0)` gives Provider `0x5B048852F909f47FfEb94B288bAc1a243eE54255` and fee `25000000000000` wei; `OpenMonitorCommittee.candidateCount()=1`. **Bid index 0 CONFIRMED**, not just presumed. No evidence of lease funding. Bidding close does not invalidate an existing unselected request; selection is allowed after close, conditional on >=4 eligible monitors. The co-located monitor on Consumer VM cannot be called independent for this lease. Do not attempt to fund at candidateCount 1.
 
 
@@ -41,12 +44,30 @@ Choices/limits:
 | Original Participant VM | `ayoubakrvm4693` | `10.50.56.8` | `patch-dil-template-s2-service-base-g68-20260628-044954` | Consumer + Monitor + Observer, source/controller | Running; existing wallets and Anvil tunnel |
 | Blockchain VM | `ayoubakrvm4695` | `10.50.56.20` | `patch-dil-template-s1-service-base-g68-20260628-050503` | Anvil EVM RPC | Running systemd Anvil |
 | Provider VM | `ayoubakrvm4696` | `10.50.56.2` | `patch-dil-template-s2-service-base-g68-20260628-044954` | Provider + Observer | New signed-source-handoff repo and encrypted Provider wallet; Docker and UI active |
+| Monitor M1 (new) | `ayoubakrvm4699` | `10.50.56.14` | `patch-dil-template-s1-service-base-g68-20260628-050503` | Intended Monitor + Observer | Identified only; no SSE install/wallet/RPC/bond yet |
+| Monitor M2 (new) | `ayoubakrvm4700` | `10.50.56.18` | `patch-dil-template-s2-service-base-g68-20260628-044954` | Intended Monitor + Observer | Identified only; no SSE install/wallet/RPC/bond yet |
+| Monitor M3 (new) | `ayoubakrvm4701` | `10.50.56.21` | `patch-dil-template-s2-service-base-g68-20260628-044954` | Intended Monitor + Observer | Identified only; no SSE install/wallet/RPC/bond yet |
+| Monitor M4 (new) | `ayoubakrvm4702` | `10.50.56.22` | `patch-dil-template-s2-service-base-g68-20260628-044954` | Intended Monitor + Observer | Identified only; no SSE install/wallet/RPC/bond yet |
+| Monitor M5 (new; standby target) | `ayoubakrvm4703` | `10.50.56.23` | `patch-dil-template-s2-service-base-g68-20260628-044954` | Intended Monitor + Observer | Identified only; no SSE install/wallet/RPC/bond yet |
 
 VM4696 independent identity evidence: `whoami=ayoubakrvm4696`, `eth0=10.50.56.2/24`, Docker **29.1.3**, Ubuntu **24.04.4**, Python **3.12.3**, Git **2.43.0**, `python3-venv` installed, 4 vCPU/11 GiB/96 GB root. Its Ed25519 SSH host key verified **on Provider VM itself and from VM4693**: `SHA256:mRUhzUOtlxE1Ug8mRYJ0CB5BQzzGQ0PWikY0bT+GARs`. Provider hashed machine ID prefix: `80c52466654f77fa`. Its **persistent SSE nodeId**: `sse-81322ab79a2ee6a795952306` (not duplicate Linux hostname).
 
 VM4693 earlier SSH host fingerprint `SHA256:HulbLhb3yurT0jsL0m/44mzvzIngekxtxryKifEq4PQ`, machine-id hash prefix `aeeef7ef0fa61d4d`. These are **VM4693**, NOT VM4696. VM4695 Anvil host SSH fingerprint as independently pinned on Provider: `SHA256:Xw3anupwwpofutE6sm0c8sRHi1NjDHALCaLWfK17LUA`. Reverify host keys when provisioning any NEW machine.
 
 Environment: private subnet `10.50.56.0/24`; SSH reachability proved VM4693→4696; GUI/console accessed via portal gateway. Portal paste occasionally corrupts long pasted commands or Python heredocs (observed `PYint(...)`), and Ctrl+C sometimes does not interrupt portal session; use short independent commands and `timeout` for probes, and new SSH terminal when stuck. Distinguish transient service startup races from persistent failures. **Do not run arbitrary OS upgrades/reboots during unfinished Anvil lab acceptance.**
+
+
+**Monitor fleet identification, directly observed from each portal SSH shell (2026-11-17)**. These are **SSH SERVER** host fingerprints (`ssh-keygen -lf /etc/ssh/ssh_host_ed25519_key.pub`), not client keys, and 16-character prefixes of SHA-256 hashes of `/etc/machine-id` are NOT secrets or full host identifiers. All five are Ubuntu24.04-template hosts on private subnet, Python **3.12.3**; portal shell identity and address were independently printed:
+
+| VM user | IP | SSH ED25519 server fingerprint (SHA256:) | Machine-id SHA-256 prefix |
+|---|---|---|---|
+| `ayoubakrvm4699` | `10.50.56.14` | `9V9VyYCuS33nJZlU0oUIr5IgergeGNrfRApBGnkcrnM` | `b4c5debb80b323d5` |
+| `ayoubakrvm4700` | `10.50.56.18` | `OvcWc98T6/JO6IfsE9I8UwWQ+WSbf8tBTAg0gW77ojo` | `e121d93c1cd74dce` |
+| `ayoubakrvm4701` | `10.50.56.21` | `OujgGrcvNsylX8E4lYLAR7/Dj3o3pU+gUz72mATgDT4` | `4663fc11e4957e60` |
+| `ayoubakrvm4702` | `10.50.56.22` | `BPAoYECnfaJg8GTPWkl/Agimz4EehBT04/+a/4390gA` | `03a1e26afa105310` |
+| `ayoubakrvm4703` | `10.50.56.23` | `YQYN8sJsKQ0kczgPKcLY2vp6WHoYshZNE0QI3YGBVhA` | `e24d48d10763954b` |
+
+**Interpretation:** separate VM/SSH/Machine identities support infrastructure separation, not independently controlled administrative organizations; single portal owner/operator may have control over all machines. The scientific claim of operator independence remains unproven and must not be inferred merely from five VMs.
 
 ## 3. Repo versions, worktrees, history and sources of truth
 
@@ -245,8 +266,10 @@ Source references: `docs/research/MASTER_TRACKER.md`; `docs/research/PHASES_TRAC
 | 2026-11-17 | VM4696 Provider | placeBid(request1, 2.5e13 wei) | block13 tx `0xf625414...`, mined, exit0 |
 | 2026-11-17 | Source inspection | Committee assignment gate requires >=4 eligible | **Funding blocked at 1 known candidate**; no lease yet |
 | 2026-11-17 14:03 UTC (approx.) | VM4693 / public on-chain read | Verified request 1 exact hashes, max fee, close unix 1794923778, selected=false; bidCount=1; getBid(1,0)=Provider/25000000000000; candidateCount=1 | **Correct bidder/index verified; no funding permitted yet** |
+| 2026-11-17, later | VM4696 Provider | Up 45min Docker c2 worker on port8877 with successful local health response | Running/healthy at observation, not signed delivery or readiness-poll source acceptance |
+| 2026-11-17, later | VMs4699,4700,4701,4702,4703 | Portal identified distinct private IPs, Linux users, host ED25519 fingerprints, machine-id hashes, Python3.12.3 | New **unprovisioned** monitor hosts; no wallet/RPC/bond installed yet |
 
-**Next append here after the next user command output**, update §0 current state, inspect any changed branch code, revise issue #28 or new issue as needed, commit file update. Avoid stale attributions. Existing VM, wallet, contract and transaction facts are durable; current health status is a last observation, not a guarantee. Latest transcript ends with the public read-only request/bid/monitor-count verification (request remains unselected, candidate count 1), not a funding or acceptance tx.
+**Next append here after the next user command output**, update §0 current state, inspect any changed branch code, revise issue #28 or new issue as needed, commit file update. Avoid stale attributions. Existing VM, wallet, contract and transaction facts are durable; current health status is a last observation, not a guarantee. Latest transcript ends with the Provider's successful port8877 HTTP check and five new Monitor VM portal identity outputs; no new Ethereum transactions or monitor registrations.
 
 ## 13. Handoff safety invariants
 
