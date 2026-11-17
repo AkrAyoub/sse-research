@@ -7,6 +7,9 @@
 
 ## 0. NEW CHAT: READ THIS FIRST / EXACT CONTINUATION POINT
 
+> **LATEST 2026-11-17 (~16:45+ UTC) MONITOR FUNDING + ANVIL SSH AUTHORIZATION PASS:** On Blockchain VM `ayoubakrvm4695@10.50.56.20`, the operator installed five NEW restricted `authorized_keys` entries for Monitor EOA-owning VM tunnel clients, source IPs `10.50.56.14, .18, .21, .22, .23`, each constrained `from="<matching source>",restrict,port-forwarding,permitopen="127.0.0.1:8545"`. Output showed **5/5 `AUTHORIZED RPC` + `ALL FIVE RPC KEYS AUTHORIZED`**. Separately on controller `ayoubakrvm4693@10.50.56.8`, corrected chain-31337-gated idempotent test-funding loop used `eth_getBalance`/ `eth_sendTransaction`, `cast receipt`, and post-balance validation to top up **all five previously unfunded Monitor EOAs to at least 0.01 experimental ETH**. Five distinct tx hashes listed in §4 and ledger; output ended **`ALL FIVE MONITORS FUNDED SUCCESSFULLY`**. **Do NOT duplicate funding blindly**, use balance checks. Still **no SSH tunnels or monitor on-chain registrations observed** on new machines; candidate count still last read 1. Immediate next: each Monitor pin Anvil server host ED25519 fingerprint `SHA256:Xw3anupwwpofutE6sm0c8sRHi1NjDHALCaLWfK17LUA` against `ssh-keyscan`, start `127.0.0.1:8545` SSH local forwarding with its own SSH client key and strict checking, and verify role `status --rpc-url ... --chain-id 31337 --pool <committee>`. Then each Monitor `register-monitor --execute` locally with its own encrypted wallet passphrase and 1 Gwei bond; verify candidate count and independent service health.
+
+
 > **LATEST 2026-11-17 MONITOR RPC KEY PREP + FUNDING FAILURE:** Controller VM `ayoubakrvm4693@10.50.56.8` attempted dev-funding all 5 monitors using `cast balance "$A" --wei --rpc-url "$RPC"`, but installed Foundry `cast` rejected `--wei` with `error: unexpected argument '--wei' found`. The very first balance query failed; loop stopped before its `eth_sendTransaction`. **ZERO test ETH transfers were executed in this batch**, despite misleading `FUNDING BATCH FINISHED` label. Use `eth_getBalance` RPC directly, enforce 31337, verify amounts/receipts and stop on failures. Controller then used host-key-pinned restricted SSH to generate **five distinct VM-local Ed25519 client keys at `~/.ssh/sse_rpc_tunnel_ed25519`**, printing only their public keys, all five successful; the public keys in §5. Next: install five source-IP-restricted `port-forwarding,permitopen="127.0.0.1:8545"` public key entries on Anvil VM `ayoubakrvm4695@10.50.56.20`, pin its verified SSH host fingerprint from each Monitor, start secure loopback RPC tunnels, fund five monitor EOAs and register 1 Gwei bonds. No bonds or tunnels confirmed yet.
 
 
@@ -116,6 +119,19 @@ Private GitHub: `AkrAyoub/sse-research`. Primary active lab-engineering branch `
 - VM4696 Provider **`0x5B048852F909f47FfEb94B288bAc1a243eE54255`**, encrypted `provider.json`; funded **0.02 ETH** by Anvil dev funder tx **`0xa9fd17cdd72c2050e1ab0ce1aee970b8579ca7632aa1a227a1206cc45d5676e6`**, mined **block 11**, status 1. Provider read-only role status returned `chainId=31337` and `balancesWei.provider=20000000000000000` **before bid gas**. Never fund again without checking balance.
 
 **Authoritative public env on VM4693:** `~/sse-research/.local/live-chain/contracts.env` with `CHAIN_ID=31337` and above addresses. A fresh Provider install does **not** automatically have this local file. Provider UI systemd has corresponding explicit public address env vars.
+
+
+**2026-11-17 five actual Anvil funding transactions — POST-BALANCE CHECK PASSED at 0.01 ETH each (dev chain31337 only):**
+
+| Monitor | Wallet receiving test ETH | Funding TX hash | Result observed |
+|---|---|---|---|
+| VM4699 | `0x40c9443877D85140e5f234Fa8A4f28F319F04C0f` | `0x61fb121ae04ded3777e90ec9fcfbad5e704419de8c0e8dc7d8c0431ccc050847` | Receipt command succeeded; post balance ≥10000000000000000 wei |
+| VM4700 | `0x7d2D2f9EcdB2318fD6C3dEA03b1fD4faaDdaD531` | `0xdcc767d535cda889df7129a13a7701c066fe7361e14b3df9cae63f6b07d07d6a` | Same |
+| VM4701 | `0x700Cb6794eA891bfea21e01C4cf3F1aa2584c18d` | `0xc51b4b5d966abe924cfb0a0863219e55cd5ea2594b92b1c9a14ed5c005c5385d` | Same |
+| VM4702 | `0x658DAc80B4697B2ab68d692a07A14b050B76b86d` | `0xfa7ee48ad77baa611d4adba4746e05fd131426713e81841788b8339e706cf5ba` | Same |
+| VM4703 | `0x01aEB0bc34b3C5b19Bd76cb904b940515029dF9F` | `0xe8d08e153cf3bbc6ac01db5e69e733ab52e10062f56ea44b8bf05c860115bbf0` | Same |
+
+Anvil VM `ayoubakrvm4695` has all five new matching SSH client public keys in `~/.ssh/authorized_keys` with `from="<source IP>",restrict,port-forwarding,permitopen="127.0.0.1:8545"`, preserving old controller/Provider entries. This does **not** establish that tunnels are yet active. The helper `cast receipt` output was suppressed by the funding script; a zero exit and post-balance check establish successful local command sequence but exact receipt `status` can be independently re-queried. No monitor bond, no evidence of new candidate registration as of this step.
 
 ## 5. SSH, chain RPC, role UI and security setup actually performed
 
@@ -307,8 +323,10 @@ Source references: `docs/research/MASTER_TRACKER.md`; `docs/research/PHASES_TRAC
 | 2026-11-17 ~16:45 UTC | VM4693→VM4699/4700/4701/4702/4703 | 5/5 approved release installs and monitor wallet generation | Git c9c3afa, five unique node IDs + encrypted monitor EOAs, 5/5 LOCAL_ROLE_STATUS; no RPC/funds/bonds yet |
 | 2026-11-17, later | VM4693 controller | Dev wallet funding script halted at first `cast balance --wei` | Foundry balance --wei unsupported; no transfers initiated; do not count 5 funded |
 | 2026-11-17, later | 5 new Monitor VMs via restricted controller SSH | Generated individual `sse_rpc_tunnel_ed25519` and returned only public keys | 5/5 keys ready; Anvil authorization and tunnel not yet configured |
+| 2026-11-17, later | VM4693 controller / Anvil31337 | All five 0.01-ETH dev top-ups, receipt queries + post-balance checks | 5/5 completed; exact public hashes §4; no new bond |
+| 2026-11-17, later | VM4695 blockchain | 5 restricted `authorized_keys` Anvil port-forward entries | **ALL FIVE RPC KEYS AUTHORIZED**; monitor client tunnels unstarted |
 
-**Next append here after the next user command output**, update §0 current state, inspect any changed branch code, revise issue #28 or new issue as needed, commit file update. Avoid stale attributions. Existing VM, wallet, contract and transaction facts are durable; current health status is a last observation, not a guarantee. Latest transcript ends with attempted funding failing before first transfer and five successfully generated local Monitor→Anvil SSH tunnel client keys. No new Ethereum transactions, monitor RPC tunnels or registrations.
+**Next append here after the next user command output**, update §0 current state, inspect any changed branch code, revise issue #28 or new issue as needed, commit file update. Avoid stale attributions. Existing VM, wallet, contract and transaction facts are durable; current health status is a last observation, not a guarantee. Latest transcript ends with all five dev-only Monitor wallet funding txs and all five Anvil SSH restricted key authorizations succeeding. No new Monitor-to-Anvil tunnels or monitor bonds reported yet.
 
 ## 13. Handoff safety invariants
 
