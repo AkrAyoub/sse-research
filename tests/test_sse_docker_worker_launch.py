@@ -52,6 +52,57 @@ class LocalLauncherTest(unittest.TestCase):
         self.assertLess(readable,nonroot)
         self.assertNotIn("chmod -R 777",dockerfile)
 
+    def test_worker_ready_rejects_exited_container(self):
+        from types import SimpleNamespace
+        observed=SimpleNamespace(returncode=1, stdout="")
+        with patch.object(launcher.subprocess,"run",return_value=observed):
+            with self.assertRaisesRegex(launcher.LaunchError,"exited before HTTP"):
+                launcher.wait_worker_ready(WORKER,NAME,timeout_seconds=0)
+
+    def test_worker_ready_rejects_unhealthy_http(self):
+        from types import SimpleNamespace
+        observed=SimpleNamespace(returncode=0,stdout="true\\n")
+        with patch.object(launcher.subprocess,"run",return_value=observed), \\
+             patch.object(launcher,"build_opener") as make_opener:
+            make_opener.return_value.open.side_effect=ConnectionError("connection refused")
+            with self.assertRaisesRegex(launcher.LaunchError,"HTTP health"):
+                launcher.wait_worker_ready(WORKER,NAME,timeout_seconds=0)
+
+    def test_worker_ready_accepts_only_positive_compute_health(self):
+        from types import SimpleNamespace
+        observed=SimpleNamespace(returncode=0,stdout="true\\n")
+        class Response:
+            status=200
+            def __enter__(self): return self
+            def __exit__(self,*_): return None
+            def read(self, limit): return b'{"ok":true,"localComputeWorker":true}'
+        with patch.object(launcher.subprocess,"run",return_value=observed), \\
+             patch.object(launcher,"build_opener") as make_opener:
+            make_opener.return_value.open.return_value=Response()
+            self.assertIsNone(launcher.wait_worker_ready(WORKER,NAME,timeout_seconds=0))
+
+    def test_live_launch_does_not_report_success_before_http_health(self):
+        from types import SimpleNamespace
+        cid="a"*64
+        commands=[]
+        def fake_run(command,**kwargs):
+            commands.append(command)
+            if command[1:3]==["image","inspect"]:
+                return SimpleNamespace(returncode=0,stdout=PROFILE["imageDigest"]+"\\n")
+            if command[1]=="run":
+                return SimpleNamespace(returncode=0,stdout=cid+"\\n")
+            if command[1]=="stop":
+                return SimpleNamespace(returncode=0,stdout=cid+"\\n")
+            raise AssertionError("unexpected Docker call")
+        with patch.object(launcher,"ensure_local_docker"), \\
+             patch.object(launcher.subprocess,"run",side_effect=fake_run), \\
+             patch.object(launcher,"inspect_container",return_value={"containerId":cid}), \\
+             patch.object(launcher,"wait_worker_ready",
+                          side_effect=launcher.LaunchError("not ready")):
+            with self.assertRaisesRegex(launcher.LaunchError,"HTTP readiness"):
+                launcher.execute_launch(PROFILE,POLICY,WORKER,NAME)
+        self.assertTrue(any(cmd[1]=="stop" for cmd in commands))
+
     def test_dryrun_does_not_probe_or_launch_docker(self):
         output=StringIO()
         with patch.object(launcher,"ensure_local_docker",
