@@ -82,9 +82,9 @@ def init_wallets(directory: Path, hostname: str, roles: str,
     manifest = {"schema": "sse-node-roles-v1", "nodeId": hostname,
                 "roles": selected, "wallets": {}}
     # Validate role names and hostname BEFORE creating any files.
-    for role in selected:
+    for i, role in enumerate(selected):
         if role != "observer":
-            manifest["wallets"][role] = "0x" + "11" * 20
+            manifest["wallets"][role] = "0x" + format(i + 1, "040x")
     role_manifest(manifest)
 
     _private_dir(directory, create=True)
