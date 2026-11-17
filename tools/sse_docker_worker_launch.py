@@ -19,6 +19,8 @@ import shutil
 import stat
 import subprocess
 import sys
+import time
+from urllib.request import ProxyHandler, Request, build_opener
 from pathlib import Path
 
 from sse_docker_sla_runner import (DockerSLAError, docker_launch_argv,
@@ -65,6 +67,44 @@ def ensure_local_docker():
         raise LaunchError("Docker context socket is not local or cannot be verified")
 
 
+def wait_worker_ready(endpoint: str, container_name: str, *, timeout_seconds: float = 12.0):
+    """Do not report a running worker until local HTTP has answered healthz.
+
+    Anvil and container start-up on a real Ubuntu VM can be asynchronous.
+    A successful 'docker run -d' or inspect is NOT proof that the unprivileged
+    Python process can read the code or serve its HTTP endpoint.
+    """
+    from sse_compute_docker import local_endpoint
+    local_endpoint(endpoint)
+    opener = build_opener(ProxyHandler({}))  # Never route loopback via a proxy.
+    deadline = time.monotonic() + timeout_seconds
+    while True:
+        try:
+            observed = subprocess.run(
+                ["docker", "container", "inspect", "--format",
+                 "{{.State.Running}}", container_name],
+                capture_output=True, text=True, timeout=3, check=False)
+        except (OSError, subprocess.TimeoutExpired) as exc:
+            raise LaunchError("Docker worker state check failed") from exc
+        if observed.returncode != 0 or observed.stdout.strip() != "true":
+            raise LaunchError("Docker worker exited before HTTP readiness")
+        try:
+            with opener.open(Request(endpoint + "/healthz", method="GET"),
+                             timeout=1.0) as response:
+                if response.status == 200:
+                    raw = response.read(2049)
+                    if len(raw) <= 2048:
+                        body = json.loads(raw)
+                        if (type(body) is dict and body.get("ok") is True
+                                and body.get("localComputeWorker") is True):
+                            return
+        except (OSError, ValueError, UnicodeError, TypeError):
+            pass
+        if time.monotonic() >= deadline:
+            raise LaunchError("Docker worker HTTP health did not become ready")
+        time.sleep(0.35)
+
+
 def execute_launch(profile, policy, endpoint, name):
     setup = validate_setup(profile, policy, endpoint, name)
     ensure_local_docker()
@@ -97,13 +137,14 @@ def execute_launch(profile, policy, endpoint, name):
         }, endpoint, name, strict_hardening=True)
         if installed["containerId"] != cid:
             raise LaunchError("runtime inspected unexpected Docker container")
+        wait_worker_ready(endpoint, name)
     except (ValueError, TypeError, KeyError):
         try:
             subprocess.run(["docker", "stop", cid], timeout=15,
                            capture_output=True, text=True, check=False)
         except (OSError, subprocess.TimeoutExpired):
             pass
-        raise LaunchError("worker isolation inspection failed; attempted to stop worker") from None
+        raise LaunchError("worker inspection or HTTP readiness failed; attempted to stop worker") from None
     return {"kind": "SSE_COMPUTE_DOCKER_WORKER", "running": True,
             "containerId": cid, "containerName": name,
             "localWorkerEndpoint": endpoint, "imageId": image,
