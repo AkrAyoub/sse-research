@@ -49,7 +49,7 @@ python tools/sse_vm_role_setup.py status
 ```
 
 If the VM already has role wallets, **do not run init again**; run `status`.
-The node ID is the full existing Ubuntu hostname; no hostname changes occur.
+**Node identity:** the portal was observed assigning the exact same Linux\nhostname to two DIFFERENT VMs. A hostname is not a unique machine ID. New\n\`init\` runs generate a cryptographically random, stable \`sse-...\` node ID and\nstore a restricted local binding to the machine-id fingerprint. Both the\nportal hostname and the node ID are retained separately. No VM hostname\nchanges occur. The original Consumer+Monitor VM's pre-R7 manifest still has\na hostname-based legacy ID; it remains valid and should not be regenerated.\nThe machine-id binding is a copy-detection check, **not** hardware attestation;\ncloned machine IDs or shared operator control remain research limitations.
 
 After deploying the actual contracts, set trusted public addresses:
 
