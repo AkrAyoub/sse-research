@@ -45,7 +45,7 @@ class FakeRPC:
                 words = [self.bond, 0, 0, 0, int(self.active), int(self.active)]
                 return "0x" + "".join(value.to_bytes(32, "big").hex() for value in words)
             if sig == s._selector("minimumBond()"):
-                return hex(10**9).replace("0x", "0x") .ljust(66, "0") if False else "0x" + (10**9).to_bytes(32, "big").hex()
+                return "0x" + (10**9).to_bytes(32, "big").hex()
             if sig == s._selector("candidateCount()"):
                 return "0x" + int(self.active).to_bytes(32, "big").hex()
         if method == "eth_sendTransaction":
