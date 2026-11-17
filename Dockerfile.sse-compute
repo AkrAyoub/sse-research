@@ -4,6 +4,10 @@ WORKDIR /app
 RUN python -m pip install --no-cache-dir pycryptodome==3.23.0 && useradd --system --uid 10001 --no-create-home sseworker
 COPY tools/sse_challenge.py tools/compute_workload.py /app/tools/
 COPY services/provider-agent/compute_http_service.py /app/services/provider-agent/compute_http_service.py
+# Shallow SSH handoffs may have restrictive source modes (e.g. 0600/0700).
+# Python must be able to traverse/read copied code as the unprivileged UID.
+# Do not make the application runtime root or grant write permissions here.
+RUN chmod -R a+rX /app/tools /app/services
 USER 10001:10001
 EXPOSE 8877
 CMD ["python", "services/provider-agent/compute_http_service.py", "--port", "8877"]
