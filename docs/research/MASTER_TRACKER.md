@@ -1,5 +1,7 @@
 # SSE master engineering tracker — R0 through R11
 
+> **R7 BLOCKER — 2026-11-17 Provider Docker readiness failure:** Real Ubuntu Provider `ayoubakrvm4696@10.50.56.2` built immutable image `sha256:c513259296110d080221d610e481fa336eaf5b0219fd1937883bcc2f87f5888f`; `--launch` briefly reported a running container, but HTTP port 8877 refused connections and a subsequent `docker ps -a` found no container. The launcher's `--rm` and `--log-driver none` hid the underlying process-exit cause. **R7 Docker workload live acceptance remains BLOCKED**, not measured or accepted. Capture diagnostic-container exit code and logs and add an HTTP readiness gate before reporting launch success. [GitHub issue #28](https://github.com/AkrAyoub/sse-research/issues/28). The formal tracker percentages are unchanged.
+
 > **NEWER VM EVIDENCE CHECKPOINT — 2026-11-17 (R7 branch):**
 > [Live Ubuntu evidence record](R5_R6_NOV17_LIVE_UBUNTU_CHECKPOINT.md)
 > documents two connected Ubuntu VMs, supervised Anvil + SSH tunnel,
