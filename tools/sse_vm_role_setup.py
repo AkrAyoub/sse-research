@@ -13,8 +13,10 @@ from __future__ import annotations
 
 import argparse
 from getpass import getpass
+import hashlib
 import json
 import os
+import secrets
 from pathlib import Path
 import stat
 import sys
@@ -74,8 +76,23 @@ def _exclusive_json(path: Path, obj: dict) -> None:
         raise
 
 
-def init_wallets(directory: Path, hostname: str, roles: str,
+def machine_fingerprint() -> str:
+    """Bind new node identities to the local VM, not its non-unique hostname."""
+    path = Path("/etc/machine-id")
+    try:
+        value = path.read_text(encoding="ascii").strip().lower()
+    except OSError as exc:
+        raise SetupError("VM machine identity unavailable") from exc
+    if len(value) != 32 or any(c not in "0123456789abcdef" for c in value):
+        raise SetupError("invalid VM machine identity")
+    return hashlib.sha256(value.encode("ascii")).hexdigest()
+
+
+def init_wallets(directory: Path, hostname: str | None, roles: str,
                  password: str, confirmation: str) -> dict:
+    if hostname is None:
+        # The portal can give distinct VMs identical Linux hostnames.
+        hostname = "sse-" + secrets.token_hex(12)
     if password != confirmation or len(password) < 16:
         raise SetupError("passphrase must match and contain at least 16 characters")
     selected = [item.strip() for item in roles.split(",")]
@@ -89,9 +106,13 @@ def init_wallets(directory: Path, hostname: str, roles: str,
 
     _private_dir(directory, create=True)
     targets = [directory / (role + ".json") for role in selected if role != "observer"]
-    targets.append(directory / "roles.json")
+    targets.extend((directory / "roles.json", directory / "node-binding.json"))
     if any(target.exists() or target.is_symlink() for target in targets):
         raise SetupError("existing wallet/manifest found; refusing to overwrite")
+
+    # This is an additional local check; not hardware attestation.
+    binding = {"nodeId": hostname, "machineFingerprint": machine_fingerprint()}
+    _exclusive_json(directory / "node-binding.json", binding)
 
     from eth_account import Account  # Only required for wallet creation/signing.
     public_wallets = {}
@@ -106,7 +127,8 @@ def init_wallets(directory: Path, hostname: str, roles: str,
     manifest["wallets"] = public_wallets
     role_manifest(manifest)
     _exclusive_json(directory / "roles.json", manifest)
-    return {"result": "LOCAL_WALLETS_ENCRYPTED", "hostname": hostname,
+    return {"result": "LOCAL_WALLETS_ENCRYPTED",
+            "hostname": os.uname().nodename, "nodeId": hostname,
             "roles": selected, "wallets": public_wallets,
             "chainTransactionsSent": False, "monitorBondRegistered": False}
 
@@ -116,8 +138,18 @@ def load_manifest(directory: Path, *, require_this_vm: bool = True) -> dict:
     path = directory / "roles.json"
     _private_file(path)
     obj = role_manifest(json.loads(path.read_text(encoding="utf-8")))
-    if require_this_vm and obj["nodeId"] != os.uname().nodename:
-        raise SetupError("manifest hostname differs from this VM; refusing copied identity")
+    binding_path = directory / "node-binding.json"
+    if binding_path.exists() or binding_path.is_symlink():
+        _private_file(binding_path)
+        binding = json.loads(binding_path.read_text(encoding="utf-8"))
+        if (type(binding) is not dict or set(binding) != {"nodeId", "machineFingerprint"}
+                or binding.get("nodeId") != obj["nodeId"]
+                or (require_this_vm and binding.get("machineFingerprint") != machine_fingerprint())):
+            raise SetupError("node identity binding does not match this VM")
+    elif require_this_vm and obj["nodeId"] != os.uname().nodename:
+        # Backward-compatible, read-only acceptance for original VM-4693.
+        # New VMs must have a bound unique ID, not a duplicate portal hostname.
+        raise SetupError("unbound or copied VM identity")
     for role in obj["wallets"]:
         _private_file(directory / (role + ".json"))
     return obj
@@ -246,8 +278,8 @@ def main(argv=None) -> int:
     sub = parser.add_subparsers(dest="action", required=True)
     init = sub.add_parser("init", help="create role keystores; never overwrite")
     init.add_argument("--roles", required=True)
-    init.add_argument("--node-id", default=os.uname().nodename,
-                      help="actual portal-generated hostname, not an alias")
+    init.add_argument("--node-id",
+                      help="optional externally assigned unique ID; default generates one")
     status = sub.add_parser("status", help="read-only local and optional chain status")
     status.add_argument("--rpc-url")
     status.add_argument("--chain-id", type=int)
