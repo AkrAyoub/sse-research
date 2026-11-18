@@ -35,6 +35,7 @@ class OwnPoSNetworkTests(unittest.TestCase):
             'preregistered_validator_keys_mnemonic: "',"cl_type: lighthouse",
             "el_type: besu","sigp/lighthouse:v8.3.3",
             "hyperledger/besu:26.11.1@sha256:",
+            "fulu_fork_epoch: 18446744073709551615",
             "port_publisher:","    enabled: false",
         ):
             self.assertIn(required,text)

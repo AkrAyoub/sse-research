@@ -131,6 +131,11 @@ def _render(*,faucet:str,participants:int,validators_per_node:int,
         "  seconds_per_slot: 12",
         "  slot_duration_ms: 12000",
         "  genesis_gaslimit: 30000000",
+        # The pinned upstream package defaults Fulu=0 and otherwise
+        # REJECTS <16 participants without supernodes/128+ validators.
+        # A 2-node/64-validator smoke devnet must explicitly defer Fulu.
+        # Separate fork-upgrade trials must use a NEW genesis and tests.
+        "  fulu_fork_epoch: 18446744073709551615",
         f"  num_validator_keys_per_node: {validators_per_node}",
         "  preregistered_validator_count: 0",
         f'  preregistered_validator_keys_mnemonic: "{mnemonic}"',

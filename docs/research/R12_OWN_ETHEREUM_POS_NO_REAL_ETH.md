@@ -305,3 +305,49 @@ distribution, independent BLS key generation for a custom fork,
 remote peer bootstrap/advertisements, validator execution/consensus
 containers on arbitrary machines and 2+ externally observed
 stake activations are still ACCEPTANCE WORK, not completed facts.
+
+## 2026-11-18: one-time safety repair of ALREADY GENERATED R12 config
+
+VM4704 has successfully created one encrypted faucet wallet:
+`0xC27AeB5db0FB6Cf999FB67DBbF5c3AAf73243084`, and one
+owner-only `~/sse-pos-secrets/network_params.yaml` with a 24-word
+bootstrap-validator mnemonic. **Do not recreate either**. The source
+revision `c061f4f9b2b269b6aea93acb72641fe1746f1cb4` generated
+this config without a pinned Fulu-fork override. The official upstream
+ethPandaOps package at source `d3014d6d23d683362025b9e23a0d69de49e77cca`
+**rejects a two-node/64-validator Fulu launch** unless an
+independent PeerDAS/supernode requirement is met. We choose to defer
+Fulu on the R12 small smoke chain; testing Fulu requires a separate
+experiment with 128+ validators or a properly configured PeerDAS setup.
+
+A GitHub-approved, **local-output-only** repair script
+`tools/sse_pos_prepare_launch.py` verifies the precise originally
+hashed secret config against its original manifest, inserts only
+`fulu_fork_epoch: 18446744073709551615`, and atomically replaces
+the old config while preserving its mnemonic byte-for-byte. It writes
+`launch_ready.json` with original and amended SHA256; it does not
+upload secrets or create a new wallet. On an interrupted run it can
+recover by reconstructing the original hash without exposing secrets.
+The launcher now REFUSES to start if the new manifest fails verification.
+
+On a freshly updated, test-approved revision:
+
+```bash
+cd ~/sse-r9
+source .venv-r9/bin/activate
+python tools/sse_pos_prepare_launch.py \\
+  --output-dir "$HOME/sse-pos-secrets" \\
+  --expected-commit "$(git rev-parse HEAD)" --apply
+python tools/sse_pos_prepare_launch.py \\
+  --output-dir "$HOME/sse-pos-secrets" --verify-only
+```
+
+Do not print `network_params.yaml` or upload it as a GitHub issue/log.
+This repair does not deploy or fund a chain; the 1,000,000 test ETH
+allocation still requires a successful PoS genesis and actual RPC
+verification. VM4704 has been reported as approximately 2 vCPU/
+3.8 GiB RAM: this is NOT a measured sufficient budget for two
+Besu+Lighthouse+validator-client triples plus Kurtosis. Select a
+larger approved research host before applying `sse_pos_launch.sh`
+if VM resources are insufficient. Keep source GitHub-first and all
+historical Anvil31337/controlled QBFT31338 state intact.
