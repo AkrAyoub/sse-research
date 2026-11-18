@@ -1,0 +1,18 @@
+# Example local systemd service to invoke an APPROVED, pinned SSE checkout.
+# Substitute paths, signer public key, known chain genesis hash, HTTPS endpoint
+# and local node identity. Service writes peer hints only; no auto restarts.
+[Unit]
+Description=SSE verified peer catalog refresh (no blockchain transactions)
+Wants=network-online.target
+After=network-online.target tailscaled.service
+
+[Service]
+Type=oneshot
+User=ssepeer
+Group=ssepeer
+ExecStart=/opt/sse/release/.venv/bin/python /opt/sse/release/tools/sse_peer_refresh.py --url https://peers.example.org/sse-qbft-peers.json --public-key /etc/sse/peers-ed25519.pub --chain-id 31338 --genesis-hash 0xREPLACE_64_HEX --self-id validator-1 --manifest-state /srv/sse-qbft/config/last-signed-peers.json --bootnodes-out /srv/sse-qbft/config/bootnodes.txt --apply
+NoNewPrivileges=true
+PrivateTmp=true
+ProtectSystem=strict
+ReadWritePaths=/srv/sse-qbft/config
+ProtectHome=true

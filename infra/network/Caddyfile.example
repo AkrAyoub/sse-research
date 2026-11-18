@@ -1,0 +1,13 @@
+# A real publicly reachable domain, DNS and TLS certificate are required.
+# Enrollment tokens are NEVER placed in GitHub URLs or query parameters.
+# Replace enroll.example.org with an approved FQDN.
+enroll.example.org {
+    @enroll {
+        path /v1/mesh/enroll
+        method POST
+    }
+    reverse_proxy @enroll 127.0.0.1:18781 {
+        header_up Host {host}
+    }
+    respond "Not found" 404
+}

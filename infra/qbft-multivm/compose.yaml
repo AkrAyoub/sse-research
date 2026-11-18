@@ -1,0 +1,47 @@
+# ONE instance of this Compose file per INDEPENDENT Ubuntu VM.
+# No GitHub Actions, no shared validator private keys, no Anvil 31337 mutation.
+# Deliberately no default image digest; operator approves the exact Besu image.
+services:
+  qbft:
+    image: ${BESU_IMAGE:?Set reviewed Besu image with immutable sha256 digest}
+    user: "${BESU_UID:?Numeric host uid}:${BESU_GID:?Numeric host gid}"
+    network_mode: host  # Ubuntu; Tailscale overlay belongs to the actual VM
+    init: true
+    read_only: true
+    tmpfs:
+      - /tmp:rw,noexec,nosuid,nodev,size=128m
+    restart: unless-stopped
+    stop_grace_period: 60s
+    cap_drop: [ALL]
+    security_opt:
+      - no-new-privileges:true
+    pids_limit: 256
+    volumes:
+      - ${BESU_DATA:?Persistent data directory}:/var/lib/besu/data
+      - ${BESU_GENESIS:?Approved genesis.json}:/etc/sse/genesis.json:ro
+      - ${BESU_NODE_KEY:?VM-owned Besu node key}:/etc/sse/node.key:ro
+      - ${BESU_BOOTNODES:?Verified peer file}:/etc/sse/bootnodes.txt:ro
+    command:
+      - --genesis-file=/etc/sse/genesis.json
+      - --data-path=/var/lib/besu/data
+      - --node-private-key-file=/etc/sse/node.key
+      - --network-id=31338
+      - --p2p-enabled=true
+      - --p2p-interface=${TAILSCALE_IPV4:?Approved local overlay IPv4}
+      - --p2p-host=${TAILSCALE_IPV4:?Approved local overlay IPv4}
+      - --p2p-port=30303
+      - --nat-method=NONE
+      - --bootnodes=/etc/sse/bootnodes.txt
+      - --Xdns-enabled
+      - --Xdns-update-enabled
+      - --rpc-http-enabled=true
+      - --rpc-http-host=127.0.0.1
+      - --rpc-http-port=18545
+      - --rpc-http-api=ETH,NET,WEB3,QBFT
+      - --host-allowlist=localhost,127.0.0.1
+      - --logging=INFO
+    logging:
+      driver: json-file
+      options:
+        max-size: "10m"
+        max-file: "3"
