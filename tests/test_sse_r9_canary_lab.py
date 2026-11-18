@@ -76,6 +76,14 @@ class CanaryRealGateTests(unittest.TestCase):
             with self.subTest(kind=kind),self.assertRaises(c.CanaryError):
                 c.probe(read_rpc=bad,retries=1,sleep=lambda _:None)
 
+    def test_operator_run_never_silently_repulls_or_waits_for_sudo(self):
+        source=(ROOT/"tools"/"sse_r9_canary_lab.py").read_text()
+        self.assertIn('["sudo","-n","docker","info"',source)
+        self.assertIn('["sudo","-n","docker","pull",version]',source)
+        self.assertIn('base+["up","-d","--pull","never"]',source)
+        self.assertIn('SSE_R9_CANARY_STAGE=',source)
+        self.assertNotIn('["sudo","docker","pull"',source)
+
     def test_approved_compose_template_has_no_p2p_or_secrets(self):
         text=(ROOT/"infra"/"qbft-multivm"/"genesis-canary.compose.yaml").read_text()
         self.assertIn("--p2p-enabled=false",text)

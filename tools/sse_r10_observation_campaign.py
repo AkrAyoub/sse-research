@@ -47,7 +47,9 @@ def wilson95(k:int,n:int)->tuple[float,float]:
     den=1+z*z/n
     center=(p+z*z/(2*n))/den
     half=z*math.sqrt(p*(1-p)/n+z*z/(4*n*n))/den
-    return max(0.,center-half),min(1.,center+half)
+    # At k=0 or k=n, floating-point roundoff must not exclude the
+    # observed proportion from its own Wilson confidence interval.
+    return min(max(0.,center-half),p),max(min(1.,center+half),p)
 
 def allocation(histories:set[str],fee:int,reservation:int)->tuple[int,int,int]:
     """WP02 bounds: L=min entitlement, consumer=fee-max, held=max-min."""

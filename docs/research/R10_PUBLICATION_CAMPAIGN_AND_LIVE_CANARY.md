@@ -238,3 +238,81 @@ Immediate hard evidence:
 Operators must preserve the Anvil chain31337 and original unresolved
 historical obligations. Never destroy VM4695, copy wallet keys, or
 auto-update live consensus from a moving branch.
+
+## 2026-11-18 — VM4704 first live Besu canary FAILURE, rooted and preserved
+
+This is a real **execution failure** on a new Ubuntu host, not a fake
+test or a consensus measurement. The operator executed R10
+`sse_r9_canary_lab.py --apply` on VM4704 and obtained:
+
+```text
+SSE_R9_CANARY_REFUSED: canary never produced a valid genesis RPC: canary RPC not ready
+```
+
+The preserved `~/sse-r9-canary-01/docker.log` proves Docker launched
+Besu 26.11.1 far enough to parse CLI options and configure loopback
+RPC at port18559, but it crashed during Java native-library initialization:
+
+```text
+NativeLibraryLoader | /tmp/libnetty_transport_native_epoll...so exists
+but cannot be executed; check volume for "noexec" flag
+java.lang.NoClassDefFoundError: Could not initialize class com.sun.jna.Native
+Caused by: java.lang.UnsatisfiedLinkError:
+  /tmp/jna....tmp: failed to map segment from shared object
+```
+
+Root cause: the disposable Compose service mounted `/tmp` as a Docker
+tmpfs without explicit `exec`. Container tmpfs is often `noexec` by
+default. The JNA and Netty native libraries are dynamically extracted
+into `/tmp` and require an executable mapping, even when other UNIX
+permissions are correct. This fault occurred **before** Besu exposed
+a functional JSON-RPC server. The original container was cleaned
+successfully: `docker ps -a --filter name=sse-canary-vm4704-r10-canary`
+returned no containers.
+
+**Reviewed source correction:**
+
+- Only the **isolated, short-lived, P2P-disabled** canary Compose
+  changes its tmpfs declaration to
+  `/tmp:rw,exec,nosuid,nodev,size=512m,mode=1777`.
+  Keep `read_only: true`, `cap_drop: [ALL]`, `no-new-privileges`,
+  nonroot UID, no wallet/validator secret, and local loopback RPC.
+  This exec permission is an **explicit security exception**:
+  validate a separate restricted native-extraction directory before
+  applying any similar change to long-running production validators.
+- Canary operator script checks `sudo -n docker info` *before* creating
+  evidence, reports current phases and starts Compose with
+  `--pull never` after resolving and recording the registry digest.
+- R10 Wilson 0/10 and 10/10 floating-point interval tests and the
+  incorrect preflight 26.10.1 expectation are corrected in source.
+- New tests assert executable canary tmpfs, nonroot read-only container,
+  correct client-image minimum, no silent repull and no wallet access.
+- **All changes require full manual Windows gate and Ubuntu targeted
+  source tests before claiming a corrected deployment.**
+
+Preserve `~/sse-r9-canary-01/` as the FIRST FAILED real-client case.
+After accepting the new Git SHA, use an entirely NEW directory, e.g.:
+
+```bash
+cd ~/sse-r9
+source .venv-r9/bin/activate
+mkdir -m 700 "$HOME/sse-r9-canary-02"
+sudo -v
+python tools/sse_r9_canary_lab.py \
+  --source-commit "$(git rev-parse HEAD)" \
+  --image-tag hyperledger/besu:26.11.1 \
+  --run-id vm4704-r10-canary2 \
+  --output-dir "$HOME/sse-r9-canary-02"
+# After reviewing the plan, repeat the exact command with --apply.
+```
+
+Successful canary means: evidence includes observed Besu `chainId`
+31338, real block-zero hash, client version, immutable image digest
+and `canaryStoppedAfterProbe: true`. It **does not** mean four
+validators, honest SLA monitors or production application nodes exist.
+Never infer protocol safety from a successful boot0 canary.
+
+Vendor references:
+- https://docs.docker.com/engine/storage/tmpfs/
+- https://www.elastic.co/docs/deploy-manage/deploy/self-managed/executable-jna-tmpdir
+

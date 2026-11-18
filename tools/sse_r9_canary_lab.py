@@ -71,6 +71,11 @@ def check(version:str,revision:str,run_id:str)->dict:
     }
 
 
+def stage(label: str):
+    # No credentials or source-derived names in stage labels.
+    print("SSE_R9_CANARY_STAGE=" + label, flush=True)
+
+
 def invoke(argv,*,env=None,timeout=40,success=True):
     try:
         result=subprocess.run(argv,cwd=ROOT,env=env,capture_output=True,
@@ -177,9 +182,18 @@ def execute(directory:Path,*,version:str,revision:str,run_id:str,
         raise CanaryError("requires native nonroot Ubuntu and user-owned 0700 output dir")
     if _busy(8545) or _busy(18545) or _busy(18559):
         raise CanaryError("Anvil, validator or canary RPC detected; refuse collision")
+    stage("VERIFY_APPROVED_SOURCE_AND_LOCAL_PORTS")
     if (command(["git","rev-parse","HEAD"])!=revision
             or command(["git","status","--porcelain","--untracked-files=no"])):
         raise CanaryError("approved exact GitHub checkout not clean")
+    # Validate passwordless sudo for this interactive session BEFORE any
+    # evidence file is created. The operator can run sudo -v separately;
+    # the tool never prompts through captured STDIN/STDOUT or hangs on sudo.
+    try:
+        command(["sudo","-n","docker","info","--format",
+                 "{{.ServerVersion}}"],timeout=15)
+    except CanaryError:
+        raise CanaryError("Docker sudo authorization unavailable: run sudo -v in your VM terminal, then retry with a NEW output directory") from None
     needed=("genesis.json",".canary.env","result.json","docker.log")
     if any((directory/name).exists() or (directory/name).is_symlink()
            for name in needed):
@@ -192,8 +206,10 @@ def execute(directory:Path,*,version:str,revision:str,run_id:str,
     # Exploratory pilot may pull a version tag. Pin the returned immutable
     # registry digest for the *actual run*, and never silently use that tag
     # for a later production validator.
-    command(["sudo","docker","pull",version],timeout=240)
-    digests=command(["sudo","docker","image","inspect","--format",
+    stage("PULL_CLIENT_IMAGE_REVIEWED_TAG")
+    command(["sudo","-n","docker","pull",version],timeout=240)
+    stage("RECORD_IMMUTABLE_IMAGE_DIGEST")
+    digests=command(["sudo","-n","docker","image","inspect","--format",
                      "{{json .RepoDigests}}",version])
     try:
         listed=json.loads(digests)
@@ -218,17 +234,21 @@ def execute(directory:Path,*,version:str,revision:str,run_id:str,
     _new_file(directory/".canary.env",env_content)
     # Unique project per run ensures cleanup cannot affect validator Compose.
     project="sse-canary-"+run_id
-    base=["sudo","docker","compose","-p",project,"-f",str(COMPOSE),
+    base=["sudo","-n","docker","compose","-p",project,"-f",str(COMPOSE),
           "--env-file",str(directory/".canary.env")]
     started=False
     logs=""
     try:
+        stage("COMPOSE_VALIDATE")
         command(base+["config","--quiet"])
         started=True  # up may partially create resources, cleanup on error.
-        command(base+["up","-d"],timeout=120)
+        stage("START_P2P_DISABLED_CLIENT")
+        command(base+["up","-d","--pull","never"],timeout=120)
+        stage("PROBE_BLOCK_ZERO_AND_CLIENT_VERSION")
         observed=probe(read_rpc=read_rpc,sleep=sleep)
     finally:
         if started:
+            stage("CAPTURE_EPHEMERAL_CLIENT_LOGS_AND_STOP")
             try:
                 logs=command(base+["logs","--no-color","--tail","120"],
                              timeout=20,success=False)

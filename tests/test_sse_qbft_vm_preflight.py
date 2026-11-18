@@ -36,7 +36,7 @@ class PreflightTests(unittest.TestCase):
                 parse_image(value)
         self.assertEqual(parse_image(IMAGE), IMAGE)
         self.assertEqual(parse_image("hyperledger/besu:26.11.1@sha256:"+"a"*64),
-                         "hyperledger/besu:26.10.1@sha256:"+"a"*64)
+                         "hyperledger/besu:26.11.1@sha256:"+"a"*64)
         for vulnerable in ("24.5.2","25.8.0","26.7.0","26.8.0","26.8.1","26.11.0"):
             with self.subTest(vulnerable=vulnerable), self.assertRaises(PreflightError):
                 parse_image("hyperledger/besu:"+vulnerable+"@sha256:"+"a"*64)

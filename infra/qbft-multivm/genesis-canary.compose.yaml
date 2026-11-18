@@ -13,8 +13,15 @@ services:
     security_opt:
       - no-new-privileges:true
     pids_limit: 200
+    # The 2026-11-18 VM4704 real canary crashed during JNA/Netty
+    # initialization: /tmp/jna*.tmp: failed to map segment from shared
+    # object, because Docker's tmpfs defaulted to NOEXEC. Native Java
+    # libraries must be mapped executable. This tightly scoped exception
+    # applies to the disposable, P2P-disabled canary ONLY. Keep the rest
+    # of the root filesystem read-only; retain nosuid,nodev,cap_drop ALL.
+    # Evaluate dedicated native library extraction for production validators.
     tmpfs:
-      - /tmp:rw,nosuid,nodev,size=512m,mode=1777
+      - /tmp:rw,exec,nosuid,nodev,size=512m,mode=1777
     volumes:
       - ${BESU_GENESIS:?approved immutable genesis file}:/etc/sse/genesis.json:ro
     command:

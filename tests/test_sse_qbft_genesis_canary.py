@@ -13,6 +13,11 @@ class GenesisCanaryTests(unittest.TestCase):
         self.assertIn("--network-id=31338",text)
         self.assertIn("--rpc-http-host=127.0.0.1",text)
         self.assertIn("--rpc-http-port=18559",text)
+        # A real VM4704 run on 2026-11-18 failed because Docker's
+        # noexec tmpfs prevented loading libjnidispatch / Netty .so.
+        self.assertIn("/tmp:rw,exec,nosuid,nodev,size=512m,mode=1777",text)
+        self.assertIn("cap_drop: [ALL]",text)
+        self.assertIn("no-new-privileges:true",text)
         self.assertIn("read_only: true",text)
         self.assertIn("restart: \"no\"",text)
         self.assertNotIn("--node-private-key-file=",text)

@@ -159,3 +159,20 @@ experimental client has no other vulnerabilities.
 real Docker canary logs.** Full multi-VM SLA/permissionless admission
 and a publication novelty claim remain separate, unverified gates.
 See `docs/research/R10_PUBLICATION_CAMPAIGN_AND_LIVE_CANARY.md`.
+
+## 2026-11-18 — VM4704 first real Besu canary failure (root cause)
+
+This is genuine runtime evidence, not a simulated failure. The
+VM4704 `sse-r9-canary-01/docker.log` reported
+`java.lang.UnsatisfiedLinkError ... /tmp/jna*.tmp ... failed to map
+segment from shared object`, preceded by Netty `/tmp/...so cannot be
+executed; check noexec`. Besu initialized enough to read CLI and set
+HTTP RPC127.0.0.1:18559, then died. `docker ps -a` confirmed the
+canary was removed; no real block0 was observed and no validator was
+deployed. New source sets **exec only on the ephemeral P2P-disabled
+canary /tmp tmpfs** while retaining no-new-privileges, cap-drop and
+read-only root; a real production validator needs a more restrictive
+executable-library extraction strategy. The fix also corrects the
+Wilson CI boundary and the 26.10.1 test expectation. New SHA full
+gate + new run directory required. Preserve original failure logs.
+
