@@ -71,6 +71,17 @@ def parse_image(value: str) -> str:
         raise PreflightError("Besu image must have full reviewed version AND sha256 digest")
     if not value.startswith("hyperledger/besu:"):
         raise PreflightError("wrong Besu image repository")
+    # GHSA-p4h2-gvh4-pv6j: one Byzantine QBFT proposer could mint native
+    # currency through unvalidated withdrawals when Shanghai is enabled.
+    # Upstream patched QBFT withdrawals in 26.8.1; a later JVM Base64
+    # security mitigation shipped in 26.11.1. This research baseline
+    # therefore requires >=26.11.1 (and still needs review of later CVEs).
+    version = value.split(":", 1)[1].split("@", 1)[0]
+    if not re.fullmatch(r"[0-9]+\.[0-9]+\.[0-9]+", version):
+        raise PreflightError("Besu version must be explicit, no RC/latest")
+    version_numbers = tuple(int(v) for v in version.split("."))
+    if version_numbers < (26, 11, 1):
+        raise PreflightError("Research baseline requires 26.11.1+ (QBFT withdrawals and 2026 JVM Base64 fixes)")
     return value
 
 

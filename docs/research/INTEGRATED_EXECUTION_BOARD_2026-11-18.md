@@ -134,3 +134,28 @@ A corrective GitHub commit adds the real secp256k1 field modulus and
 explicit empty-role fixture semantics, plus a known elliptic-curve generator
 regression. No code was pushed to a live VM. Re-run all new targeted suites
 and the complete manual Windows gate before accepting the corrective SHA.
+
+## 2026-11-18 — R10 scientific falsification and real Besu canary bundle
+
+Operator-supplied logs at source SHA
+`2bc993b2d05a08b831669a3b735a73a40959c78c`: **910 Python
+tests on Windows (890 run, 20 platform-skipped), 144/144 Foundry,
+50/50 Ubuntu security tests (no skips)**. Existing real Anvil 31337
+and VM4704 Tailscale were not modified by the R10 source work.
+No real Besu genesis/canary/consensus deployment has been observed yet.
+The new R10 source package includes a reproducible, hash-indexed
+synthetic observation-conditional settlement experiment, strict local
+EVM/Ubuntu paper-evidence extraction, and an **explicitly apply-gated**
+VM4704 disposable real Besu client canary; it checks P2P-disabled RPC
+block0 and records a Docker registry digest before cleanup.
+
+Besu security required >=26.11.1 for the *new* research release due
+to upstream Shanghai/QBFT unauthorized withdrawals
+GHSA-p4h2-gvh4-pv6j (26.8.1 fixed) and the later 26.11.1 JVM
+CVE-2026-114938 mitigation. Neither patch is proof that the
+experimental client has no other vulnerabilities.
+
+**Status: SOURCE ONLY until Windows full gate on new SHA and VM4704
+real Docker canary logs.** Full multi-VM SLA/permissionless admission
+and a publication novelty claim remain separate, unverified gates.
+See `docs/research/R10_PUBLICATION_CAMPAIGN_AND_LIVE_CANARY.md`.

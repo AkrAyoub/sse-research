@@ -1,5 +1,15 @@
 # R9 multi-VM QBFT deployment: actual validator operators, no GitHub Actions
 
+> **R10 publication and real-client canary:** Source now contains an
+> operator-approved, P2P-disabled Besu **26.11.1+** genesis canary that
+> records a live block-zero hash and immutable Docker image digest, and a
+> seeded research campaign for observational SLA ambiguity plus an
+> evidence parser for Foundry/Ubuntu logs. Read
+> `docs/research/R10_PUBLICATION_CAMPAIGN_AND_LIVE_CANARY.md` before running.
+> The synthetic canary addresses are NOT real validators. Do not reuse
+> its genesis or call its block0 result four-node consensus. No existing
+> Anvil 31337 VM or real validator key is touched.
+>
 > **Fresh VM fast path and subsequent GitHub source updates:** Use
 > `docs/research/R9_VM_SOURCE_ROLLOUT_AND_FIRSTHOST.md`. On an approved
 > native Ubuntu checkout, `bash scripts/r9_ubuntu_firsthost.sh validator-1

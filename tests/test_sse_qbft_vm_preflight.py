@@ -14,7 +14,7 @@ from sse_qbft_vm_preflight import (parse_image,parse_tailscale_status,
 from sse_qbft_lab_config import genesis
 
 ADDRS=["0x"+f"{i:02x}"*20 for i in range(1,5)]
-IMAGE="hyperledger/besu:26.8.0@sha256:"+"a"*64
+IMAGE="hyperledger/besu:26.11.1@sha256:"+"a"*64
 
 
 class PreflightTests(unittest.TestCase):
@@ -35,6 +35,13 @@ class PreflightTests(unittest.TestCase):
             with self.subTest(value=value), self.assertRaises(PreflightError):
                 parse_image(value)
         self.assertEqual(parse_image(IMAGE), IMAGE)
+        self.assertEqual(parse_image("hyperledger/besu:26.11.1@sha256:"+"a"*64),
+                         "hyperledger/besu:26.10.1@sha256:"+"a"*64)
+        for vulnerable in ("24.5.2","25.8.0","26.7.0","26.8.0","26.8.1","26.11.0"):
+            with self.subTest(vulnerable=vulnerable), self.assertRaises(PreflightError):
+                parse_image("hyperledger/besu:"+vulnerable+"@sha256:"+"a"*64)
+        with self.assertRaises(PreflightError):
+            parse_image("hyperledger/besu:26.11.1-rc1@sha256:"+"a"*64)
         with tempfile.TemporaryDirectory() as directory:
             path=Path(directory)/"genesis.json"
             value=genesis(ADDRS)
