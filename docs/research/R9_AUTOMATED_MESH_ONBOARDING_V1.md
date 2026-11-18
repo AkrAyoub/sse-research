@@ -1,5 +1,16 @@
 # R9 Domainless fully automated onboarding — validator and app roles
 
+> **Architecture correction (ADR-007):** `SSE_ROLE_REQUEST_V1` accepts
+> `observer,full_node,consumer,provider,monitor,validator` in any valid
+> combination. The applicant signs a chain/genesis-bound request and
+> network transport is OPTIONAL, not a role or administrator approval.
+> **This document below describes a restricted lab pilot only.**
+> For truly open external participation, the user's existing Tailscale
+> account must be preserved; use native Besu P2P/relay or an independently
+> consented, isolated overlay. The R9 four-validator QBFT chain remains a
+> permissioned experimental baseline. Read
+> `docs/research/ADR-007_OPEN_ROLES_PERMISSIONLESS_TRANSPORT.md`.
+
 Date: 2026-11-18. **Code pilot; no live public credential broker, signed public
 source publisher or unattended VM created yet.** GitHub is source of truth,
 all changes committed on integration branch, no GitHub Actions.

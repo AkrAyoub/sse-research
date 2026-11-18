@@ -1,5 +1,17 @@
 # SSE cross-cloud enrollment, cryptographic discovery and signed distribution
 
+> **Open external-node correction:** owning a Tailscale account and
+> gaining `tag:sse-validator` are not prerequisites for permissionless
+> blockchain role requests. An external machine may already belong to
+> another tailnet; do not log it out. New
+> `sse_role_request_create.py` and `sse_open_role_requests.py`
+> handle wallet-signed multi-role *requests* independently of
+> `sse_external_transport.py` transport planning.
+> `sse_qbft_role_authority.py` checks actual validator membership;
+> `sse_monitor_role_authority.py` checks on-chain candidate bonds
+> (not lease-level election). The old OAuth brokers below remain
+> restricted lab tools; read ADR-007 before Internet deployment.
+>
 > **Headless validator onboarding (new pilot):** The app-role broker
 > on 127.0.0.1:18781 remains separate from the new validator-only
 > broker on 127.0.0.1:18782. The latter issues one-time invitations for

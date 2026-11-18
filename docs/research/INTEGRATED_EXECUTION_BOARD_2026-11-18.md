@@ -102,3 +102,17 @@ expose the Python pilot publicly. See
 `docs/research/R9_AUTOMATED_MESH_ONBOARDING_V1.md` for outstanding
 automatic *source publishing*, key-bound invitation, server hardening,
 cloud-init secret delivery and live independent-host acceptance.
+
+## ADR-007 — role admission and transport correction
+
+On 2026-11-18 the operator identified a conceptual flaw: network join
+was incorrectly coupled to Tailscale owner approval, and the fixed
+`validator-1..4` bootstrap roles were presented as general permissionless
+enrollment. **This must not be claimed as achieved in a QBFT lab.**
+New read-only source now supports externally signed multi-role requests
+including validator/full_node, independent transport choices (native P2P
+or relay even with another Tailscale account active), current QBFT set
+membership checks, and monitor bond checks without claiming lease votes.
+The complete network remains NOT permissionless in its QBFT consensus
+layer; a genuine PoS/PoW alternative requires separate protocol selection,
+economics, testing and comparison. See ADR-007 and manual new SHA gate.
