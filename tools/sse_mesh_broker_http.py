@@ -7,6 +7,7 @@ An operator preauthorizes each node ID and role using sse_mesh_broker.py.
 from __future__ import annotations
 
 import argparse
+from contextlib import closing
 import io
 import json
 import os
@@ -121,7 +122,7 @@ class EnrollmentApp:
                 raise BrokerHTTPError("noncanonical roles")
             # Atomic token burn comes *before* upstream key creation.
             # On a failed/uncertain upstream call, the owner must issue a NEW token.
-            with sqlite3.connect(self.database, timeout=8, isolation_level=None) as db:
+            with closing(sqlite3.connect(self.database, timeout=8, isolation_level=None)) as db:
                 redeem_token(db, node, roles, token)
             key = self.mint(self.client_id, self.client_secret, tailnet=self.tailnet)
             if type(key) is not str or not key.startswith("tskey-auth-") or len(key) > 2048:

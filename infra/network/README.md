@@ -1,6 +1,6 @@
 # SSE cross-cloud enrollment, cryptographic discovery and signed distribution
 
-**Integration stage (2026-11-18). Source and offline test cases exist; no real public HTTPS broker, public Tailscale tailnet, independent four-VM Besu deployment or authenticated external host acceptance has yet been proven.** NO GitHub Actions are used.
+> **No purchased domain needed (ADR-006, 2026-11-18).** The previously described public-DNS + Caddy deployment is one optional alternative. The preferred first controlled lab uses the Tailscale-assigned `*.ts.net` HTTPS address with **Tailscale Funnel**, operator-approved one-time enrollment and a local loopback broker. Read `docs/research/ADR-006_DOMAINLESS_WAN_AND_LAB_REBUILDS.md` before enabling public exposure. The existing broker is a pilot, not a hardened public service; implement throttling and access policy before extended exposure.\n\n**Integration stage (2026-11-18). Source and offline test cases exist; no real public HTTPS broker, public Tailscale tailnet, independent four-VM Besu deployment or authenticated external host acceptance has yet been proven.** NO GitHub Actions are used.
 
 This package extends the existing R6/R7 code, rather than replacing `tools/sse_vm_bootstrap.py`, `tools/sse_vm_role_setup.py`, `tools/sse_vm_enroll.py`, `tools/sse_vm_overlay.py`, `tools/sse_mesh_broker.py`, `tools/sse_release_verify.py` or `tools/sse_ssh_identity_tunnel.py`. It preserves Anvil chain 31337 and its existing funded lease.
 
@@ -30,7 +30,7 @@ Any **network-reachable Ubuntu host under its own administration**, including ho
 
 ## A. An operator sets up the network exactly once
 
-1. Provision a dedicated HTTPS enrollment host with a **public DNS name** and a real TLS certificate, independent of the original Anvil VM. Apply restrictive firewall rules and logs that never include POST bodies/tokens.
+1. Provision a dedicated HTTPS enrollment host independent of Anvil VM4695. Tailscale Funnel on the assigned `*.ts.net` name requires no custom domain or public IP; an owned-domain reverse proxy is an optional alternative. Apply restrictive firewall rules and logs that never include POST bodies/tokens.
 2. Create a Tailscale tailnet with tags, restrictive policy grants, tag ownership and separate categories for app nodes, non-validator full nodes, and validator hosts. This first lab's existing broker can only mint `tag:sse-node`. Do not grant broad network administrator rights to ordinary tagged participants.
 3. Create an OAuth client restricted to creating Tailscale auth keys with **only** `tag:sse-node` permission. Do not place its secret in the GitHub repository, chat, cloud-init or client VM.
 4. On the enrollment host, create a private database directory and root/service-owned mode-0600 files for the Tailscale OAuth ID/secret. First use `tools/sse_mesh_broker.py --db ... --node-id ... --roles ...` to issue a short-lived one-time token for a specific identity.

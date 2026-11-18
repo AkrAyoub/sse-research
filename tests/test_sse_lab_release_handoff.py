@@ -3,6 +3,7 @@ from __future__ import annotations
 
 import hashlib
 import io
+import os
 from pathlib import Path
 import subprocess
 import sys
@@ -88,6 +89,7 @@ class ReleaseHandoffTests(unittest.TestCase):
                          self.revision, target_home, install=False)
         self.assertFalse((self.root / "escape.txt").exists())
 
+    @unittest.skipUnless(os.name == "posix", "POSIX SSH-key ownership/mode semantics require Ubuntu")
     def test_private_ip_role_allowlist_and_key_permissions(self):
         key = self.root / "private-ssh-key"
         key.write_text("not a real key, dry-run validation only")
@@ -105,6 +107,7 @@ class ReleaseHandoffTests(unittest.TestCase):
         with self.assertRaises(h.RelayError):
             h.validated_destination("10.50.56.30", "ubuntu", key, "provider")
 
+    @unittest.skipUnless(os.name == "posix", "POSIX SSH-key ownership/mode semantics require Ubuntu")
     def test_dry_run_uses_no_ssh(self):
         key = self.root / "ssh-key"
         key.write_text("test-only")

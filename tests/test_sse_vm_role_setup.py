@@ -6,6 +6,7 @@ from __future__ import annotations
 
 import json
 import os
+import socket
 from pathlib import Path
 import tempfile
 import unittest
@@ -57,16 +58,17 @@ class FakeRPC:
 
 
 def manifest():
-    return {"schema": "sse-node-roles-v1", "nodeId": os.uname().nodename,
+    return {"schema": "sse-node-roles-v1", "nodeId": socket.gethostname(),
             "roles": ["consumer", "monitor", "observer"],
             "wallets": {"consumer": CONSUMER, "monitor": MONITOR}}
 
 
 class OperatorTests(unittest.TestCase):
+    @unittest.skipUnless(os.name == "posix", "POSIX wallet ACL, hostname and machine binding require Ubuntu")
     def test_role_wallets_never_overwrite_and_use_distinct_addresses(self):
         with tempfile.TemporaryDirectory() as temp:
             target = Path(temp) / "secrets"
-            out = s.init_wallets(target, os.uname().nodename,
+            out = s.init_wallets(target, socket.gethostname(),
                                  "consumer,monitor,observer",
                                  "at least sixteen characters", "at least sixteen characters")
             self.assertEqual(out["result"], "LOCAL_WALLETS_ENCRYPTED")
@@ -77,9 +79,10 @@ class OperatorTests(unittest.TestCase):
             loaded = s.load_manifest(target)
             self.assertEqual(loaded["wallets"], {k:v.lower() for k,v in out["wallets"].items()})
             with self.assertRaises(s.SetupError):
-                s.init_wallets(target, os.uname().nodename, "monitor",
+                s.init_wallets(target, socket.gethostname(), "monitor",
                                "at least sixteen characters", "at least sixteen characters")
 
+    @unittest.skipUnless(os.name == "posix", "POSIX wallet ACL, hostname and machine binding require Ubuntu")
     def test_duplicate_portal_hostnames_get_distinct_node_id(self):
         with tempfile.TemporaryDirectory() as temp:
             first = Path(temp) / "first"
@@ -102,10 +105,11 @@ class OperatorTests(unittest.TestCase):
             directory = Path(temp) / "private"
             for roles in ("consumer,consumer", "provider,invalid", "monitor,"):
                 with self.subTest(roles=roles), self.assertRaises(Exception):
-                    s.init_wallets(directory, os.uname().nodename, roles,
+                    s.init_wallets(directory, socket.gethostname(), roles,
                                    "at least sixteen characters", "at least sixteen characters")
             self.assertFalse(directory.exists())
 
+    @unittest.skipUnless(os.name == "posix", "POSIX wallet ACL, hostname and machine binding require Ubuntu")
     def test_wrong_manifest_hostname_rejected(self):
         with tempfile.TemporaryDirectory() as temp:
             directory = Path(temp)
@@ -116,11 +120,12 @@ class OperatorTests(unittest.TestCase):
             (directory / "roles.json").chmod(0o600)
             self.assertRaises(s.SetupError, s.load_manifest, directory)
 
+    @unittest.skipUnless(os.name == "posix", "POSIX wallet ACL, hostname and machine binding require Ubuntu")
     def test_world_readable_manifest_rejected(self):
         with tempfile.TemporaryDirectory() as temp:
             directory = Path(temp)
             (directory / "roles.json").write_text(json.dumps({
-                "schema": "sse-node-roles-v1", "nodeId": os.uname().nodename,
+                "schema": "sse-node-roles-v1", "nodeId": socket.gethostname(),
                 "roles": ["observer"], "wallets": {}
             }))
             (directory / "roles.json").chmod(0o644)

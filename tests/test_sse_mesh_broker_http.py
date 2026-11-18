@@ -1,5 +1,6 @@
 """Offline contract tests: genuine broker client shape, replay and errors; no WAN calls."""
 import io
+from contextlib import closing
 import json
 import sqlite3
 import sys
@@ -42,7 +43,7 @@ class EnrollmentEndpointTests(unittest.TestCase):
             self.minted.append((client_id, tailnet))
             return "tskey-auth-fixture-no-network"
         self.app = EnrollmentApp(self.dbpath, "id", "private", "-", mint=mint)
-        with sqlite3.connect(self.dbpath, isolation_level=None) as db:
+        with closing(sqlite3.connect(self.dbpath, isolation_level=None)) as db:
             self.token = issue_token(db, "provider-a", "provider,monitor")
         self.valid = {"node_id": "provider-a", "roles": "provider,monitor",
                       "enrollment_token": self.token}

@@ -1,4 +1,5 @@
 """Regression tests for private, fingerprint-pinned lab SSH discovery."""
+import os
 from pathlib import Path
 import sys
 import tempfile
@@ -33,6 +34,7 @@ class TestPinnedDiscovery(unittest.TestCase):
                 discover("10.50.56.12/30", KEY,
                          scan=lambda ip, key, seconds: ip in matches)
 
+    @unittest.skipUnless(os.name == "posix", "POSIX SSH-key ownership/mode semantics require Ubuntu")
     def test_pin_exact_alias_and_user_private_file(self):
         with tempfile.TemporaryDirectory() as directory:
             f = Path(directory) / "known_hosts"
@@ -45,6 +47,7 @@ class TestPinnedDiscovery(unittest.TestCase):
             with self.assertRaises(DiscoveryError):
                 read_pin(str(f), "sse-anvil")
 
+    @unittest.skipUnless(os.name == "posix", "POSIX SSH-key ownership/mode semantics require Ubuntu")
     def test_ssh_uses_pinned_identity_and_loopback_forward(self):
         with tempfile.TemporaryDirectory() as directory:
             k = Path(directory) / "key"
