@@ -116,3 +116,21 @@ membership checks, and monitor bond checks without claiming lease votes.
 The complete network remains NOT permissionless in its QBFT consensus
 layer; a genuine PoS/PoW alternative requires separate protocol selection,
 economics, testing and comparison. See ADR-007 and manual new SHA gate.
+
+## 2026-11-18 — ADR-007 validation regression (operator logs)
+
+VM4704 checked out exact `73d5817fb10d76a619f0a0b57bccbe6dbcb69d66`, and its
+**50 Ubuntu security tests passed without any skips**. Tailscale stayed online,
+device IP 100.65.29.101. Doctor correctly reported
+`DOCKER_SOCKET_REQUIRES_REVIEWED_OPERATOR_ACCESS` and
+`readyForContainerCanary=false`; nothing started on the chain.
+
+The same ADR-007 commit was **NOT accepted on Windows**. Three new suites
+passed, but the open-role test for an empty list failed because the test
+fixture treated `[]` as a request for default roles; the QBFT authority
+suite had four errors caused by an undefined `SECP256K1_P` modulus.
+The manual gate halted at this failed Python test, BEFORE its Solidity stage.
+A corrective GitHub commit adds the real secp256k1 field modulus and
+explicit empty-role fixture semantics, plus a known elliptic-curve generator
+regression. No code was pushed to a live VM. Re-run all new targeted suites
+and the complete manual Windows gate before accepting the corrective SHA.

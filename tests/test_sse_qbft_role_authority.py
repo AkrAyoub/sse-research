@@ -9,8 +9,9 @@ from sse_qbft_role_authority import (
     validator_membership,validator_address,ValidatorAuthorityError,
 )
 
-PUB1="79be667ef9dcbbac55a06295ce870b07029bfcdb2dce28d959f2815b16f81798"+\
-     "483ada7726a3c4655da4fbfc0e1108a8fd17b448a68554199c47d08ffb10d4b8"
+# Known secp256k1 generator: a real on-curve P2P identity.
+PUB1=("79be667ef9dcbbac55a06295ce870b07029bfcdb2dce28d959f2815b16f81798"
+      "483ada7726a3c4655da4fbfc0e1108a8fd17b448a68554199c47d08ffb10d4b8")
 GEN="0x"+"ab"*32
 HEAD="0x"+"bc"*32
 HOSTS=["http://127.0.0.1:18545","http://127.0.0.1:18546"]
@@ -30,6 +31,15 @@ def fake(url,method,params):
 
 
 class AuthorityTests(unittest.TestCase):
+    def test_curve_modulus_is_defined_and_known_generator_valid(self):
+        import sse_qbft_role_authority as module
+        self.assertEqual(module.SECP256K1_P,
+                         0xFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFEFFFFFC2F)
+        self.assertEqual(validator_address(PUB1),
+                         "0x7e5f4552091a69125d5dfcb7b8c2659029395bdf")
+        with self.assertRaises(ValidatorAuthorityError):
+            validator_address("a" * 128)
+
     def test_verified_active_membership_not_stake(self):
         d=validator_membership(HOSTS,chain_id=31338,genesis_hash=GEN,
                                enode_public_key=PUB1,call=fake)

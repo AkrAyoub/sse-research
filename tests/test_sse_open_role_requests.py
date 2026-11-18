@@ -19,7 +19,7 @@ def request(roles=None,transport="auto"):
     return {
         "schema":app.SCHEMA,"chainId":31338,"genesisHash":GEN,
         "nodeId":"open-node-12345","account":ACTOR,
-        "roles":list(roles or ["observer","provider","validator"]),
+        "roles":list(["observer","provider","validator"] if roles is None else roles),
         "transportPreference":transport,"nonce":"0x"+"c1"*32,
         "issuedAt":TIME-1,"expiresAt":TIME+300,
     }
@@ -87,6 +87,9 @@ class RoleRequestTests(unittest.TestCase):
             with self.subTest(roles=roles):
                 with self.assertRaises(app.RoleRequestError):
                     app.inspect_request(request(roles),now=TIME)
+        # Explicit [] must NOT fall back to the helper's default test roles.
+        self.assertEqual(request([])["roles"],[])
+        self.assertRaises(app.RoleRequestError, app.requested_roles, [])
         self.assertEqual(app.requested_roles("validator,consumer"),
                          ("consumer","validator"))
 

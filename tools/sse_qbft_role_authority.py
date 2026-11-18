@@ -23,6 +23,8 @@ from sse_qbft_readiness import rpc, safe_rpc, QBFTReadinessError
 ADDRESS=re.compile(r"0x[0-9a-fA-F]{40}\Z")
 PUBKEY=re.compile(r"[0-9a-fA-F]{128}\Z")
 BLOCKHASH=re.compile(r"0x[0-9a-fA-F]{64}\Z")
+# secp256k1 field modulus; reject curve-invalid remote consensus identities.
+SECP256K1_P=(1 << 256) - (1 << 32) - 977
 
 
 class ValidatorAuthorityError(ValueError):
@@ -56,8 +58,6 @@ def validator_membership(urls, *, chain_id, genesis_hash, enode_public_key,
     subject=validator_address(enode_public_key)
     for url in urls:
         safe_rpc(url)
-    chainids=[]
-    hashes=[]
     heights=[]
     for url in urls:
         chain=call(url,"eth_chainId",[])
