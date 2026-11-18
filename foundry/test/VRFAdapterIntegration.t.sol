@@ -11,6 +11,7 @@ import {GlobalRosterMerkle} from "../../contracts/GlobalRosterMerkle.sol";
 /// @notice Requires a local Foundry toolchain. Mock coordinator proves NO VRF.
 /// @dev This file is authored but NOT run in the ChatGPT execution environment.
 contract VRFAdapterIntegrationTest is Test {
+    uint256 internal constant VRF_FEE = 0.001 ether;
     MockVRFV25Coordinator internal coordinator;
     SSEVRFV25Adapter internal adapter;
     OpenMonitorCommittee internal pool;
@@ -34,9 +35,11 @@ contract VRFAdapterIntegrationTest is Test {
         settlement = new SSESettlement(address(pool));
         pool.bindSettlement(address(settlement));
         adapter.bindPoolAndSettlement(address(pool), address(settlement));
+        settlement.configureVrfFeePolicy(VRF_FEE, 50);
         settlement.bindRandomnessAdapter(address(adapter));
         vm.deal(consumer, 10 ether);
         vm.deal(provider, 10 ether);
+        vm.deal(outsider, 1 ether);
         for (uint256 i; i < 6; ++i) {
             address account = address(uint160(0xC100 + i));
             monitors[i] = account;
@@ -60,9 +63,16 @@ contract VRFAdapterIntegrationTest is Test {
         settlement.acceptLease(leaseId);
     }
 
+    function _fund(uint256 leaseId) internal {
+        // A reverted coordinator request preserves the prepaid fee.
+        if (!settlement.vrfFeeFunded(leaseId)) {
+            vm.prank(consumer);
+            settlement.fundVrfRequestFee{value: VRF_FEE}(leaseId);
+        }
+    }
+
     function _request(uint256 leaseId) internal returns (uint256 vrfId) {
-        // Test contract is deployer/bootstrapper and has the temporary
-        // authorization needed to spend the subscription.
+        _fund(leaseId);
         vrfId = settlement.requestLeaseRandomness(leaseId);
     }
 
@@ -83,20 +93,20 @@ contract VRFAdapterIntegrationTest is Test {
         assertEq(req.callbackGasLimit, 220_000);
         assertEq(req.extraArgs.length, 36);
         assertTrue(adapter.assignmentEverRequested(1));
-        vm.expectRevert(SSEVRFV25Adapter.BadState.selector);
+        vm.expectRevert(SSESettlement.InvalidState.selector);
         settlement.requestLeaseRandomness(leaseId);
 
         _deliver(vrfId, 1234567);
         (,,, SSEVRFV25Adapter.State ready,) = adapter.byVrfId(vrfId);
         assertEq(uint8(ready), uint8(SSEVRFV25Adapter.State.Ready));
         vm.prank(outsider);
-        adapter.apply(1);
+        adapter.applyRandomness(1);
         assertEq(uint8(pool.assignmentStatus(1)),
                  uint8(OpenMonitorCommittee.RequestStatus.Assigned));
         (,,, SSEVRFV25Adapter.State applied,) = adapter.byVrfId(vrfId);
         assertEq(uint8(applied), uint8(SSEVRFV25Adapter.State.Applied));
         vm.expectRevert(SSEVRFV25Adapter.BadState.selector);
-        adapter.apply(1);
+        adapter.applyRandomness(1);
 
         settlement.finalizeMonitorCommittee(leaseId);
         address[4] memory committee = pool.getCommittee(1);
@@ -129,7 +139,7 @@ contract VRFAdapterIntegrationTest is Test {
         assertEq(uint8(stillRequested), uint8(SSEVRFV25Adapter.State.Requested));
         coordinator.deliver(vrfId, words);
         coordinator.deliver(vrfId, words); // duplicate ignored
-        adapter.apply(1);
+        adapter.applyRandomness(1);
         coordinator.deliver(vrfId, words); // after application ignored
         (,,, SSEVRFV25Adapter.State state,) = adapter.byVrfId(vrfId);
         assertEq(uint8(state), uint8(SSEVRFV25Adapter.State.Applied));
@@ -143,12 +153,12 @@ contract VRFAdapterIntegrationTest is Test {
         (,,, SSEVRFV25Adapter.State pending,) = adapter.byVrfId(vrfId);
         assertEq(uint8(pending), uint8(SSEVRFV25Adapter.State.Requested));
         vm.expectRevert(SSEVRFV25Adapter.BadState.selector);
-        adapter.apply(1);
+        adapter.applyRandomness(1);
         adapter.expire(1);
         pool.expire(1);
         (,,, SSEVRFV25Adapter.State expired,) = adapter.byVrfId(vrfId);
         assertEq(uint8(expired), uint8(SSEVRFV25Adapter.State.Expired));
-        vm.expectRevert(SSEVRFV25Adapter.BadState.selector);
+        vm.expectRevert(SSESettlement.InvalidState.selector);
         settlement.requestLeaseRandomness(leaseId);
         vm.prank(consumer);
         settlement.closeLease(leaseId);
@@ -161,11 +171,11 @@ contract VRFAdapterIntegrationTest is Test {
         _deliver(vrfId, 321);
         vm.warp(block.timestamp + pool.randomnessTimeout() + 1);
         vm.expectRevert(SSEVRFV25Adapter.BadState.selector);
-        adapter.apply(1);
+        adapter.applyRandomness(1);
         adapter.expire(1);
         pool.expire(1);
         vm.expectRevert(SSEVRFV25Adapter.BadState.selector);
-        adapter.apply(1);
+        adapter.applyRandomness(1);
     }
 
     function testOnlySettlementMayRequestAndBindingCannotBeReconfigured() public {
@@ -182,25 +192,27 @@ contract VRFAdapterIntegrationTest is Test {
         assertTrue(leaseId != 0);
     }
 
-    /// @notice No third party can spend subscription funds. Even the sponsor
-    /// must wait until the provider explicitly accepts this lease.
+    /// @notice WP09L: only the accepted consumer can prepay; after prepayment,
+    /// anyone can request the one permitted coordinator purchase.
     function testSubscriptionSpendRequiresSponsorAndProviderAcceptance() public {
         uint256 leaseId = _createOfferedLease();
-        vm.prank(outsider);
-        vm.expectRevert(SSESettlement.Unauthorized.selector);
-        settlement.requestLeaseRandomness(leaseId);
         vm.expectRevert(SSESettlement.InvalidState.selector);
-        settlement.requestLeaseRandomness(leaseId);
+        settlement.requestLeaseRandomness(leaseId); // no prepaid fee
         vm.prank(provider);
         settlement.acceptLease(leaseId);
-        vm.prank(consumer);
+        vm.prank(outsider);
         vm.expectRevert(SSESettlement.Unauthorized.selector);
-        settlement.requestLeaseRandomness(leaseId);
-        assertEq(coordinator.nextRequestId(), 1);
-        uint256 vrfId = _request(leaseId);
+        settlement.fundVrfRequestFee{value: VRF_FEE}(leaseId);
+        vm.expectRevert(SSESettlement.InvalidState.selector);
+        settlement.requestLeaseRandomness(leaseId); // still no prepaid fee
+        vm.prank(consumer);
+        settlement.fundVrfRequestFee{value: VRF_FEE}(leaseId);
+        vm.prank(outsider);
+        uint256 vrfId = settlement.requestLeaseRandomness(leaseId);
         assertEq(vrfId, 1);
         assertEq(coordinator.nextRequestId(), 2);
         assertEq(adapter.leaseForAssignment(1), leaseId);
+        assertEq(settlement.vrfRequestsUsed(), 1);
     }
 
     /// @notice Closing a lease while VRF is pending MUST NOT lock otherwise
@@ -214,9 +226,7 @@ contract VRFAdapterIntegrationTest is Test {
         settlement.closeLease(leaseId);
         assertFalse(settlement.isLeaseRandomnessOpen(leaseId, 1));
         vm.expectRevert(SSEVRFV25Adapter.BadState.selector);
-        adapter.apply(1);
-        assertEq(uint8(pool.assignmentStatus(1)),
-                 uint8(OpenMonitorCommittee.RequestStatus.AwaitingRandomness));
+        adapter.applyRandomness(1);
         assertEq(settlement.withdrawable(consumer), 25);
         // Closing an unfinalized lease atomically CANCELS pool selection.
         assertEq(uint8(pool.assignmentStatus(1)),
@@ -241,6 +251,7 @@ contract VRFAdapterIntegrationTest is Test {
     /// allowance: EVM reverts all checks/effects atomically.
     function testCoordinatorFailureRollsBackRequestAndAllowsSingleRetry() public {
         uint256 leaseId = _createLease();
+        _fund(leaseId);
         coordinator.configureFailures(true, address(0), 0);
         vm.expectRevert(MockVRFV25Coordinator.Unauthorized.selector);
         settlement.requestLeaseRandomness(leaseId);
@@ -250,7 +261,7 @@ contract VRFAdapterIntegrationTest is Test {
         coordinator.configureFailures(false, address(0), 0);
         assertEq(_request(leaseId), 1);
         assertTrue(adapter.assignmentEverRequested(1));
-        vm.expectRevert(SSEVRFV25Adapter.BadState.selector);
+        vm.expectRevert(SSESettlement.InvalidState.selector);
         settlement.requestLeaseRandomness(leaseId);
     }
 
@@ -289,7 +300,7 @@ contract VRFAdapterIntegrationTest is Test {
         uint256 leaseId = _createLease();
         uint256 vrfId = _request(leaseId);
         _deliver(vrfId, 2353);
-        adapter.apply(1);
+        adapter.applyRandomness(1);
         assertEq(uint8(pool.assignmentStatus(1)),
                  uint8(OpenMonitorCommittee.RequestStatus.Assigned));
         address[4] memory committee = pool.getCommittee(1);
@@ -351,6 +362,7 @@ contract VRFAdapterGlobalMerkleTest is Test {
         settlement = new SSESettlement(address(pool));
         pool.bindSettlement(address(settlement));
         adapter.bindPoolAndSettlement(address(pool), address(settlement));
+        settlement.configureVrfFeePolicy(0.001 ether, 10);
         settlement.bindRandomnessAdapter(address(adapter));
         for (uint256 i; i < 6; ++i) {
             address monitor = address(uint160(0xC100 + i));
@@ -371,11 +383,13 @@ contract VRFAdapterGlobalMerkleTest is Test {
         );
         vm.prank(address(0xB100));
         settlement.acceptLease(leaseId);
+        vm.prank(address(0xA100));
+        settlement.fundVrfRequestFee{value: 0.001 ether}(leaseId);
         uint256 vrfId = settlement.requestLeaseRandomness(leaseId);
         uint256[] memory word = new uint256[](1);
         word[0] = 777;
         coordinator.deliver(vrfId, word);
-        adapter.apply(1);
+        adapter.applyRandomness(1);
         assertTrue(pool.pendingGlobalSeedReady(1));
         assertEq(pool.globalSnapshotRoot(1), historicalTree[1]);
         uint256[] memory indexes = pool.globalDrawIndexes(1);
@@ -411,11 +425,13 @@ contract VRFAdapterGlobalMerkleTest is Test {
         );
         vm.prank(provider);
         settlement.acceptLease(leaseId);
+        vm.prank(address(0xA100));
+        settlement.fundVrfRequestFee{value: 0.001 ether}(leaseId);
         uint256 vrfId = settlement.requestLeaseRandomness(leaseId);
         uint256[] memory word = new uint256[](1);
         word[0] = 888;
         coordinator.deliver(vrfId, word);
-        adapter.apply(1);
+        adapter.applyRandomness(1);
         assertTrue(pool.pendingGlobalSeedReady(1));
         uint256[] memory indexes = pool.globalDrawIndexes(1);
         address[] memory accounts = new address[](indexes.length);

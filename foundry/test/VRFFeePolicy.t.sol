@@ -34,6 +34,7 @@ contract VRFFeePolicyTest is Test {
         settlement.bindRandomnessAdapter(address(adapter));
         vm.deal(consumer, 10 ether);
         vm.deal(provider, 10 ether);
+        vm.deal(outsider, 1 ether);
         for (uint256 i; i < 6; ++i) {
             address member = address(uint160(0xC100 + i));
             vm.deal(member, 2 ether);
@@ -146,7 +147,7 @@ contract VRFFeePolicyTest is Test {
         assertEq(uint8(pool.assignmentStatus(id)),
                  uint8(OpenMonitorCommittee.RequestStatus.Expired));
         vm.expectRevert(SSEVRFV25Adapter.BadState.selector);
-        adapter.apply(id);
+        adapter.applyRandomness(id);
     }
 
     function testCoordinatorRejectsAndEntirePaidPurchaseRollsBack() public {
@@ -269,7 +270,7 @@ contract VRFFeeGlobalMerkleTest is Test {
         uint256[] memory words = new uint256[](1);
         words[0] = 818;
         coordinator.deliver(vrfId, words);
-        adapter.apply(id);
+        adapter.applyRandomness(id);
         assertTrue(pool.pendingGlobalSeedReady(id));
         vm.prank(CONSUMER);
         settlement.closeLease(id);
