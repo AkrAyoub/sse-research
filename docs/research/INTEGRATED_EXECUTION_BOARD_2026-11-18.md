@@ -195,3 +195,28 @@ membership must run on a rule-based permissionless consensus engine,
 for example a public Ethereum PoS research/testnet deployment.
 New code has NOT passed its new full manual gate or run on VMs yet.
 See docs/research/R11_OPEN_VALIDATOR_POLICY_AND_REAL_GENESIS.md.
+
+## 2026-11-18 — R12 decisive architectural change: SSE OWNS a PoS blockchain (zero real ETH)
+
+The operator REJECTED using public Ethereum testnets and REJECTED
+permissioned QBFT validator admission. Chain31338 QBFT is now a
+HISTORICAL CONTROL BASELINE, NOT the requested SSE launch.
+An independently owned Ethereum PoS research devnet (chain31339) will
+mint *test ETH* in its genesis, initialize an EL/CL/validator stack,
+and admit later validators under the underlying Ethereum Beacon
+deposit/activation protocol rather than administrator votes.
+The genesis operator's 64 provisional validator keys are NOT evidence
+of decentralized ownership; free testETH yields no real Sybil-resistant
+economic security. External P2P, public non-discretionary faucet,
+independent validator deposits and physical service experiments
+must still be implemented and demonstrated before claiming open
+operational participation.
+
+New GitHub source: sse_pos_devnet_plan, sse_pos_test_wallet,
+sse_pos_devnet_health, sse_pos_contract_attest,
+scripts/sse_pos_launch.sh, script/DeploySSEPos.s.sol and
+targeted tests. Upstream ethPandaOps ethereum-package source is
+pinned to d3014d6d23d683362025b9e23a0d69de49e77cca. No code
+was run on the user's VMs, no Ethereum mainnet ETH was spent and
+no live chain31339 or contracts have been measured yet.
+See docs/research/R12_OWN_ETHEREUM_POS_NO_REAL_ETH.md.
