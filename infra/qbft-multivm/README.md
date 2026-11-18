@@ -1,5 +1,14 @@
 # R9 multi-VM QBFT deployment: actual validator operators, no GitHub Actions
 
+> R11 real-genesis and permissionless-roles correction: THIS FOUR-HOST QBFT
+> IS A PERMISSIONED RESEARCH BASELINE, NOT A PERMANENT NETWORK CAP OR
+> PERMISSIONLESS CONSENSUS. Host Compose now accepts actual signed comma-
+> separated enodes and executable temporary native libraries. First collect
+> the four independently created PUBLIC validator identities, then run the
+> REAL-genesis canary; the old synthetic canary hash must never be used as
+> the permanent genesis. See
+> docs/research/R11_OPEN_VALIDATOR_POLICY_AND_REAL_GENESIS.md.
+>
 > **R10 publication and real-client canary:** Source now contains an
 > operator-approved, P2P-disabled Besu **26.11.1+** genesis canary that
 > records a live block-zero hash and immutable Docker image digest, and a

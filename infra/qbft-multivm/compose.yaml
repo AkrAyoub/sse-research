@@ -1,4 +1,9 @@
 # ONE instance of this Compose file per INDEPENDENT Ubuntu VM.
+# QBFT RESEARCH BASELINE ONLY: membership is by existing-validator votes,
+# NOT the production permissionless validator-admission design.
+# Native Besu/JNA needs executable tmpfs; scope exec to this container only.
+# A SIGNED catalog must be verified and rendered to BESU_BOOTNODES_LIST;
+# never pass an on-disk path to Besu --bootnodes, nor empty/default peers.
 # No GitHub Actions, no shared validator private keys, no Anvil 31337 mutation.
 # Deliberately no default image digest; operator approves the exact Besu image.
 services:
@@ -9,7 +14,7 @@ services:
     init: true
     read_only: true
     tmpfs:
-      - /tmp:rw,noexec,nosuid,nodev,size=128m
+      - /tmp:rw,exec,nosuid,nodev,size=256m,mode=1777
     restart: unless-stopped
     stop_grace_period: 60s
     cap_drop: [ALL]
@@ -20,7 +25,6 @@ services:
       - ${BESU_DATA:?Persistent data directory}:/var/lib/besu/data
       - ${BESU_GENESIS:?Approved genesis.json}:/etc/sse/genesis.json:ro
       - ${BESU_NODE_KEY:?VM-owned Besu node key}:/etc/sse/node.key:ro
-      - ${BESU_BOOTNODES:?Verified peer file}:/etc/sse/bootnodes.txt:ro
     command:
       - --genesis-file=/etc/sse/genesis.json
       - --data-path=/var/lib/besu/data
@@ -31,9 +35,8 @@ services:
       - --p2p-host=${TAILSCALE_IPV4:?Approved local overlay IPv4}
       - --p2p-port=30303
       - --nat-method=NONE
-      - --bootnodes=/etc/sse/bootnodes.txt
-      - --Xdns-enabled
-      - --Xdns-update-enabled
+      - --bootnodes=${BESU_BOOTNODES_LIST:?Verified signed enode list required}
+      - --discovery-enabled=true
       - --rpc-http-enabled=true
       - --rpc-http-host=127.0.0.1
       - --rpc-http-port=18545

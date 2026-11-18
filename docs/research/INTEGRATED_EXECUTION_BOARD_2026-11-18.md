@@ -176,3 +176,22 @@ executable-library extraction strategy. The fix also corrects the
 Wilson CI boundary and the 26.10.1 test expectation. New SHA full
 gate + new run directory required. Preserve original failure logs.
 
+
+## 2026-11-18 — R11: four is an EXPERIMENTAL QBFT number only
+
+Operator confirmed Besu26.11.1 real synthetic canary on VM4704
+with observed real RPC genesis hash (synthetic validator addresses)
+and no remaining Docker container. Windows gate was green with
+927 Python tests / 20 Windows platform skips and 144/144 Foundry
+on caa88863901afc0a3f12871c4c8b666b1087dadb.
+The CANARY HASH is not the final real-validator genesis hash.
+R11 GitHub source patches actual lab Compose to accept signed enode
+URLs rather than a filename and executable tmpfs for Besu native
+libraries. Added four-PUBLIC-validator real-genesis canary and
+signed-peer host environment generator. These tools never copy node
+private keys or grant open validator consensus. The four genesis
+validator QBFT network is permissioned; genuinely open validator
+membership must run on a rule-based permissionless consensus engine,
+for example a public Ethereum PoS research/testnet deployment.
+New code has NOT passed its new full manual gate or run on VMs yet.
+See docs/research/R11_OPEN_VALIDATOR_POLICY_AND_REAL_GENESIS.md.
