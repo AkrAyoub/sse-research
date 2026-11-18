@@ -83,3 +83,22 @@ No deployment to VM4704 is assumed from committing code: host must
 explicitly fetch the approved new SHA and rerun its tests. The source updater
 is not a consensus rolling upgrade and is not permitted on the old Anvil
 host. See `docs/research/R9_VM_SOURCE_ROLLOUT_AND_FIRSTHOST.md`.
+
+## 2026-11-18 — headless validator admission implementation
+
+After Windows **869/869 Python tests successful (20 skipped)** and **144/144
+Foundry tests**, Ubuntu VM4704 passed **50/50 security checks** and
+39 isolated QBFT Python checks, then manually authenticated Tailscale
+as `sse-validator-1`, overlay `100.65.29.101`. The personal tailnet
+still needs policy review; it is NOT accepted as isolated production.
+No Besu validator key or genesis block was deployed by those steps.
+
+The next source package adds distinct one-use validator invitation
+SQLite/OAuth service, an HTTPS headless join client, a root-only
+source-staged VM firstboot wrapper, a dedicated-tailnet least-privilege
+policy example and offline security tests. It expressly rejects
+re-authentication of VM4704, grants no QBFT vote, and does not
+expose the Python pilot publicly. See
+`docs/research/R9_AUTOMATED_MESH_ONBOARDING_V1.md` for outstanding
+automatic *source publishing*, key-bound invitation, server hardening,
+cloud-init secret delivery and live independent-host acceptance.

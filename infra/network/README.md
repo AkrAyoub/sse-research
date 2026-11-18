@@ -1,5 +1,20 @@
 # SSE cross-cloud enrollment, cryptographic discovery and signed distribution
 
+> **Headless validator onboarding (new pilot):** The app-role broker
+> on 127.0.0.1:18781 remains separate from the new validator-only
+> broker on 127.0.0.1:18782. The latter issues one-time invitations for
+> `validator-1` ... `validator-4` and only requests the overlay tag
+> `tag:sse-validator` through a *dedicated* OAuth client. The new
+> `sse_validator_mesh_join.py` runs on NEW Ubuntu hosts without a
+> Tailscale browser sign-in, using a root-only token file, but refuses
+> to touch already-connected VM4704. The new source-staged
+> `r9_headless_validator_bootstrap.sh` wrapper runs the Ubuntu checks
+> and local key ceremony after a human-authorized invitation.
+> **These are source-only components, not an internet-ready broker.**
+> Read `docs/research/R9_AUTOMATED_MESH_ONBOARDING_V1.md` for
+> security prerequisites and remaining source publication work.
+>
+
 > **No purchased domain needed (ADR-006, 2026-11-18).** The previously described public-DNS + Caddy deployment is one optional alternative. The preferred first controlled lab uses the Tailscale-assigned `*.ts.net` HTTPS address with **Tailscale Funnel**, operator-approved one-time enrollment and a local loopback broker. Read `docs/research/ADR-006_DOMAINLESS_WAN_AND_LAB_REBUILDS.md` before enabling public exposure. The existing broker is a pilot, not a hardened public service; implement throttling and access policy before extended exposure.\n\n**Integration stage (2026-11-18). Source and offline test cases exist; no real public HTTPS broker, public Tailscale tailnet, independent four-VM Besu deployment or authenticated external host acceptance has yet been proven.** NO GitHub Actions are used.
 
 This package extends the existing R6/R7 code, rather than replacing `tools/sse_vm_bootstrap.py`, `tools/sse_vm_role_setup.py`, `tools/sse_vm_enroll.py`, `tools/sse_vm_overlay.py`, `tools/sse_mesh_broker.py`, `tools/sse_release_verify.py` or `tools/sse_ssh_identity_tunnel.py`. It preserves Anvil chain 31337 and its existing funded lease.
