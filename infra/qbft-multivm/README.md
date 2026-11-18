@@ -132,8 +132,13 @@ with Compose file permissions and a node-private-key file only on THIS host.
 The Compose template lives at `infra/qbft-multivm/compose.yaml` and uses
 host networking, the host's Tailscale IP, and loopback-only HTTP RPC.
 
-Initially create an **empty** `bootnodes.txt` within the protected config
-directory; the very first validator cannot finalize a new block on its own.
+**Do not start real validators with an empty bootnodes file.** Besu can fall back
+to default Mainnet bootnodes if no peers are configured. Instead use the NEW
+`genesis-canary.compose.yaml` with `--p2p-enabled=false` and
+`--discovery-enabled=false` to check the actual genesis block-zero hash in a
+disposable isolated data folder. Only after signing a matching peer catalog
+do we start any validator. A single canary is NOT a blockchain network,
+and it must never be used as a validator.
 
 ```bash
 python3 tools/sse_qbft_vm_preflight.py \
@@ -165,53 +170,74 @@ docker run --rm --entrypoint besu 'hyperledger/besu:REVIEWED_VERSION@sha256:REAL
 These arguments are illustrative: enter a **real validated** image ref.
 No `--apply` action in the preflight; activation is a separate approved action.
 
-## 5. Start the 4-validator network in a measured rollout
+## 5. Derive actual block-zero hash with an isolated canary
 
-1. Start validator-1 alone and inspect its **genesis block0** over
-   `127.0.0.1:18545`. Do not expect QBFT to produce later blocks with only
-   one of four validators online. Record actual genesis hash, client version
-   and P2P public node key.
-2. Operator constructs `SSE_QBFT_PEERS_V1` from the same FOUR
-   `validator-N.public.json` records with an ACTUALLY OBSERVED genesis block
-   hash and current approved Git SHA:
+Set reviewed `BESU_IMAGE`, `BESU_UID`, `BESU_GID` and
+`BESU_GENESIS` in a **private .env file** on a NEW Ubuntu host.
+The canary service uses NO validator key or persistent validator data;
+P2P and discovery are disabled. It only exposes loopback RPC on port18559.
 
-   ```bash
-   mkdir -m 700 -p .local/qbft-r9-catalog
-   python3 tools/sse_qbft_network_assembly.py catalog \
-     --output-dir .local/qbft-r9-catalog \
-     --public /trusted/validator-1.public.json \
-     --public /trusted/validator-2.public.json \
-     --public /trusted/validator-3.public.json \
-     --public /trusted/validator-4.public.json \
-     --genesis-hash 0xACTUAL_64_HEX_BLOCK0_HASH \
-     --revision THE_REVIEWED_FULL_40_HEX_SHA
-   ```
+```bash
+docker compose -p sse-genesis-canary \
+  -f infra/qbft-multivm/genesis-canary.compose.yaml \
+  --env-file .env config --quiet
 
-   This emits an UNSIGNED draft only. Sign it offline using
-   `sse_network_peers.py sign` with a separately secured Ed25519 key, then
-   verify before distribution. Never commit the signing private key or
-   replace the actual block0 hash with the file SHA256.
-   Public verifier key is pinned out of band.
-   Publish the signed envelope over HTTPS in a trusted, approved repository
-   or Funnel asset service. Do not host keys or mutable unverified bootnodes.
-3. Each VM calls `sse_network_peers.py verify` to obtain its 3 peer enodes
-   into a NEW `bootnodes.txt`. The initial file may need controlled replacement
-   if it was created empty for the canary; use a staged refresh path, not
-   unauthenticated edits.
-4. Bring remaining validator VMs online using the same approved genesis,
-   then restart validator-1's peer config only when safe. Verify all four
-   P2P overlays and ports, then confirm headers converge.
-5. Bind each local RPC to the operator via distinct **identity-pinned SSH
-   tunnels** and invoke `sse_qbft_readiness.py --require-four`. This compares
-   four chain IDs, genesis hashes, validator lists and common block hashes.
-   A fake four-port local proxy could pass unless independent host evidence
-   is ALSO checked.
+docker compose -p sse-genesis-canary \
+  -f infra/qbft-multivm/genesis-canary.compose.yaml \
+  --env-file .env up -d
 
-Only after read-only agreement passes do we send a new synthetic transaction.
-On-chain validator votes, monitoring proofs, rewards and SLA contracts are a
-**separate experimental gate**.
+curl -sS --max-time 5 -H 'Content-Type: application/json' \
+  --data '{"jsonrpc":"2.0","id":1,"method":"eth_getBlockByNumber","params":["0x0",false]}' \
+  http://127.0.0.1:18559
 
-## 6. Collect raw real-block metrics, not guessed values
+docker compose -p sse-genesis-canary \
+  -f infra/qbft-multivm/genesis-canary.compose.yaml \
+  --env-file .env logs --tail=80
+
+docker compose -p sse-genesis-canary \
+  -f infra/qbft-multivm/genesis-canary.compose.yaml \
+  --env-file .env down
+```
+
+Record the actual **block-zero hash** (NOT the SHA256 of the JSON file).
+If the canary does not start, do not deploy 4 validators: inspect flags,
+image, genesis parser and permissions and fix in GitHub. This is a
+controlled **disposable canary project**, not a command to remove any
+other Compose services/chain. Preserve sanitized logs and image digest.
+
+## 6. Sign peer catalog, then start the genuine 4-validator network
+
+1. Operator obtains four independently generated public validator reports.
+   Use `sse_qbft_fleet_evidence.py collect` locally on each VM and
+   `sse_qbft_fleet_evidence.py audit` on the operator checkout to reject
+   copied SSH host keys, reused Tailscale device identities, overlay IPs,
+   different source SHAs and duplicated P2P keys. This is a **clone/consistency
+   check**, not proof of separate physical administrators.
+2. From the four public records and the observed canary hash, create the
+   unsigned `SSE_QBFT_PEERS_V1` catalog. Pin and sign via the existing
+   offline Ed25519 signer; publish the signed catalog through a reviewed HTTPS
+   source, not a private repository with shared tokens.
+3. Each VM verifies the signed catalog and creates its own immutable
+   `bootnodes.txt` before starting a validator. It should identify **at
+   least two** distinct other peers and carry the same public genesis hash
+   and chain ID 31338. The signed file is an initial trust anchor; native
+   Besu discovery handles peer expansion and reconnects. DNS enodes are an
+   early-access feature and require explicit on-host testing.
+4. All four VMs pass `sse_qbft_vm_preflight.py`. Then operator starts the
+   single local `qbft` service per VM from the reviewed, pinned
+   `infra/qbft-multivm/compose.yaml`. Never run the four-validator smoke
+   Compose on one VM as a substitute for independent hosts.
+5. Use four identity-pinned loopback RPC tunnels to run
+   `sse_qbft_readiness.py --require-four`. Check actual validator views,
+   P2P peer counts, genesis, common height/hash and advancement. Head
+   agreement does not by itself prove physically independent hosts.
+6. Only after read-only agreement passes, execute approved synthetic
+   transactions on **chain31338**, never the protected Anvil chain31337.
+
+No automatic wallet transactions, validator votes, or synthetic rewards
+are activated merely by publishing code or starting Tailscale.
+
+## 7. Collect raw real-block metrics, not guessed values
 
 Use four independently verified local RPC tunnels, a signed catalog and
 the real genesis hash:
@@ -240,7 +266,7 @@ Before deleting any disposable VM, capture logs and hash-index them using
 archive. Preserve original run seed, client image digest, VM resources,
 UTC timestamps and observed faults.
 
-## 7. Failures and teardown/rebuild experiments
+## 8. Failures and teardown/rebuild experiments
 
 Run under an explicit **experimental window** only, never on VM4695:
 - 0 failures: all 4 peers connected, common hash, expected block rate;

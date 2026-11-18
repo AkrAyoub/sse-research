@@ -8,7 +8,7 @@ Source branch baseline: `research/r7-vm-role-operator-no-ci` (238 commits ahead 
 
 | ID | R/P tracks | Priority | Current state | Deliverable and hard exit evidence |
 |---|---|---|---|---|
-| M0-W1 | R0/R3 | P0 | **ACCEPTED: Windows local gate for 6587566 only**; Ubuntu remains pending | 825 Python tests, 18 Windows skips, 144/144 Foundry, 10/10 WP09Q; report and EIP170 measurements in VALIDATION_WINDOWS_GREEN_2026-11-18.md |
+| M0-W1 | R0/R3 | P0 | **ACCEPTED: Windows local gate for 5475bc7**; Ubuntu remains pending | 842 Python tests, 20 Windows skips, 144/144 Foundry, 10/10 WP09Q; R9_ACCEPTANCE_NEXT_STEPS_2026-11-18.md records results and EIP170 measurements |
 | M0-W2 | R2/R3 | P0 | SOURCE | Payment/VRF fees, refunds, selected bonds, timeout and adversarial replay invariants on real EVM |
 | M0-W3 | R2/R9 | P0 | LIVE Anvil receipt checked | Original chain 31337 block26 conserved; inspect lease1 status, escrow, bonds, deadlines/expiry before transaction; no reset |
 | M0-W4 | R0/R5/R6 | P0 | SOURCE | Repository PRs #8–#17 audited, old source research preserved, no GitHub Actions, safe reviewed baseline |

@@ -1,0 +1,36 @@
+# Disposable, P2P-disabled, isolated genesis block-zero verifier.
+# No mainnet bootnodes, no validator private keys, no permanent chain database.
+# One instance on a NEW Ubuntu host ONLY. Not for production blockmaking.
+services:
+  canary:
+    image: ${BESU_IMAGE:?Review and pin an immutable Besu Docker digest}
+    user: "${BESU_UID:?operator uid}:${BESU_GID:?operator gid}"
+    network_mode: host
+    restart: "no"
+    init: true
+    read_only: true
+    cap_drop: [ALL]
+    security_opt:
+      - no-new-privileges:true
+    pids_limit: 200
+    tmpfs:
+      - /tmp:rw,nosuid,nodev,size=512m,mode=1777
+    volumes:
+      - ${BESU_GENESIS:?approved immutable genesis file}:/etc/sse/genesis.json:ro
+    command:
+      - --genesis-file=/etc/sse/genesis.json
+      - --data-path=/tmp/sse-qbft-genesis-canary
+      - --network-id=31338
+      - --p2p-enabled=false
+      - --discovery-enabled=false
+      - --rpc-http-enabled=true
+      - --rpc-http-host=127.0.0.1
+      - --rpc-http-port=18559
+      - --rpc-http-api=ETH,NET,WEB3,QBFT
+      - --host-allowlist=127.0.0.1,localhost
+      - --logging=INFO
+    logging:
+      driver: json-file
+      options:
+        max-size: "5m"
+        max-file: "2"

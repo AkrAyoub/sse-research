@@ -13,7 +13,7 @@ forge --version
 mkdir -p .local/manual-gate
 echo "SSE: compile Python and rapidly check the previous Windows regressions first"
 python -m compileall -q tools tests
-for name in test_sse_mesh_broker_http.py test_sse_vm_role_setup.py test_sse_lab_release_handoff.py test_sse_ssh_identity_tunnel.py test_sse_funnel_pilot.py test_sse_experiment_evidence.py test_sse_qbft_validator_identity.py test_sse_qbft_vm_preflight.py test_sse_qbft_network_assembly.py test_sse_qbft_block_sample.py; do
+for name in test_sse_mesh_broker_http.py test_sse_vm_role_setup.py test_sse_lab_release_handoff.py test_sse_ssh_identity_tunnel.py test_sse_funnel_pilot.py test_sse_experiment_evidence.py test_sse_qbft_validator_identity.py test_sse_qbft_vm_preflight.py test_sse_qbft_network_assembly.py test_sse_qbft_block_sample.py test_sse_qbft_fleet_evidence.py test_sse_qbft_genesis_canary.py test_sse_ubuntu_security_gate.py; do
   python -m unittest discover -s tests -p "$name" -v 2>&1 |
     tee ".local/manual-gate/${name%.py}.log"
 done
