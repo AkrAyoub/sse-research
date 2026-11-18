@@ -8,13 +8,13 @@ Source branch baseline: `research/r7-vm-role-operator-no-ci` (238 commits ahead 
 
 | ID | R/P tracks | Priority | Current state | Deliverable and hard exit evidence |
 |---|---|---|---|---|
-| M0-W1 | R0/R3 | P0 | SOURCE; **LOCAL BLOCKED on earlier main-based recovery** | WP09Q real Solidity merged source, all Foundry+Python tests on this exact SHA; EIP170 size/gas report |
+| M0-W1 | R0/R3 | P0 | **ACCEPTED: Windows local gate for 6587566 only**; Ubuntu remains pending | 825 Python tests, 18 Windows skips, 144/144 Foundry, 10/10 WP09Q; report and EIP170 measurements in VALIDATION_WINDOWS_GREEN_2026-11-18.md |
 | M0-W2 | R2/R3 | P0 | SOURCE | Payment/VRF fees, refunds, selected bonds, timeout and adversarial replay invariants on real EVM |
 | M0-W3 | R2/R9 | P0 | LIVE Anvil receipt checked | Original chain 31337 block26 conserved; inspect lease1 status, escrow, bonds, deadlines/expiry before transaction; no reset |
 | M0-W4 | R0/R5/R6 | P0 | SOURCE | Repository PRs #8–#17 audited, old source research preserved, no GitHub Actions, safe reviewed baseline |
 | M1-W1 | R1/P1/P2/P3 | P0 | RESEARCH SOURCE | Formal success/failure/nonresponse/inconclusive evidence semantics and independent negative tests |
 | M1-W2 | R2/R3/P2 | P0 | SOURCE | True VRF coordinator or explicitly permissioned alternative with economic limits; Sybil, randomness withholding, churn, fee and liveness analysis |
-| M2-W1 | R6/R9/P4 | P0 | SOURCE | Four distinct real VMs, distinct Besu P2P keys, single genesis/hash, chain31338, 4-way validator view |
+| M2-W1 | R6/R9/P4 | P0 | **SOURCE PREPARED / NO LIVE VALIDATORS** | Per-VM local secp256k1 key ceremony, public 4-record assembly, chain31338 genesis SHA gate, compose canary and 4-way RPC measurements; verify on distinct Ubuntu hosts |
 | M2-W2 | R6/R9 | P0 | SOURCE | HTTPS broker + one-use token + approved Tailscale, external WAN host, signed peer catalog & readdress acceptance |
 | M2-W3 | R9/R10 | P0 | NOT TESTED LIVE | 1/2 validator failure, full restart, heads/rewards/times and no hidden single-host dependency |
 | M3-W1 | R4/R5/R7 | P0 | SOURCE | Provider/consumer/monitor each own key/VM and complete signed remote compute/HTTP lease |
