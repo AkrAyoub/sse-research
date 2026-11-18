@@ -232,3 +232,76 @@ Other chain state deliberately preserved:
 - 31338: earlier QBFT experimental source and canary artifacts,
   not the final SSE network.
 - 31339: NEW own independent PoS blockchain, no real ETH.
+
+
+## NEW — real self-service staking deposit for an external validator
+
+No administrator grants the validator role. A separate participant,
+on a separate machine and using their OWN BLS keys, creates standard
+\`deposit_data.json\` for this **chain's actual GENESIS_FORK_VERSION**
+using a reviewed Ethereum validator deposit/keystore generator.
+They do not receive or import the lab's bootstrap mnemonic. They
+must control an EOA with 32 worthless test ETH on chain31339
+plus enough additional test ETH for gas. Native ETH on Ethereum mainnet
+is NOT used or required.
+
+Verify the actual version from this blockchain's Beacon REST API,
+not a hard-coded mainnet or Hoodi value:
+
+\`\`\`bash
+# Replace ACTUAL_BEACON_PORT from kurtosis enclave inspect.
+curl -fsS http://127.0.0.1:ACTUAL_BEACON_PORT/eth/v1/config/spec
+# Locate data.GENESIS_FORK_VERSION in that response.
+\`\`\`
+
+On the **independent participant's machine**, after safely transferring
+ONLY the public deposit_data.json (never validator keystore/mnemonic):
+
+\`\`\`bash
+mkdir -m 700 "$HOME/sse-pos-deposit-evidence"
+python tools/sse_pos_validator_deposit.py \\
+  --deposit-data /PRIVATE/PATH/deposit_data.json \\
+  --fork-version 0xACTUAL_GENESIS_FORK_VERSION \\
+  --output "$HOME/sse-pos-deposit-evidence/validator-deposit.json"
+\`\`\`
+
+The script verifies 48-byte BLS public key, 32-byte withdrawal
+credentials, 96-byte BLS signature byte length, exactly 32 test
+ETH (32000000000 gwei) and rederives the SSZ DepositData root.
+It outputs calldata for the standard DepositContract
+\`deposit(bytes,bytes,bytes,bytes32)\` at
+\`0x00000000219ab540356cBB839Cbe05303d7705Fa\`.
+**It does NOT verify the BLS proof signature or submit a
+transaction.** A consensus client decides validity and activation,
+not SSE. Always confirm that the actual deposit contract bytecode
+exists at this address on chain31339 before depositing.
+
+After verifying the actual execution chain ID31339 and the deposit
+contract, the independent participant can explicitly submit their
+test-ETH-funded transaction using their OWN encrypted EOA wallet:
+
+\`\`\`bash
+CALLDATA="$(python3 -c 'import json,sys;print(json.load(open(sys.argv[1]))["calldata"])' "$HOME/sse-pos-deposit-evidence/validator-deposit.json")"
+cast send 0x00000000219ab540356cBB839Cbe05303d7705Fa \\
+  --data "$CALLDATA" --value 32000000000000000000 \\
+  --rpc-url "$SSE_EL_RPC" \\
+  --keystore /PRIVATE/PATH/participant-EOA.keystore.json \\
+  --sender 0xPARTICIPANT_PUBLIC_EOA_ADDRESS
+\`\`\`
+
+**This sends/spends ONLY test ETH on our own chain.** Save the
+transaction receipt. Independently observe the newly created
+validator's BLS public key through:
+\`python tools/sse_pos_devnet_health.py --execution-url ...
+--beacon-url ... --validator-pubkey 0xBLS48BYTE_HEX\`.
+First expect a pending status, then an active status only after
+the actual beacon protocol transitions. Do not equate a mined
+deposit transaction with immediate permission to sign blocks.
+
+The protocol admission path is implemented as a *read-only deposit
+data preparation and validation* layer and an explicit ordinary
+Ethereum deposit transaction. Fully automated public faucet
+distribution, independent BLS key generation for a custom fork,
+remote peer bootstrap/advertisements, validator execution/consensus
+containers on arbitrary machines and 2+ externally observed
+stake activations are still ACCEPTANCE WORK, not completed facts.

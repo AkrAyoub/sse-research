@@ -1,6 +1,8 @@
 """Signed QBFT lab startup config: four genesis keys and peer signatures."""
 import hashlib
 import json
+import os
+from unittest.mock import patch
 from pathlib import Path
 import sys
 import tempfile
@@ -22,6 +24,14 @@ class SignedQbftHostEnvironmentTests(unittest.TestCase):
         self.temp=tempfile.TemporaryDirectory()
         self.addCleanup(self.temp.cleanup)
         self.base=Path(self.temp.name)
+        if os.name == "nt":
+            # Production host paths MUST remain POSIX-only. Unit tests on
+            # Windows model safe Linux host-volume paths without weakening
+            # sse_qbft_host_env.safe_path() for actual deployments.
+            temporary_path=patch("sse_qbft_host_env.safe_path",
+                                 side_effect=lambda value: "/tmp/sse-qbft-unit/"+value.name)
+            temporary_path.start()
+            self.addCleanup(temporary_path.stop)
         self.records=[node_key_record(i.to_bytes(32,"big"),f"validator-{i}",
                         f"100.101.102.{i+100}") for i in range(1,5)]
         self.genesis=self.base/"genesis.json"
