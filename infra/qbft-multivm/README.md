@@ -1,5 +1,16 @@
 # R9 multi-VM QBFT deployment: actual validator operators, no GitHub Actions
 
+> **Fresh VM fast path and subsequent GitHub source updates:** Use
+> `docs/research/R9_VM_SOURCE_ROLLOUT_AND_FIRSTHOST.md`. On an approved
+> native Ubuntu checkout, `bash scripts/r9_ubuntu_firsthost.sh validator-1
+> APPROVED_FULL_SHA` runs Linux gates and produces a read-only host readiness
+> report. Tailscale login requires initial owner approval. Then an explicit
+> `--apply-identity` generates the node's own Besu key locally once. To
+> install a newer GitHub revision on a STOPPED R9 source checkout, use
+> `tools/sse_r9_release_update.py`, which pins the exact approved SHA,
+> reruns Ubuntu/Python gates and does not restart Docker or change chain state.
+> **Do not run either tool on old Anvil/agent VMs.**
+>
 **Deployment status: NOT YET RUN ON LIVE BESU.** The client/image, Compose flags,
 genesis hash, peer discovery and permissioning must pass these gates before any
 financial/SSE workload. This is one independent Ubuntu host **per validator**.

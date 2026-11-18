@@ -64,3 +64,22 @@ Attach logs with Git SHA/OS/Python/Forge/Solc versions and label real EVM execut
 ## Scientific boundaries
 
 The phase percentages in `docs/research/PHASES_TRACKER.csv` are **historical planning estimates** and are not revised by source commits. Record measured outcomes and update only with actual, independently reviewable evidence. Build/crypto-soundness, independence, throughput, physical SLA truth, and third-party permissionless onboarding are different claims.
+
+## 2026-11-18 — GitHub-to-new-VM repeatable release gate
+
+VM4704 (new Ubuntu24.04.4, SSH-deploy-key checkout) passed **50/50**
+Ubuntu-only security tests, no skips, at
+`0f070f6f676336be3decc02a41dd2361cb81100e`.
+The same SHA passed 856 Python tests (20 Windows skips) and 144 Foundry
+tests locally. This is **not** a four-validator network or remote
+participation acceptance. The host has Tailscale installed but
+**NeedsLogin**, Docker daemon running but socket access restricted to sudo,
+2 vCPU/3.8 GiB RAM, and a reused private-lab 10.50.56.20 IP.
+
+The next GitHub source package adds repeatable first-host Ubuntu gates,
+read-only doctor, explicit local Besu key creation after Tailscale
+authorization, and an exact-SHA stopped-node source updater with test/rollback.
+No deployment to VM4704 is assumed from committing code: host must
+explicitly fetch the approved new SHA and rerun its tests. The source updater
+is not a consensus rolling upgrade and is not permitted on the old Anvil
+host. See `docs/research/R9_VM_SOURCE_ROLLOUT_AND_FIRSTHOST.md`.
