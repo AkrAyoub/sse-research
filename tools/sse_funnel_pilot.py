@@ -11,7 +11,7 @@ from __future__ import annotations
 import argparse
 import json
 import shutil
-import socket
+import http.client
 import subprocess
 import sys
 
@@ -73,11 +73,21 @@ def enable(plan_doc: dict, *, explicit_approval=False, run=_run,
             or len(name) > 253):
         raise FunnelError("missing trusted tailnet MagicDNS FQDN")
     if probe is None:
+        connection = http.client.HTTPConnection("127.0.0.1", BROKER_PORT, timeout=3)
         try:
-            with socket.create_connection(("127.0.0.1", BROKER_PORT), timeout=2):
-                pass
-        except OSError:
+            connection.request("GET", "/healthz")
+            reply = connection.getresponse()
+            raw = reply.read(4097)
+            if reply.status != 200 or len(raw) > 4096:
+                raise FunnelError("localhost broker health response invalid")
+            check = json.loads(raw)
+            if (type(check) is not dict or check.get("status") != "ready"
+                    or check.get("ethereumTransactionsSent") is not False):
+                raise FunnelError("wrong service on SSE broker port")
+        except (OSError, ValueError, http.client.HTTPException):
             raise FunnelError("localhost enrollment broker unavailable") from None
+        finally:
+            connection.close()
     elif not probe("127.0.0.1", BROKER_PORT):
         raise FunnelError("localhost enrollment broker unavailable")
     # Real public exposure MUST be opt-in; the owner may have to approve Funnel
