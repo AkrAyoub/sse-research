@@ -1,0 +1,51 @@
+----------------------------------------------------------------------
+Ran 15 tests in 0.013s
+
+OK
+Installed test-only file: /tmp/tmpbhjgxt7p/foundry/test/WP09NGasBench.t.sol
+Installed test-only file: /tmp/tmpbhjgxt7p/foundry/test/WP09NWithdrawalReentrancy.t.sol
+Already installed: /tmp/tmpbhjgxt7p/foundry/test/WP09NGasBench.t.sol
+Already installed: /tmp/tmpbhjgxt7p/foundry/test/WP09NWithdrawalReentrancy.t.sol
+optimizer_runs=   1 | bytes=22,999 | headroom=1,577 | low_headroom
+optimizer_runs= 200 | bytes=22,800 | headroom=1,776 | low_headroom
+Results: /tmp/tmpc_i2obc6/.local/wp09n/optimizer_sweep.csv
+Installed test-only file: /tmp/tmppjzalghj/foundry/test/WP09NGasBench.t.sol
+Installed test-only file: /tmp/tmppjzalghj/foundry/test/WP09NWithdrawalReentrancy.t.sol
+WP09N|register|n_active 4
+WP09N|register|gas 10000
+WP09N|register|n_active 5
+WP09N|register|gas 10001
+WP09N|register|n_active 6
+WP09N|register|gas 10002
+WP09N|register|n_active 7
+WP09N|register|gas 10003
+WP09N|register|n_active 8
+WP09N|register|gas 10004
+WP09N|register|n_active 9
+WP09N|register|gas 10005
+WP09N|register|n_active 10
+WP09N|register|gas 10006
+WP09N|register|n_active 11
+WP09N|register|gas 10007
+WP09N|register|n_active 12
+WP09N|register|gas 10008
+WP09N|register|n_active 13
+WP09N|register|gas 10009
+WP09N|register|n_active 14
+WP09N|register|gas 10010
+WP09N|register|n_active 15
+WP09N|register|gas 10011
+WP09N|register|n_active 16
+WP09N|register|gas 10012
+WP09N|register|n_active 17
+WP09N|register|gas 10013
+WP09N|register|n_active 18
+WP09N|register|gas 10014
+WP09N|register|n_active 19
+WP09N|register|gas 10015
+
+Saved: /tmp/tmppjzalghj/.local/wp09n/success_call_gas.csv
+Installed test-only file: /tmp/tmp7ubbrb25/foundry/test/WP09NGasBench.t.sol
+Installed test-only file: /tmp/tmp7ubbrb25/foundry/test/WP09NWithdrawalReentrancy.t.sol
+error bad test
+BENCHMARK FAILED; no results will be reported. Inspect: /tmp/tmp7ubbrb25/.local/wp09n/wp09n_foundry_bench.log
