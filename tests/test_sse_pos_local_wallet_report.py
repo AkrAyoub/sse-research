@@ -50,8 +50,14 @@ class LocalOwnerWithdrawalTests(unittest.TestCase):
         self.assertFalse(result["walletPasswordVerified"])
         self.assertFalse(result["operatorPhysicalIndependenceVerified"])
         self.assertFalse(result["genesisOrValidatorActivated"])
-        self.assertNotIn("ciphertext", json.dumps(result))
-        self.assertNotIn("privateKey", json.dumps(result))
+        # Distinguish a reassuring status FIELD from actual secret material:
+        # "privateKeyPrinted": false is safe; privateKey: "<hex>" is not.
+        self.assertNotIn("ciphertext", result)
+        self.assertNotIn("privateKey", result)
+        self.assertNotIn("private_key", result)
+        self.assertNotIn("mnemonic", result)
+        self.assertNotIn("secretKey", result)
+        self.assertIs(result["privateKeyPrinted"], False)
 
     def test_address_may_use_ethereum_0x_prefix(self):
         self.doc["address"] = "0x" + "b" * 40
