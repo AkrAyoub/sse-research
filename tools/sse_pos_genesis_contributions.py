@@ -71,10 +71,11 @@ def read_contribution(path: Path):
     return op, result
 
 
-def collect(paths: list[Path], *, min_operators: int = 4,
-            min_validators: int = 64) -> tuple[str, dict]:
-    # These minima are the INITIAL RESEARCH CEREMONY targets, NOT protocol
-    # limits/whitelists or requirements for future permissionless deposits.
+def collect(paths: list[Path], *, min_operators: int,
+            min_validators: int) -> tuple[str, dict]:
+    # The initiating operators explicitly publish these *genesis-snapshot*
+    # safety thresholds; NO program-wide fixed operator/validator roster.
+    # Future validator deposits remain permissionless and uncapped.
     if min_operators < 2 or min_validators < 1:
         raise CeremonyError("invalid independent genesis research ceremony minima")
     if len(paths) < min_operators or len(set(paths)) != len(paths):
@@ -123,8 +124,10 @@ def main(argv=None) -> int:
     p = argparse.ArgumentParser(description="Collect public genesis validator keys WITHOUT seeds or claim of BLS proof")
     p.add_argument("--contribution", action="append", type=Path, required=True,
                    help="a distinct independent operator's PUBLIC-only JSON contribution; repeat")
-    p.add_argument("--min-operators", type=int, default=4)
-    p.add_argument("--min-validators", type=int, default=64)
+    p.add_argument("--min-operators", type=int, required=True,
+                   help="documented independent fault-domain target for THIS genesis; not a membership cap")
+    p.add_argument("--min-validators", type=int, required=True,
+                   help="documented active-key target for THIS genesis; future deposits are open")
     p.add_argument("--output", type=Path, help="write new provisional public validators.txt, never overwrite")
     args = p.parse_args(argv)
     try:
