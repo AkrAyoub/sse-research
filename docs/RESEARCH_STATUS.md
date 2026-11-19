@@ -7,7 +7,7 @@ Internet-public deployment. Research claims require actual observations.
 
 | Observation | Evidence and exact scope |
 |---|---|
-| Private PoS smoke VM | VM4705, 4vCPU/11GiB, Besu EL+Lighthouse CL/VC, all operated on ONE host |
+| Private PoS smoke VM | **Historical isolated chain31339** on VM4705, 4vCPU/11GiB, Besu EL+Lighthouse CL/VC, all operated on ONE host; **not public and not suitable for public reuse** |
 | Consensus | Execution blocks increased to at least 1157; Beacon finalized checkpoint previously observed |
 | Deployed source | SSE Solidity R16 commit `cd2fe67e3031d4f25c41bfc714c6539b7ca1ebef` |
 | Committee | `0x9965bAC16C5Df538df0373a906e42eA0E0C327d9` |
@@ -24,6 +24,8 @@ Internet-public deployment. Research claims require actual observations.
 | Public PoS P2P | **No independent remote P2P peer or dynamically readdressing seed witnessed** |
 | Public validator joining | **No new BLS deposit/activation from an independent host witnessed** |
 | Genesis key security | First upstream PoS launch printed genesis consensus mnemonic and premine private keys. **Compromised for any Internet-public use.** |
+
+**Chain identity and custody:** The preceding VM4705 chain was **31339** (historical, one-operator, leaked genesis mnemonic/private key material). It must never be published or repurposed as the independent public network. **31340** is a *proposed new chain ID*, not an already validated or deployed network; its genesis, independently generated validator identities, and Internet P2P remain outstanding. These chain IDs are not real Ethereum Mainnet and contain only worthless TEST ETH.
 
 **Important distinction:** The successful ledger is genuine PoS and
 the three SSE contracts genuinely exist there. But 32 genesis
