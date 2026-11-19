@@ -1,0 +1,28 @@
+{
+  "schema": "SSE_NATIVE_POS_CLIENT_DIGEST_PINS_V1",
+  "intendedChainId": 31340,
+  "notes": "Observed on developer VM4706 in isolated version-only Docker runs on 2026-11-19, immutable image refs do not establish chain deployment or upstream supply-chain audit.",
+  "evidenceSourceSha": "2908450be6e3360d58ea35d64f7a72bcfa4f5f43",
+  "artifactProvenance": "docs/experiments/VM4706_2026-11-19.md#entry-018--actual-besu-26111-and-lighthouse-v833-image-pulls-and-isolated-version-runs-observed",
+  "images": {
+    "besu": {
+      "tag": "hyperledger/besu:26.11.1",
+      "ref": "hyperledger/besu@sha256:4fd2ba40f0d65917bcb3abd9af60673946f66dee2ecb1b87f7cdfa6a30fe458d",
+      "imageId": "sha256:4fd2ba40f0d65917bcb3abd9af60673946f66dee2ecb1b87f7cdfa6a30fe458d",
+      "observedVersion": "besu/v26.11.1/linux-x86_64/openjdk-java-25"
+    },
+    "lighthouse": {
+      "tag": "sigp/lighthouse:v8.3.3",
+      "ref": "sigp/lighthouse@sha256:53f9063d98c3d3a2d290207873f019ea2298cfc02f8cd58d87c33b04aab856d1",
+      "imageId": "sha256:53f9063d98c3d3a2d290207873f019ea2298cfc02f8cd58d87c33b04aab856d1",
+      "observedVersion": "Lighthouse v8.3.3-57c2abc"
+    }
+  },
+  "verification": {
+    "versionCommandsExecutedOnVM4706": true,
+    "genesisBuilt": false,
+    "publicP2PStarted": false,
+    "validatorKeysGenerated": false,
+    "realTestEthDeposited": false
+  }
+}
