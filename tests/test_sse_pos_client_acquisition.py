@@ -37,6 +37,13 @@ class NativeClientGateTests(unittest.TestCase):
         self.assertNotIn('-p 30303', self.src)
         self.assertNotIn('-p 9000', self.src)
 
+    def test_preserves_besu_security_wrapper(self):
+        # Besu's Docker image has a security-configuring entrypoint; only
+        # Lighthouse's dedicated CLI is overridden in this version probe.
+        self.assertIn('entrypoint_args=(--entrypoint lighthouse)', self.src)
+        self.assertIn('"${entrypoint_args[@]}" "$digest" --version', self.src)
+        self.assertNotIn('--entrypoint "$name"', self.src)
+
     def test_no_admission_or_genesis_claims(self):
         self.assertIn('R19_NATIVE_EL_CL_P2P_STARTED=false', self.src)
         self.assertIn('R19_BEACON_GENESIS_CREATED=false', self.src)
