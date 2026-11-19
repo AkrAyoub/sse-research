@@ -32,7 +32,7 @@ verify_binary() {
     echo "R20_GENESIS_TOOL_REFUSED: missing, symlinked or nonexecutable binary: $binary" >&2
     return 2
   fi
-  if ! printf '%s  %s\\n' "$BIN_SHA256" "$binary" | sha256sum --check --status; then
+  if ! printf '%s  %s\n' "$BIN_SHA256" "$binary" | sha256sum --check --status; then
     echo "R20_GENESIS_TOOL_REFUSED: expected generator binary SHA256 mismatch" >&2
     return 2
   fi
