@@ -150,6 +150,8 @@ class OwnPosEndToEndStaticTests(unittest.TestCase):
         modules=(ROOT/".gitmodules").read_text()
         self.assertIn("path = lib/forge-std",modules)
         self.assertIn("https://github.com/foundry-rs/forge-std.git",modules)
+        self.assertIn("path = lib/openzeppelin-contracts",modules)
+        self.assertIn("https://github.com/OpenZeppelin/openzeppelin-contracts.git",modules)
         proc=subprocess.run(
             ["git","ls-tree","HEAD","lib/forge-std"],cwd=ROOT,
             capture_output=True,text=True,timeout=10,check=True
@@ -157,6 +159,14 @@ class OwnPosEndToEndStaticTests(unittest.TestCase):
         self.assertIn(
             "160000 commit f3dae6e6ee381f25eb6a246f7da9b85c91a68219",
             proc.stdout
+        )
+        oz=subprocess.run(
+            ["git","ls-tree","HEAD","lib/openzeppelin-contracts"],cwd=ROOT,
+            capture_output=True,text=True,timeout=10,check=True
+        )
+        self.assertIn(
+            "160000 commit cab19933c33c2ad1d4c7a84864a3601dddfd16f3",
+            oz.stdout
         )
 
     def test_wallet_is_encrypted_no_real_eth(self):

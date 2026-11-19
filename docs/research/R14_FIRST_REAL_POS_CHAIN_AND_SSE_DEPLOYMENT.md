@@ -72,11 +72,23 @@ balance is required; a YAML allocation alone does not prove it.
 ## 2 — Reproducible Foundry dependency (GitHub-first)
 
 Previously, tests and script imported forge-std but the repo had
-NO lib/forge-std tracked. R14 added an immutable submodule:
+NO lib/forge-std tracked. R14 pinned the forge-std submodule:
 
     lib/forge-std -> foundry-rs/forge-std
     Git SHA: f3dae6e6ee381f25eb6a246f7da9b85c91a68219
     Official release: v1.17.0
+
+Actual VM4705 compilation then proved one more missing dependency:
+SSESettlement.sol imports OpenZeppelin's EIP712.sol and ECDSA.sol.
+R15 pins the full audited OpenZeppelin Contracts v5.7.0 source
+as an immutable second Git submodule:
+
+    lib/openzeppelin-contracts -> OpenZeppelin/openzeppelin-contracts
+    Git SHA: cab19933c33c2ad1d4c7a84864a3601dddfd16f3
+    Official release: v5.7.0 (pragma ^0.8.24 for EIP712)
+
+Both these source dependencies are needed for Foundry builds.
+No local source edits, forge install or GitHub Actions are required.
 
 Update GitHub source to the approved new R14 commit, then:
 
@@ -102,8 +114,13 @@ containing private keys. Example:
 
 Record the actual Foundry build version and solc0.8.24.
 
-    forge build
+    forge build --sizes
     forge test
+
+If any deployed contract reaches >=24576 runtime bytes (EIP-170),
+STOP before broadcasting. The required code size has to be measured
+under this pinned OpenZeppelin version rather than inferred from older
+Anvil tests.
 
 Full gates must pass in this new clone before deploying
 the SSE contracts. Check no contract exceeds EIP170 24576B.
@@ -180,3 +197,23 @@ and mutual contract addresses.
 The first single-host smoke chain is **not** a permissioned QBFT
 deployment, but it is also not yet an observed geographically
 decentralized, fully open operational network.
+
+## 2026-11-19 — LIVE PoS finality and funded faucet PROVED
+
+VM4705 operator executed the actual read-only RPC checks:
+- `chainId=31339`, exact genesis hash unchanged
+- `executionBlockHeight=269`, Beacon head slot 269
+- `finalizedEpoch=6`, `finalityObserved=true`
+- Faucet public address `0x1D987dBFEB682Ff4bD88EfAc293f132e233168e7`
+  has an observed `1,000,000.0` worthless test-ETH genesis balance
+- 29/29 Python PoS tests passed at R14, Foundry 1.9.0 installed
+
+**Current blocker was a missing OpenZeppelin dependency, not PoS
+consensus.** `forge build`, `forge test` and the unbroadcast
+`DeploySSEPos` simulation failed to resolve
+`@openzeppelin/contracts/utils/cryptography/EIP712.sol` and
+`ECDSA.sol`. R15 source now pins that dependency in GitHub; rerun
+`git submodule update --init --recursive` then `forge build --sizes`,
+`forge test`, and only then dry-run deployment. No SSE contract has
+yet been deployed, no wallet key has been shared, and NO PoS state
+needs regeneration.
