@@ -142,6 +142,23 @@ class OwnPosEndToEndStaticTests(unittest.TestCase):
         self.assertNotIn("privateKey =",code)
         self.assertNotIn("0xac0974",code)
 
+    def test_foundry_dependency_is_pinned_in_github(self):
+        # The source tree is private and fresh VMs had NO lib/forge-std.
+        # A GitHub-tracked gitlink, not a local untracked install, is
+        # needed for reproducible Forge tests and on-chain deployment.
+        import subprocess
+        modules=(ROOT/".gitmodules").read_text()
+        self.assertIn("path = lib/forge-std",modules)
+        self.assertIn("https://github.com/foundry-rs/forge-std.git",modules)
+        proc=subprocess.run(
+            ["git","ls-tree","HEAD","lib/forge-std"],cwd=ROOT,
+            capture_output=True,text=True,timeout=10,check=True
+        )
+        self.assertIn(
+            "160000 commit f3dae6e6ee381f25eb6a246f7da9b85c91a68219",
+            proc.stdout
+        )
+
     def test_wallet_is_encrypted_no_real_eth(self):
         p=wallet_plan("faucet")
         self.assertFalse(p["walletCreated"])
