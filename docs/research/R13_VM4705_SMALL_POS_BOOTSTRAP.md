@@ -1,9 +1,11 @@
 # R13 — VM4705 small-host SSE own-PoS bootstrap
 
-Date 2026-11-19. Status: GitHub source only, LIVE network not launched.
+Date 2026-11-19. Status: **FIRST ON-VM PoS CHAIN31339 ENCLAVE RUNNING**,
+execution/finality/faucet balances not yet independently checked.
+**First run emitted mnemonic and prefunded private keys: tainted smoke-only genesis.**
 
 Fresh VM4705: Ubuntu 24.04.4, 4 vCPU, 11 GiB memory, 93GB free
-storage, Docker 29.1.3 through sudo, no Kurtosis or SSE checkout yet.
+storage, Docker 29.1.3. GitHub checkout and Kurtosis 1.23.0 now installed,\nwith reviewed Docker-group access and first running PoS enclave.
 Destroyed VM4704's private keys and faucet are intentionally discarded.
 DO NOT reuse the old faucet address or old genesis mnemonic.
 
@@ -190,3 +192,92 @@ and install reviewed Kurtosis. Only then consider `--apply`.
 genesis 1M worthless test ETH balance, deployed SSE EVM contracts,
 actual SLA settlement, and later separate-host external PoS validator
 deposit+activation. The initial one-host network is not decentralized.
+
+## 2026-11-19 — FIRST REAL CHAIN31339 BOOT (verified operator log)
+
+The **actual** VM4705 Kurtosis transcript now proves new chain
+31339 reached RUNNING with these distinct services:
+`el-1-besu-lighthouse` (Besu 26.11.1),
+`cl-1-lighthouse-besu` (Lighthouse v8.3.3),
+`vc-1-besu-lighthouse` (validator client),
+and a one-off key-generation service.
+Besu reported Ethereum protocol genesis, execution chainID31339,
+and all 32 Electra-genesis validators. Real EL genesis block0 hash:
+
+`0x2aab680cd1b5fe856566eb81eae181b8f15b0cdfb6bdd218180f793371df97f5`
+
+Real Beacon genesis validators root:
+
+`0x016a9bddcf3e7fcd561895d5b75ab461ad6f75f0c5f8b5d74e9556b6df8cb425`
+
+Public faucet address selected by owner:
+
+`0x1D987dBFEB682Ff4bD88EfAc293f132e233168e7`
+
+Observed first-run **local** endpoints (Kurtosis dynamically maps
+ports; verify these against `kurtosis enclave inspect` after restart):
+EL RPC `http://127.0.0.1:32770`,
+Beacon API `http://127.0.0.1:32774`.
+3 core services were RUNNING at inspection. Actual chain height,
+finality and funded test-ETH balance had NOT yet been measured by the
+operator log. Use read-only commands:
+
+```bash
+python tools/sse_pos_devnet_health.py \
+  --execution-url http://127.0.0.1:32770 \
+  --beacon-url http://127.0.0.1:32774 \
+  --expected-genesis 0x2aab680cd1b5fe856566eb81eae181b8f15b0cdfb6bdd218180f793371df97f5 \
+  --require-finality
+curl -fsS http://127.0.0.1:32770 -H 'Content-Type: application/json' \
+  -d '{"jsonrpc":"2.0","method":"eth_getBalance","params":["0x1D987dBFEB682Ff4bD88EfAc293f132e233168e7","latest"],"id":1}' \
+  | python -c 'import json,sys; x=json.load(sys.stdin); print("Faucet test ETH:",int(x["result"],16)/10**18)'
+```
+
+### CRITICAL key exposure discovered in first live log
+
+**The upstream pinned ethereum-package Starlark run printed a 24-word
+bootstrap consensus mnemonic and numerous premine EOA private keys to
+its ordinary CLI transcript, including a JSON object with all private
+keys.** Do NOT duplicate these secrets in research notes, GitHub,
+terminal excerpts, issues, chat or public release bundles. The
+previously shared transcript exposed the bootstrap mnemonic. This
+ONE-HOST current enclave is therefore **TAINTED for public admission**:
+use only as an isolated, disposable smoke chain, with no externally
+exposed validator admission or valuable assets. A future public
+experiment MUST replace all exposed genesis bootstrap keys with
+fresh independently generated secrets and a new genesis; it MUST NOT
+claim independent operator decentralization merely because 32
+validators share one machine. The operator's separately encrypted
+faucet wallet password and private EOA are NOT shown as leaked in
+this output, but its public address is known.
+
+The upstream Kurtosis service metadata showed Besu and Lighthouse
+discovery TCP endpoints bound to `0.0.0.0` on ephemeral VM4705 host
+ports, **despite this R13 configuration disabling intentional P2P
+publication**. Do not assume these binds are safe. Keep them blocked
+by host/cloud firewall and do not provide Internet access for the
+current exposed-key smoke network. DO NOT change SSH security groups
+blindly or enable UFW without confirming SSH reachability.
+
+**GitHub launcher source corrected for FUTURE RUNS**: raw upstream
+`kurtosis run` stdout+stderr goes to a restricted, owner-only
+`sse-pos-runlogs` directory with umask077 and unique mode0600 files.
+The terminal instead displays safe stage markers and a warning that
+the raw output contains secrets. This is a containment mitigation;
+the upstream package may still log secrets inside Kurtosis. Treat
+enclave outputs as sensitive. The already running enclave is
+unmodified by source updates. Never rerun `--apply` into an
+existing enclave and never print the raw private log.
+
+### Next acceptance
+
+1. Prove advancing EL height and finalized Beacon epoch/root, and
+   real on-chain faucet funding. Save only non-secret evidence.
+2. Install Foundry on the VM or use a verified secure SSH tunnel from
+   the existing Foundry workstation; deploy the current SSE contracts
+   through locally authenticated encrypted faucet EOA and chain31339.
+3. Run real consumer-provider-monitor escrow and settlement receipts,
+   collect gas costs/latencies/signed service artifacts.
+4. Prepare clean independent, multi-host PoS validator joining on a
+   NEW research genesis with no printed/distributed bootstrap keys,
+   proof of remote networking and 32-test-ETH on-chain activation.

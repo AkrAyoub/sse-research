@@ -80,8 +80,40 @@ if kurtosis enclave inspect "$ENCLAVE" >/dev/null 2>&1; then
   echo "SSE_POS_REFUSED: existing enclave present; will not replace or destroy" >&2
   exit 2
 fi
+# Upstream package d3014d6 PRINTS validator mnemonics and premine EOA
+# private keys as standard run output. Never stream that output into an
+# operator chat, build log or SSH terminal. This restricted log itself
+# still contains secrets; KEEP IT PRIVATE and remove it securely when
+# the associated disposable research chain is retired.
+umask 077
+LOG_DIR="${SSE_POS_PRIVATE_LOG_DIR:-$HOME/sse-pos-runlogs}"
+if [[ "$LOG_DIR" != /* || -L "$LOG_DIR" ]]; then
+  echo "SSE_POS_REFUSED: absolute nonsymlink private runlog directory required" >&2
+  exit 2
+fi
+if [[ ! -d "$LOG_DIR" ]]; then
+  mkdir -m 700 -- "$LOG_DIR"
+fi
+if [[ "$(stat -c '%a' "$LOG_DIR")" != 700 ||
+      "$(stat -c '%u' "$LOG_DIR")" != "$(id -u)" ]]; then
+  echo "SSE_POS_REFUSED: private runlog directory must be owner 0700" >&2
+  exit 2
+fi
+RUNLOG="$(mktemp "$LOG_DIR/kurtosis-run.XXXXXXXX.log")"
 echo "SSE_POS_STAGE=START_PINNED_ETHEREUM_POS_DEVNET"
-kurtosis run --enclave "$ENCLAVE" "$SSE_POS_UPSTREAM_DIR" \
-  --args-file "$CONFIG"
+echo "SSE_POS_UPSTREAM_OUTPUT_CONTAINS_PRIVATE_KEYS=true"
+echo "SSE_POS_RAW_OUTPUT_HIDDEN_FROM_TERMINAL=true"
+echo "SSE_POS_PRIVATE_RUNLOG=$RUNLOG"
+if kurtosis run --enclave "$ENCLAVE" "$SSE_POS_UPSTREAM_DIR" \
+  --args-file "$CONFIG" >"$RUNLOG" 2>&1; then
+  echo "SSE_POS_KURTOSIS_RUN_EXIT=0"
+else
+  status=$?
+  echo "SSE_POS_KURTOSIS_RUN_FAILED=$status" >&2
+  echo "SSE_POS_KEEP_RAW_RUNLOG_PRIVATE=true" >&2
+  echo "SSE_POS_ENCLAVE_PRESERVED_FOR_DIAGNOSIS=true" >&2
+  kurtosis enclave inspect "$ENCLAVE" || true
+  exit "$status"
+fi
 echo "SSE_POS_STAGE=RUNNING_CHECK_WITH_kurtosis_enclave_inspect"
 kurtosis enclave inspect "$ENCLAVE"

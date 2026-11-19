@@ -244,3 +244,32 @@ source Git SHA, private config SHA256, no default mnemonic, no public
 exposure and correct BPO epochs; launcher refuses other configs.
 No new chain launched and no new keys generated at GitHub commit.
 See docs/research/R13_VM4705_SMALL_POS_BOOTSTRAP.md.
+
+## 2026-11-19 — FIRST TRUE PoS CHAIN31339 ON VM4705, tainted validator keys
+
+Verified from operator's actual 897-line Kurtosis transcript: Docker
+access resolved, Kurtosis engine 1.23.0 started, pinned upstream
+ethereum-package d3014d6d23d683362025b9e23a0d69de49e77cca
+deployed chain31339 with genesis Besu execution block0
+0x2aab680cd1b5fe856566eb81eae181b8f15b0cdfb6bdd218180f793371df97f5
+and Beacon genesis validators root
+0x016a9bddcf3e7fcd561895d5b75ab461ad6f75f0c5f8b5d74e9556b6df8cb425.
+Besu, Lighthouse Beacon and Lighthouse validator services reported RUNNING
+on fresh VM4705; 32 independent BLS validator KEY RECORDS were generated
+but they are centrally controlled by ONE lab host. Executing real PoS
+finality and the on-chain 1M testETH faucet balance is still TO BE PROVED.
+
+CRITICAL: The Kurtosis upstream CLI printed the **bootstrap validator
+mnemonic and multiple prefunded EOA private keys** in the uploaded raw
+terminal output. Those keys are now considered exposed. Do not share
+them or publicize P2P endpoints; do not treat this chain as suitable
+for external validators or as permissionless proof-of-decentralization.
+EL+CL discovery TCP ports were bound 0.0.0.0 despite disabled intended
+P2P publication. Restrict cloud/host inbound reachability and rotate
+ALL exposed bootstrap credentials in a new genesis before any
+public-access experimental network. The current enclave may be
+retained locally for throwaway smoke and SSE test-ETH contract tests.
+GitHub launcher now captures future raw output in 0600 local logs,
+not a terminal, to prevent repeats. No secrets have been placed in
+GitHub by these commits. Source updates will NOT mutate the
+running Kurtosis enclave.

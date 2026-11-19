@@ -115,6 +115,18 @@ class SmallHostPoSLaunchTests(unittest.TestCase):
             with self.assertRaises(LaunchError):
                 verify(base,git_sha=SHA)
 
+    def test_future_upstream_secret_output_is_confined_to_owner_only_log(self):
+        # Real first launch printed 24-word mnemonic and funded EOA keys.
+        # We must NOT stream those upstream outputs into the operator chat.
+        script=(ROOT/"scripts"/"sse_pos_launch.sh").read_text()
+        self.assertIn('umask 077',script)
+        self.assertIn('LOG_DIR="${SSE_POS_PRIVATE_LOG_DIR:-$HOME/sse-pos-runlogs}"',script)
+        self.assertIn('mkdir -m 700 -- "$LOG_DIR"',script)
+        self.assertIn('RUNLOG="$(mktemp "$LOG_DIR/kurtosis-run.XXXXXXXX.log")"',script)
+        self.assertIn('--args-file "$CONFIG" >"$RUNLOG" 2>&1',script)
+        self.assertIn('SSE_POS_RAW_OUTPUT_HIDDEN_FROM_TERMINAL=true',script)
+        self.assertIn('SSE_POS_KEEP_RAW_RUNLOG_PRIVATE=true',script)
+
     def test_launcher_bash_syntax_is_valid(self):
         bash=shutil.which("bash")
         if not bash:
