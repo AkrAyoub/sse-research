@@ -14,7 +14,7 @@ import re
 from typing import FrozenSet
 
 
-ADDRESS = re.compile(r"0x[0-9a-fA-F]{40}\\Z")
+ADDRESS = re.compile(r"0x[0-9a-fA-F]{40}\Z")
 PUBLIC_READ = frozenset({"read_public_chain", "read_public_market", "read_public_node_status"})
 OWNER_READ = frozenset({"read_private_node_metrics"})
 LOCAL_ONLY = frozenset({"enable_local_role", "disable_local_role"})
