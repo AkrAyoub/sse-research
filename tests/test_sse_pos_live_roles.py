@@ -188,6 +188,40 @@ class R18RolesTests(unittest.TestCase):
         self.assertIn("SSE_R18_SIGNED_TX_HASH=",output.getvalue())
         self.assertNotIn(a.key.hex(),output.getvalue())
 
+    def test_real_vm4705_lowercase_recipient_signs_using_eip55_checksum(self):
+        # VM4705 live --fund failed BEFORE broadcast:
+        # Transaction had invalid fields {'to': '0xaf8105...'}.
+        # Unlike the prior numeric-only test address this destination
+        # contains letters and has a nontrivial EIP-55 checksum.
+        from eth_account import Account
+        from eth_utils import to_checksum_address
+        account=Account.create(os.urandom(32))
+        rpc=FakeRPC()
+        rpc.balances[account.address.lower()]=10**18
+        lowercase="0xaf810580e49809f337828391725886f40207abcc"
+        checksum=to_checksum_address(lowercase)
+        self.assertNotEqual(checksum,lowercase)
+        with redirect_stdout(io.StringIO()):
+            receipt=roles._send(rpc,account,lowercase,10**15)
+        self.assertEqual(receipt["to"],checksum)
+        self.assertEqual(len(rpc.txs),1)
+        self.assertTrue(receipt["receiptSuccessful"])
+
+    def test_real_vm4705_lowercase_committee_register_destination(self):
+        from eth_account import Account
+        from eth_utils import to_checksum_address
+        account=Account.create(os.urandom(32))
+        rpc=FakeRPC()
+        rpc.balances[account.address.lower()]=10**18
+        committee_lower=COMMITTEE.lower()
+        with redirect_stdout(io.StringIO()):
+            receipt=roles._send(
+                rpc,account,committee_lower,roles.EXPECTED_MIN_BOND,
+                roles._selector("register()"),
+            )
+        self.assertEqual(receipt["to"],to_checksum_address(committee_lower))
+        self.assertEqual(len(rpc.txs),1)
+
     def test_fee_cap_or_low_balance_prevents_signing(self):
         from eth_account import Account
         a=Account.create(os.urandom(32))

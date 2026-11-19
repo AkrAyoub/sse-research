@@ -29,6 +29,7 @@ import sys
 import time
 
 from Crypto.Hash import keccak
+from eth_utils import to_checksum_address
 from sse_pos_devnet_health import CHAIN, HealthError, safe_url, _request
 from sse_pos_contract_attest import attest, AttestError
 from sse_pos_deploy_receipts import FAUCET, GENESIS, COMMITTEE, SETTLEMENT, BOARD, SOURCE_COMMIT
@@ -231,7 +232,11 @@ def _send(rpc,account,to:str,value:int,data:str="0x")->dict:
     transaction={
         "chainId":CHAIN,
         "type":2,
-        "to":"0x"+to.removeprefix("0x"),
+        # eth-account rejects lower-case recipient hex addresses unless
+        # they happen to match EIP-55 checksum. Wallet inventory deliberately
+        # normalizes addresses to lower-case; checksum them ONLY at the
+        # signing boundary (same treatment for faucet and register() calls).
+        "to":to_checksum_address("0x"+to.removeprefix("0x")),
         "value":value,"data":data,
         "nonce":nonce,
         "maxFeePerGas":maxfee,

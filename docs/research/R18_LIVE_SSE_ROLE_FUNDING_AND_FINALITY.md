@@ -180,3 +180,58 @@ Actual contracts from R16:
 The same exact deployment-source Git SHA is
 \`cd2fe67e3031d4f25c41bfc714c6539b7ca1ebef\`.
 R18 is a later source revision and does NOT alter the live contracts.
+
+## 2026-11-19 — VM4705 live R18 finality PROVED; EIP-55 funding fix
+
+Observed by operator on VM4705 at source commit
+`5126c19823b9e48b5b1d3871b5f852054211418b`:
+- `49/49` targeted PoS Python tests PASSED.
+- The seven original SSE deployment receipts were independently
+  checked canonical and successful; source rev R16 as documented.
+- `deploymentTxFinalityProved=true` from the actual **execution
+  finalized tag**; `finalizedExecutionBlock=1088`, safely covering
+  all seven deployment tx blocks953–959. No speculative Beacon fallback
+  needed for this observation.
+- All eight owner-only encrypted accounts exist: genesis-funded
+  faucet, consumer, provider and five separate monitor EOAs.
+- Read-only `sse_pos_live_roles.py --plan` showed all seven new
+  user/monitor EOA balances zero, `registeredActiveCandidateCount=0`,
+  `allFiveDemoMonitorsRegistered=false` and exact chain31339,
+  protected genesis and deployed SSE mutual wiring.
+
+The first explicit `--fund` attempt prompted for the faucet keystore
+password and then refused **BEFORE the first transaction was signed
+or sent**, with:
+`Transaction had invalid fields: {'to': '0xaf810580e49809f337828391725886f40207abcc'}`.
+
+Root cause: `read_wallets()` returns normalized lower-case public
+addresses, but eth-account v0.14 requires proper EIP-55 checksummed
+strings for the `to` field of its EIP-1559 signer. The R18
+`_send()` constructed `to` from the lower-case address without
+checksum normalization. A numeric-only test recipient failed to
+exercise this constraint.
+
+**GitHub source correction R18b:** at the `Account.sign_transaction`
+boundary, `tools/sse_pos_live_roles.py` now uses
+`eth_utils.to_checksum_address(to)`. The new exact real-consumer
+mixed-alphabet regression test and registration-destination test
+exercise real secp256k1 EIP1559 signing through a mock RPC, not
+a simulated unsecured account. No encrypted keystore, genesis,
+deployed contract or existing chain state has been replaced.
+
+After testing updated GitHub commit, run `--plan` then `--fund`
+again: since the prior signing error occurred before broadcast and
+balances were zero, no manual resend/reconcile is needed for that
+specific refused attempt. On any NEW ambiguous broadcast failure,
+check the printed signed hash in the RPC BEFORE retrying.
+Then `--register` five monitors, independently inspect real
+receipts and active bonded candidate count.
+
+**Architecture truth:** all first-run PoS EL+CL+VC, 32 BLS validator
+keys, SSE contracts' state, faucet/consumer/provider/5 monitor
+keystores and Python tools are currently on **ONE VM4705**.
+Separate keys do not prove separate host operators. Next research
+network requires at least two independently controlled EL/CL/validator
+operators, separately hosted provider compute and multiple monitors,
+a new non-exposed bootstrap mnemonic and working P2P. This initial
+chain is disposable and its upstream-exposed genesis keys are tainted.
