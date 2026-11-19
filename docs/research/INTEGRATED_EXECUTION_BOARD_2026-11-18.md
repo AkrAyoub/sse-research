@@ -292,3 +292,26 @@ Rerun reproducible build/tests and inspect EIP170 sizes before
 authorizing broadcast. No real ETH, no Tailscale or permissioned QBFT.
 One-host 32-key genesis is still tainted by upstream leaked bootstrap
 mnemonic and **must not be used for public validator admission**.
+
+## 2026-11-19 — R16: full live contract dry run found invalid bootstrap order
+
+Actual VM4705: updated R15 repo with OpenZeppelin v5.7.0, all
+29/29 Python PoS tests and 144/144 Foundry tests PASSED.
+`forge build --sizes` produced Committee22670B, Settlement22311B,
+Board3739B, all beneath EIP170 max 24576B. Actual run on chain31339
+with the funded faucet EOA: unbroadcast `forge script` FAILED
+`OpenMonitorCommittee.enableDelayedBlockEntropy() Unauthorized()`.
+The trace showed `bindSettlement` was called before delayed entropy
+enable; the same error stopped a later operator command with
+`--broadcast --slow` during simulation. NO successful on-chain
+deployment receipts or addresses were observed. The simulated
+addresses MUST NOT be cited as live deployments.
+
+R16 GitHub code explicitly moves all one-time mode opt-ins
+before the one-time settlement binding, adds both classic and
+global-Merkle Foundry EVM regression tests for actual linking,
+adds static executable-statement order tests, and extends read-only
+on-chain attestation with paired global Merkle/batched recovery mode.
+Full tests and real deployment on VM4705 remain operator-gated.
+No changes to the running PoS chain/genesis/keystore are needed.
+See docs/research/R16_SSE_POS_DEPLOY_ORDER.md.

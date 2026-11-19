@@ -58,18 +58,25 @@ contract DeploySSEPos is Script {
             exitDelay,
             randomnessTimeout
         );
-        settlement = new SSESettlement(address(committee));
-        board = new OpenResourceBoard();
 
-        committee.bindSettlement(address(settlement));
-        // Permanently disable the admin-fed arbitrary randomness callback.
-        // This mode remains biasable by block proposers; it is the
-        // explicitly labeled research baseline, NOT final unbiased VRF.
+        // Bootstrap MUST happen before bindSettlement(). The pool
+        // rejects both entropy-mode changes and global-election opt-in
+        // after settlement is wired, by design. The former R15 script
+        // bound settlement first and reverted Unauthorized() during
+        // both simulation and --broadcast preflight.
+        //
+        // Delayed future-block entropy avoids a privileged seed writer,
+        // but remains proposer-biasable. It is a research baseline
+        // rather than an unbiased production VRF.
         committee.enableDelayedBlockEntropy();
         if (useGlobalMerkle) {
             committee.enableGlobalMerkleElection();
             committee.enableGlobalBatchedRecovery();
         }
+
+        settlement = new SSESettlement(address(committee));
+        board = new OpenResourceBoard();
+        committee.bindSettlement(address(settlement));
         settlement.bindResourceBoard(address(board));
         board.bindSettlement(address(settlement));
         vm.stopBroadcast();
@@ -80,6 +87,8 @@ contract DeploySSEPos is Script {
         require(committee.delayedBlockEntropyEnabled(), "SSE: unsafe entropy mode");
         require(committee.globalMerkleElectionEnabled() == useGlobalMerkle,
                 "SSE: wrong election mode");
+        require(committee.globalBatchedRecoveryEnabled() == useGlobalMerkle,
+                "SSE: wrong batched recovery mode");
 
         emit SSEOwnPosContractsDeployed(
             block.chainid,

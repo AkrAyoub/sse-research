@@ -79,10 +79,13 @@ def attest(*,rpc_url:str,committee:str,settlement:str,board:str,
             or int(minbond,16)<=0):
         raise AttestError("monitor participation lacks positive bond")
     global_mode=read(committee,"globalMerkleElectionEnabled()")
-    if (type(global_mode) is not str or not re.fullmatch(
-            r"0x[0-9a-fA-F]{64}\Z",global_mode)
-            or int(global_mode,16) not in (0,1)):
-        raise AttestError("invalid global selection mode")
+    batched_mode=read(committee,"globalBatchedRecoveryEnabled()")
+    if (any(type(v) is not str or not re.fullmatch(
+            r"0x[0-9a-fA-F]{64}\Z",v) or int(v,16) not in (0,1)
+            for v in (global_mode,batched_mode))):
+        raise AttestError("invalid global election or batched-recovery mode")
+    if global_mode!=batched_mode:
+        raise AttestError("global Merkle election and batched recovery not paired")
     return {
         "schema":"SSE_OWN_POS_CONTRACT_WIRING_OBSERVED_V1",
         "chainId":CHAIN,
@@ -94,6 +97,7 @@ def attest(*,rpc_url:str,committee:str,settlement:str,board:str,
         "minimumMonitorBondTestWei":int(minbond,16),
         "delayedBlockEntropyEnabled":True,
         "globalMerkleElectionEnabled":bool(int(global_mode,16)),
+        "globalBatchedRecoveryEnabled":bool(int(batched_mode,16)),
         "bindingsVerified":True,
         "sourceBytecodeEquivalenceVerified":False,
         "contractAdministratorRoleGrantRequired":False,

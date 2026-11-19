@@ -51,6 +51,7 @@ def on_chain(method,params):
         if selector==_selector("minimumBond()"):return "0x"+f"{10**15:064x}"
         if selector==_selector("delayedBlockEntropyEnabled()"):return "0x"+f"{1:064x}"
         if selector==_selector("globalMerkleElectionEnabled()"):return "0x"+f"{0:064x}"
+        if selector==_selector("globalBatchedRecoveryEnabled()"):return "0x"+f"{0:064x}"
     raise AssertionError(method)
 
 class OwnPosEndToEndStaticTests(unittest.TestCase):
@@ -119,8 +120,20 @@ class OwnPosEndToEndStaticTests(unittest.TestCase):
         self.assertTrue(result["bindingsVerified"])
         self.assertEqual(result["minimumMonitorBondTestWei"],10**15)
         self.assertFalse(result["globalMerkleElectionEnabled"])
+        self.assertFalse(result["globalBatchedRecoveryEnabled"])
         self.assertFalse(result["sourceBytecodeEquivalenceVerified"])
         self.assertFalse(result["physicalSLAExecutionVerified"])
+
+    def test_incomplete_global_merkle_mode_refuses_attestation(self):
+        def inconsistent(method,params):
+            if method=="eth_call" and params[0]["data"]==_selector(
+                    "globalMerkleElectionEnabled()"):
+                return "0x"+f"{1:064x}"
+            return on_chain(method,params)
+        with self.assertRaises(AttestError):
+            attest(rpc_url="http://127.0.0.1:32000",
+                   committee=POOL,settlement=SETTLEMENT,board=BOARD,
+                   expected_sha=SHA,call=inconsistent)
 
     def test_wrong_chain_never_described_as_our_pos_network(self):
         def wrong(method,params):
