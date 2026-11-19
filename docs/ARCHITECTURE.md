@@ -145,6 +145,14 @@ must be available on a genuinely public HTTPS/mirror endpoint without
 a GitHub invitation. A public repository, release mirror or
 HTTPS-hosted signed manifest works; a private repo URL does NOT.
 
+## No-administrator test-ETH funding — mandatory for economic roles
+
+Public full nodes and observers join and synchronize with **zero** test ETH. New external validators, monitors, consumers and providers generate independent local EOA wallets and (where selected) BLS keys; their role requirements are funded with **chain-native, worthless TEST ETH**, not real Ethereum Mainnet ETH or a central operator's private keys. A validator needs the protocol's 32-test-ETH deposit per validator plus measured gas; monitors need the actual on-chain `minimumBond()`; consumers need their actual lease escrow, incentive deposits and gas; providers need gas and any on-chain required collateral. Funds and role activation are NEVER inferred from UI tags.
+
+A public ownerless claim contract with independent gas sponsors and transparent finite reserves is a candidate route, not a deployed system or promise of infinite test ETH. Sponsor nodes are replaceable participants, not an SSE authorization authority; public donation/claim accounting is verifiable on-chain. Anyone can run a sponsor and transfer their own test ETH. Publicly funded claims do not establish human uniqueness; unlimited Sybil addresses can deplete finite free reserves despite per-address/per-block rate limits. No one wallet, website, faucet key or registry may decide who can join the P2P network or whitelist validators. On depletion, joining and full-node sync remain available, while economic role activation truthfully remains pending.
+
+Candidate `contracts/OpenTestEthFaucet.sol`, adversarial Foundry tests and design/remaining integration gates: [PUBLIC_TEST_ETH_FUNDING.md](PUBLIC_TEST_ETH_FUNDING.md); tracked in #37. **No faucet or independent auto-funding has yet been observed live on chain31340.**
+
 ## Source and boundary map
 
 `contracts/OpenMonitorCommittee.sol`,
