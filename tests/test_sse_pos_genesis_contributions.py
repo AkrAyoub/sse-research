@@ -4,6 +4,8 @@ from __future__ import annotations
 from contextlib import redirect_stdout
 from io import StringIO
 import json
+import os
+import subprocess
 from pathlib import Path
 import sys
 import tempfile
@@ -150,6 +152,49 @@ class GenesisPublicContributionsTests(unittest.TestCase):
             self.assertEqual(len(wd), 64)
             self.assertEqual(balance, "32000000000")
         self.assertFalse(result["consensusGenesisSszBuilt"])
+
+    def test_existing_tampered_generator_rejected_without_download(self):
+        # A repeat installer invocation must never accept a modified binary,
+        # nor try to download/overwrite existing content.
+        script = ROOT / "scripts" / "r20_install_beacon_genesis_generator.sh"
+        home = self.dir / "isolated-home"
+        destination = (home / ".local" / "share" / "sse-r19-toolchains"
+                       / "eth-beacon-genesis-v0.0.8")
+        destination.mkdir(parents=True)
+        binary = destination / "eth-genesis-state-generator"
+        binary.write_bytes(b"NOT THE VERIFIED GENESIS GENERATOR")
+        binary.chmod(0o755)
+        p = subprocess.run(
+            ["bash", str(script)],
+            env={**os.environ, "HOME": str(home)},
+            capture_output=True,
+            text=True,
+            timeout=10,
+            check=False,
+        )
+        self.assertEqual(p.returncode, 2)
+        self.assertIn("expected generator binary SHA256 mismatch", p.stderr)
+        self.assertNotIn("R20_RELEASE_URL=", p.stdout)
+        self.assertEqual(binary.read_bytes(), b"NOT THE VERIFIED GENESIS GENERATOR")
+
+    def test_generator_installer_reuses_only_verified_existing_binary(self):
+        src = (ROOT / "scripts" / "r20_install_beacon_genesis_generator.sh").read_text()
+        self.assertIn(
+            'BIN_SHA256="5ee29389cb29e8a1ace8cfc83ff30a1726409152e88cf07681764740ca9244d2"',
+            src,
+        )
+        self.assertIn("R20_GENESIS_TOOL_REUSED_VERIFIED=true", src)
+        self.assertIn('verify_binary "$DEST/eth-genesis-state-generator"', src)
+        self.assertIn('verify_binary "$STAGE/eth-genesis-state-generator"', src)
+        self.assertIn("R20_GENESIS_BINARY_SHA256_VERIFIED=true", src)
+        self.assertIn("sha256sum --check --status", src)
+        self.assertIn("R20_GENESIS_SSZ_GENERATED=false", src)
+        self.assertIn("R20_PUBLIC_POS_NETWORK_DEPLOYED=false", src)
+        self.assertEqual(
+            subprocess.run(["bash", "-n", str(ROOT / "scripts" / "r20_install_beacon_genesis_generator.sh")],
+                           check=False, timeout=10).returncode,
+            0,
+        )
 
     def test_no_shared_seed_generator_script(self):
         src = (ROOT / "scripts" / "r20_install_beacon_genesis_generator.sh").read_text()
