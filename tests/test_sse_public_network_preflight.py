@@ -26,9 +26,9 @@ def fixture():
         "beaconGenesisValidatorsRoot":"0x"+"78"*32,
         "secondsPerSlot":12,
         "slotsPerEpoch":32,
-        "executionGenesisFile":"https://public-node.example.org/genesis.json",
+        "executionGenesisFile":"https://public-mirror.duckdns.org/genesis.json",
         "executionGenesisSha256":"ab"*32,
-        "consensusConfigFile":"https://public-node.example.org/config.yaml",
+        "consensusConfigFile":"https://public-mirror.duckdns.org/config.yaml",
         "consensusConfigSha256":"cd"*32,
         "depositContract":"0x00000000219ab540356cBB839Cbe05303d7705Fa",
         "bootnodes":[
@@ -55,10 +55,19 @@ class SSEPublicNetworkTests(unittest.TestCase):
         f=fixture();f["chainId"]=31339
         with self.assertRaises(PublicManifestError):validate(f)
 
+    def test_public_genesis_cannot_reuse_compromised_31339_keys(self):
+        f=fixture()
+        f["executionGenesisHash"]="0x2aab680cd1b5fe856566eb81eae181b8f15b0cdfb6bdd218180f793371df97f5"
+        with self.assertRaises(PublicManifestError):validate(f)
+        f=fixture()
+        f["beaconGenesisValidatorsRoot"]="0x016a9bddcf3e7fcd561895d5b75ab461ad6f75f0c5f8b5d74e9556b6df8cb425"
+        with self.assertRaises(PublicManifestError):validate(f)
+
     def test_wont_accept_overlay_lab_or_nonpublic_fqdn(self):
         for host in ("node.tailnet.ts.net","vm4705.example.org",
                      "localhost","10.50.56.13","node.local",
-                     "node.example","node.internal"):
+                     "node.example","node.internal",
+                     "seed.example.org","seed.example.com"):
             f=fixture()
             f["bootnodes"][0]["executionEnode"]=(
                 "enode://"+"12"*64+f"@{host}:30303")

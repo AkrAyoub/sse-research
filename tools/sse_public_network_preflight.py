@@ -27,6 +27,8 @@ from urllib.parse import urlsplit
 
 CURRENT_PUBLIC_TARGET_CHAIN=31340
 OLD_EXPOSED_CHAIN=31339
+OLD_EXPOSED_EXECUTION_GENESIS="0x2aab680cd1b5fe856566eb81eae181b8f15b0cdfb6bdd218180f793371df97f5"
+OLD_EXPOSED_BEACON_ROOT="0x016a9bddcf3e7fcd561895d5b75ab461ad6f75f0c5f8b5d74e9556b6df8cb425"
 SCHEMA="SSE_PUBLIC_POS_RELEASE_V1"
 HASH=re.compile(r"0x[0-9a-fA-F]{64}\Z")
 SHA256=re.compile(r"[0-9a-fA-F]{64}\Z")
@@ -61,6 +63,7 @@ def _fqdn(name:str)->str:
     if type(name) is not str or not DNS.fullmatch(name):
         raise PublicManifestError("bootstrap requires public DNS hostname, not a fixed IP")
     if (name.endswith((".local",".internal",".lan",".test",".invalid",".example"))
+            or name.endswith((".example.org",".example.com",".example.net"))
             or ".ts.net" in name
             or name.endswith((".localhost", ".onion"))):
         raise PublicManifestError("bootstrap must not require private VPN or fake DNS")
@@ -98,6 +101,9 @@ def validate(manifest:dict)->dict:
         v=manifest[name]
         if type(v) is not str or not HASH.fullmatch(v) or int(v,16)==0:
             raise PublicManifestError("missing distinct fresh nonzero genesis commitment")
+    if (manifest["executionGenesisHash"].lower()==OLD_EXPOSED_EXECUTION_GENESIS
+            or manifest["beaconGenesisValidatorsRoot"].lower()==OLD_EXPOSED_BEACON_ROOT):
+        raise PublicManifestError("public release cannot reuse VM4705 exposed-key genesis")
     for name in ("executionGenesisFile","consensusConfigFile"):
         _https_artifact(manifest[name])
     for name in ("executionGenesisSha256","consensusConfigSha256"):
