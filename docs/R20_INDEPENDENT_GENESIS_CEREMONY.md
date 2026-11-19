@@ -43,7 +43,7 @@ The first operator may create **one actual test-only execution/withdrawal EOA** 
 - Actual BLS validator key generation, signed proof of possession and fork-specific deposit-data signatures must wait for independently approved testnet fork config, owner-controlled BLS mnemonic/key custody procedure and explicit verification. Lighthouse's `validator_manager create` can output a *sensitive* `validators.json`; do not pass it through CI, HTTP endpoints, private GitHub, or chat. See [Lighthouse validator creation and export warning](https://lighthouse-book.sigmaprime.io/validator_manager_create.html).
 - Before exposing any EL/CL ports, update/harden the reported Ubuntu VM security patches, establish actual independent Internet TCP/UDP reachability and ensure local wallet controls cannot be manipulated by SSE or Docker control APIs.
 
-**New source gate:** `tests/test_sse_pos_local_wallet_report.py` contains five source/fixture guards (NOT executed on VM4706 as of commit). A test fixture showing a 40-byte public address is **not** a real wallet. The next actual operator run will generate an encrypted EOA only if the operator manually authorizes it.
+**New source gate:** `tests/test_sse_pos_local_wallet_report.py` contains six source/fixture guards (NOT executed on VM4706 as of commit). A test fixture showing a 40-byte public address is **not** a real wallet. The next actual operator run will generate an encrypted EOA only if the operator manually authorizes it.
 
 ## Public contribution file shape (local-generated, real public key data only)
 
