@@ -47,8 +47,12 @@ def inspect_encrypted_dir(directory: Path) -> dict:
     if not {"address", "id", "version"} <= set(document) or len(set(document) - EXPECTED_KEYS) > 0:
         raise WalletCheckError("unexpected keystore schema")
     addr = document["address"]
-    if type(addr) is not str or not ADDR.fullmatch(addr):
+    if type(addr) is not str:
         raise WalletCheckError("encrypted keystore missing EOA address")
+    if addr.startswith("0x"):
+        addr = addr[2:]
+    if not ADDR.fullmatch(addr):
+        raise WalletCheckError("invalid EOA address in encrypted keystore")
     crypto = document.get("crypto", document.get("Crypto"))
     if type(crypto) is not dict or not all(key in crypto for key in (
         "cipher", "ciphertext", "cipherparams", "kdf", "kdfparams", "mac"
