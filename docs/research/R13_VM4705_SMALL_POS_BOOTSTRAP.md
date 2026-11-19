@@ -142,3 +142,51 @@ Acceptance:
 - Actual PoS finality and funded test EOA balance
 - SSE contract deployment + bid/provider/monitor/settlement evidence
 - Open external validator P2P join and native staking activation
+
+## 2026-11-19 — VM4705 real operator evidence: preserve genesis, fix parser
+
+Observed on the NEW VM4705:
+- Read-only GitHub SSH deploy key created and private repo cloned;
+  R13 exact checkout `67405e2ee36be27e91bfd77fcbc2e33935830bbf`.
+- Owner-only encrypted faucet wallet created once:
+  `0x1D987dBFEB682Ff4bD88EfAc293f132e233168e7`.
+- Owner-only R13 PoS genesis and new private BIP39 bootstrap mnemonic
+  generated once. Initial configuration SHA256:
+  `b2f97ce79e0e248865ef029ae2c8c8be870e717bd9d5304fef92f02d8638a280`.
+- 25 targeted PoS tests run: 23 pass, 1 FAIL, 1 ERROR.
+  The ERROR was a source-only preflight YAML syntax mismatch:
+  `tools/sse_pos_launch_preflight.py` expected indented
+  `    el_type: besu` rather than the correct YAML list entry
+  `  - el_type: besu`.
+  The FAIL was a test matching `kurtosis clean -a` inside an
+  explanatory COMMENT, not a shell command.
+- The operator ran `sudo usermod -aG docker "$USER"` but the existing
+  SSH login still lacked Docker socket access. Log out and in, then
+  verify `id -nG` and nonroot `docker info`; the Docker group is
+  root-equivalent and not an SSE consensus authorization.
+- No Kurtosis installation or PoS launch was observed. Calls to
+  `sse_pos_launch.sh --plan` and `--apply` both correctly failed
+  closed before any enclave was created.
+
+**Correction in later GitHub source:**
+1. Preflight recognizes the actual YAML list dash.
+2. Test ignores COMMENT-only prohibited command mentions while
+   continuing to forbid actual executable destructive commands.
+3. New preflight explicitly recognizes the previously reviewed
+   `67405e2...` R13 source manifest as a valid genesis origin
+   across later clean GitHub source revisions. Every invariant and
+   original SHA256 remain checked; a new wallet/mnemonic is NOT
+   required. This is the **only** old generator revision permitted.
+4. Targeted test demonstrates preservation of prior genesis source
+   SHA while reporting the new verifier checkout separately.
+
+Next: GitHub checkout of the approved correction SHA, run 25+
+targeted tests, verify `sse_pos_launch_preflight.py --verify-only`
+against the ORIGINAL unchanged `$HOME/sse-pos-secrets`; do NOT run
+faucet/genesis creation again. Then resolve Docker group session
+and install reviewed Kurtosis. Only then consider `--apply`.
+
+**Acceptance remains:** real advancing EL/CL block height and finality,
+genesis 1M worthless test ETH balance, deployed SSE EVM contracts,
+actual SLA settlement, and later separate-host external PoS validator
+deposit+activation. The initial one-host network is not decentralized.

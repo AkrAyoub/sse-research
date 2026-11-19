@@ -25,6 +25,11 @@ import sys
 
 ROOT=Path(__file__).resolve().parents[1]
 UPSTREAM="d3014d6d23d683362025b9e23a0d69de49e77cca"
+# VM4705 generated its real, owner-private genesis under this reviewed
+# R13 release. Later source fixes MUST NOT force a new mnemonic or wallet.
+# Only this EXACT known legacy release is accepted across clean checkouts;
+# the recorded genesis SHA256 and all runtime invariants are reverified.
+FIRST_R13_GENERATOR_SHA="67405e2ee36be27e91bfd77fcbc2e33935830bbf"
 FAR=18446744073709551615
 HEX=re.compile(r"[0-9a-f]{64}\Z")
 SHA=re.compile(r"[0-9a-f]{40}\Z")
@@ -82,8 +87,8 @@ def verify(directory:Path,*,git_sha:str|None=None)->dict:
             raise LaunchError("approved GitHub source checkout unavailable") from None
         if dirty:
             raise LaunchError("modified tracked source refused")
-    if git_sha!=source_sha:
-        raise LaunchError("network genesis created by a different source commit")
+    if git_sha!=source_sha and source_sha!=FIRST_R13_GENERATOR_SHA:
+        raise LaunchError("genesis created by an unapproved different source revision")
     checks={
         "schema":"SSE_OWN_ETHEREUM_POS_DEVNET_PLAN_V1",
         "chainId":31339,
@@ -106,7 +111,7 @@ def verify(directory:Path,*,git_sha:str|None=None)->dict:
         b'  preregistered_validator_count: 0',
         b'  genesis_gaslimit: 30000000',
         b'  network: "kurtosis"',
-        b'    el_type: besu',
+        b'  - el_type: besu',
         b'    cl_type: lighthouse',
         b'    vc_type: lighthouse',
         b'  prefunded_accounts: ',
@@ -122,7 +127,10 @@ def verify(directory:Path,*,git_sha:str|None=None)->dict:
             ) else line.startswith(pattern)
         )]
         if len(matching)!=1:
-            raise LaunchError("missing or repeated secure PoS network parameter")
+            # Only static, non-secret expected keys are named in errors.
+            # Never expose actual YAML lines or the mnemonic value.
+            raise LaunchError("missing or repeated secure PoS parameter: "
+                              +pattern.strip().decode("ascii").split(":")[0])
     for fork in fork_keys:
         if lines.count(f"  {fork}: {FAR}".encode())!=1:
             raise LaunchError("Fulu or dependent BPO epoch not disabled on small host")
@@ -143,6 +151,8 @@ def verify(directory:Path,*,git_sha:str|None=None)->dict:
     return {
         "schema":"SSE_R13_SECURE_GENESIS_LAUNCH_READY_V1",
         "sourceGitSha":source_sha,
+        "reviewedCurrentCheckoutSha":git_sha,
+        "originalR13GenesisPreservedAcrossCodeFix":git_sha!=source_sha,
         "chainId":31339,
         "upstreamGitSha":UPSTREAM,
         "genesisConfigSha256":manifest_sha,
