@@ -49,23 +49,37 @@ printf '%s  %s\n' "$ARCHIVE_SHA256" "$ARCHIVE" | sha256sum --check --status || {
 }
 echo "R19_FOUNDRY_ARCHIVE_SHA256_VERIFIED=true"
 
-# Four executable files only. Reject surprising archive paths/extra files.
-mapfile -t ENTRIES < <(tar -tzf "$ARCHIVE")
-if [[ "${#ENTRIES[@]}" -ne 4 ]]; then
-  echo "R19_FOUNDRY_REFUSED: unexpected official archive file count" >&2
+# The official verified release may include extra metadata or additional
+# tools. Do NOT assume its tar has exactly four entries. Instead, extract
+# ONLY the four binaries needed for source verification; never extract
+# arbitrary archive entries (including surprise files, links or directories).
+if ! ARCHIVE_LIST="$(tar -tzf "$ARCHIVE")"; then
+  echo "R19_FOUNDRY_REFUSED: release archive listing failed" >&2
   exit 2
 fi
+declare -A BINARY_PATHS=()
 for binary in forge cast anvil chisel; do
-  present=false
-  for item in "${ENTRIES[@]}"; do
-    if [[ "${item#./}" == "$binary" ]]; then present=true; fi
-  done
-  if [[ "$present" != true ]]; then
-    echo "R19_FOUNDRY_REFUSED: missing expected binary $binary" >&2
+  found=""
+  while IFS= read -r item; do
+    if [[ "${item#./}" == "$binary" ]]; then
+      if [[ -n "$found" ]]; then
+        echo "R19_FOUNDRY_REFUSED: duplicate archive entry for $binary" >&2
+        exit 2
+      fi
+      found="$item"
+    fi
+  done <<< "$ARCHIVE_LIST"
+  if [[ -z "$found" ]]; then
+    echo "R19_FOUNDRY_REFUSED: missing required binary $binary" >&2
     exit 2
   fi
+  BINARY_PATHS["$binary"]="$found"
 done
-tar -xzf "$ARCHIVE" --no-same-owner --no-same-permissions -C "$STAGE"
+
+echo "R19_FOUNDRY_ARCHIVE_REQUIRED_BINARIES_FOUND=true"
+tar -xzf "$ARCHIVE" --no-same-owner --no-same-permissions -C "$STAGE" -- \
+  "${BINARY_PATHS[forge]}" "${BINARY_PATHS[cast]}" \
+  "${BINARY_PATHS[anvil]}" "${BINARY_PATHS[chisel]}"
 for binary in forge cast anvil chisel; do
   if [[ ! -f "$STAGE/$binary" || -L "$STAGE/$binary" ]]; then
     echo "R19_FOUNDRY_REFUSED: expected file absent/nonregular: $binary" >&2
@@ -73,6 +87,8 @@ for binary in forge cast anvil chisel; do
   fi
   chmod 0755 -- "$STAGE/$binary"
 done
+echo "== Verify executable before finalizing installation =="
+"$STAGE/forge" --version
 mv -- "$STAGE" "$DEST"
 
 echo "== installed release =="
