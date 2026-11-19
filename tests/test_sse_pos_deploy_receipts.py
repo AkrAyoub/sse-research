@@ -128,6 +128,48 @@ class R17ReceiptsTests(unittest.TestCase):
         self.assertIsNone(record["finalizedExecutionBlock"])
         self.assertFalse(record["deploymentTxFinalityProved"])
 
+    def test_finalized_lighthouse_execution_payload_proves_tx_finality(self):
+        rpc,txs,receipts,blocks=fixtures()
+        blocks["finalized"]["number"]=hex(958)  # EL tag is stale
+        final_bh="0x"+"a5"*32
+        blocks[hex(975)]={"number":hex(975),"hash":final_bh}
+        beacon=lambda path:{
+            "finalized":True,"execution_optimistic":False,
+            "data":{"message":{"body":{"execution_payload":{
+                "block_number":"975","block_hash":final_bh
+            }}}},
+        }
+        record=self.call(rpc,beacon_get=beacon,require_tx_finality=True)
+        self.assertTrue(record["deploymentTxFinalityProved"])
+        self.assertTrue(record["beaconFinalizedExecutionPayloadMatchedCanonicalEL"])
+        self.assertEqual(record["beaconFinalizedExecutionBlock"],975)
+        self.assertEqual(record["finalizedExecutionBlock"],958)
+        self.assertEqual(record["deploymentTxFinalityEvidenceSource"],
+                         "beacon_finalized_execution_payload")
+
+    def test_optimistic_or_noncanonical_beacon_payload_not_finality(self):
+        for optimistic,wrong_hash,flag in (
+            (True,False,True),(False,True,True),(False,False,False)
+        ):
+            rpc,txs,receipts,blocks=fixtures()
+            blocks["finalized"]["number"]=hex(958)
+            final_bh="0x"+"a5"*32
+            blocks[hex(975)]={"number":hex(975),"hash":final_bh}
+            result_hash="0x"+"b6"*32 if wrong_hash else final_bh
+            beacon=lambda path:{
+                "finalized":flag,"execution_optimistic":optimistic,
+                "data":{"message":{"body":{"execution_payload":{
+                    "block_number":"975","block_hash":result_hash
+                }}}},
+            }
+            with self.subTest(optimistic=optimistic,
+                              wrong_hash=wrong_hash,flag=flag):
+                report=self.call(rpc,beacon_get=beacon)
+                self.assertFalse(report["deploymentTxFinalityProved"])
+                with self.assertRaises(DeploymentAuditError):
+                    self.call(rpc,beacon_get=beacon,
+                              require_tx_finality=True)
+
     def test_wrong_chain_or_bad_contract_binding_rejected(self):
         rpc,txs,receipts,blocks=fixtures()
         with self.assertRaises(DeploymentAuditError):

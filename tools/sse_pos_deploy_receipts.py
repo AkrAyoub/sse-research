@@ -68,11 +68,12 @@ def _selector(sig):
 
 
 def audit(*,rpc_url:str,beacon_url:str,require_tx_finality:bool=False,
-          rpc=None,health=None,attestation=None)->dict:
+          rpc=None,health=None,attestation=None,beacon_get=None)->dict:
     if type(require_tx_finality) is not bool:
         raise DeploymentAuditError("invalid finality policy")
     rpc_url=safe_url(rpc_url)
     beacon_url=safe_url(beacon_url)
+    actual_rpc=rpc is None
     rpc=rpc or (lambda method,params:_request(rpc_url,method,params))
     health=health or observe(
         execution_url=rpc_url,beacon_url=beacon_url,
@@ -168,14 +169,64 @@ def audit(*,rpc_url:str,beacon_url:str,require_tx_finality:bool=False,
         # we REFUSE to claim that the seven txs were finalized.
         pass
     tx_finalized=finalized_height is not None and finalized_height>=STEPS[-1][2]
+    finality_source="execution_finalized_tag" if tx_finalized else None
+    beacon_finalized_execution_block=None
+    beacon_payload_verified=False
+    # Besu can lag (or not implement) the EL JSON-RPC 'finalized'
+    # block tag. Lighthouse's FINALIZED non-optimistic Beacon BLOCK
+    # carries a canonical execution payload; independently cross-check
+    # its block number AND block hash against Besu. This is stronger
+    # than merely observing some earlier Beacon finalized epoch.
+    # Mocked RPC callers do not make unexpected real network requests:
+    # they must provide a beacon_get callback to exercise this branch.
+    if not tx_finalized and (beacon_get is not None or actual_rpc):
+        try:
+            payload_response=(
+                beacon_get("/eth/v2/beacon/blocks/finalized")
+                if beacon_get is not None
+                else _request(beacon_url+"/eth/v2/beacon/blocks/finalized")
+            )
+            if (type(payload_response) is dict
+                    and payload_response.get("finalized") is True
+                    and payload_response.get("execution_optimistic") is False):
+                data=payload_response.get("data")
+                message=data.get("message") if type(data) is dict else None
+                body=message.get("body") if type(message) is dict else None
+                payload=body.get("execution_payload") if type(body) is dict else None
+                if type(payload) is dict:
+                    block_number=payload.get("block_number")
+                    execution_hash=payload.get("block_hash")
+                    if (type(block_number) is str and block_number.isdecimal()
+                            and type(execution_hash) is str
+                            and HASH.fullmatch(execution_hash)):
+                        n=int(block_number)
+                        execution_block=rpc("eth_getBlockByNumber",[hex(n),False])
+                        if (type(execution_block) is dict
+                                and _to_hex_hash(execution_block.get("hash"))
+                                ==execution_hash.lower()):
+                            beacon_finalized_execution_block=n
+                            beacon_payload_verified=True
+                            if n>=STEPS[-1][2]:
+                                tx_finalized=True
+                                finality_source="beacon_finalized_execution_payload"
+        except (HealthError,DeploymentAuditError,ValueError,TypeError,OSError):
+            # Unavailable/malformed Beacon payload: do not mark TX
+            # finality proved on a mere finalized epoch header.
+            pass
     if require_tx_finality and not tx_finalized:
-        raise DeploymentAuditError("deployment receipts canonical but not proven finalized")
+        raise DeploymentAuditError(
+            "deployment receipts canonical but tx finality not yet proven by EL tag "
+            "or cross-checked finalized Beacon execution payload"
+        )
     return {
         "schema":"SSE_R17_LIVE_POS_DEPLOYMENT_RECEIPTS_V1",
         "chainId":CHAIN,"executionGenesisHash":GENESIS,
         "beaconFinalityObserved":True,
         "deploymentTxFinalityProved":tx_finalized,
+        "deploymentTxFinalityEvidenceSource":finality_source,
         "finalizedExecutionBlock":finalized_height,
+        "beaconFinalizedExecutionBlock":beacon_finalized_execution_block,
+        "beaconFinalizedExecutionPayloadMatchedCanonicalEL":beacon_payload_verified,
         "sourceGitCommitAtOriginalDeployment":SOURCE_COMMIT,
         "sourceBytecodeEquivalenceVerified":False,
         "faucetPublicAddress":FAUCET,"committee":COMMITTEE,

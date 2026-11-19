@@ -344,3 +344,42 @@ evidence, settlement/withdraw receipts. Synthetic evidence must
 be explicitly identified as such, not claimed as physical delivery.
 Current VM4705 genesis bootstrap mnemonic was disclosed upstream;
 isolate this test chain and rotate in new genesis before public peers.
+
+## 2026-11-19 13:06 UTC — R18 role bootstrap next steps: user log and GitHub source
+
+User checked out R17 d04b749 on VM4705: **39/39 Python PoS tests
+PASS**. The strict 7-receipt audit reported all deployment receipts
+canonical and validated, but could NOT prove execution block959
+finality through Besu's `finalized` block tag. This is NOT a
+reverted deployment. R18 adds non-optimistic Lighthouse Beacon
+`/eth/v2/beacon/blocks/finalized` execution payload number/hash
+cross-checked against canonical Besu block; maintains refusal when
+both routes are stale/insufficient or contradictory.
+
+User successfully created distinct encrypted CONSUMER EOA:
+0xAF810580e49809F337828391725886f40207abcC.
+PROVIDER creation failed due to password confirmation mismatch.
+A second loop beginning with consumer refused to overwrite
+the existing wallet. This is expected keystore protection.
+Resume provider, monitor01..05 only; NEVER delete consumer
+or regenerate faucet, genesis or SSE contracts.
+
+R18 source adds isolated chain31339-only read-only role inventory
+and explicit EIP1559 `--fund` / `--register` operator actions
+using password-prompted encrypted EOA keystores. Maximum initial
+test funding: 1+1+5*0.1=2.5 TEST ETH, and each
+of five monitors must post exact 0.001 test ETH bond to the
+original Committee address. It verifies real chain/genesis,
+mutual contract binding, source SHA and all role EOA uniqueness.
+The script supports partial retries through observed on-chain
+balances and active-candidate state; ambiguous transactions
+must be manually checked by hash before retry. The tool
+requires explicit user confirmation phrase and NEVER
+accesses leaked genesis BLS validator keys. Unit mocks added.
+GitHub source and tests are NOT yet executed on VM4705.
+
+Next after 5 live confirmed bonded monitors: actual on-chain
+resource request/bid/escrow/lease, entropy selection, 4/4
+monitor confirmation, EIP712 evidence and payouts on chain31339.
+No real external service proof or public independent validator
+admission has yet been demonstrated.
