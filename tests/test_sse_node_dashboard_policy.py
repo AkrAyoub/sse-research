@@ -123,6 +123,32 @@ class DashboardPolicySecurityTests(unittest.TestCase):
         }).permitted)
         self.assertFalse(authorize(None, self.owner()).permitted)
 
+    def test_truthy_string_cannot_forge_owner_authentication_or_consent(self):
+        for attr in (
+            "owner_authenticated", "origin_verified", "csrf_verified",
+            "node_owned_locally", "onchain_identity_verified",
+            "chain_identity_verified", "signer_consent_verified",
+        ):
+            with self.subTest(attribute=attr):
+                self.assertFalse(authorize(
+                    "withdraw_own_credit", self.owner(**{attr: "true"})
+                ).permitted)
+
+    def test_mutable_client_role_lists_are_not_trusted_server_evidence(self):
+        self.assertFalse(authorize(
+            "submit_monitor_evidence",
+            self.owner(onchain_roles_verified=["monitor"]),
+        ).permitted)
+        self.assertFalse(authorize(
+            "submit_monitor_evidence",
+            self.owner(local_roles_enabled={"monitor"}),
+        ).permitted)
+
+    def test_malformed_eoa_owner_target_cannot_authorize_withdrawal(self):
+        e = self.owner(signer_address="attacker-wallet",
+                       withdrawal_beneficiary="attacker-wallet")
+        self.assertFalse(authorize("withdraw_own_credit", e).permitted)
+
     def test_raw_http_worker_is_not_a_public_owner_console(self):
         worker = (ROOT / "services/provider-agent/compute_http_service.py").read_text()
         runner = (ROOT / "tools/sse_docker_sla_runner.py").read_text()
