@@ -53,6 +53,12 @@ class LocalOwnerWithdrawalTests(unittest.TestCase):
         self.assertNotIn("ciphertext", json.dumps(result))
         self.assertNotIn("privateKey", json.dumps(result))
 
+    def test_address_may_use_ethereum_0x_prefix(self):
+        self.doc["address"] = "0x" + "b" * 40
+        self.write()
+        result = inspect_encrypted_dir(self.p)
+        self.assertEqual(result["withdrawalAddress"], "0x" + "b" * 40)
+
     def test_refuse_plaintext_private_fields(self):
         for bad in ("private_key", "privateKey", "mnemonic", "secretKey"):
             self.doc[bad] = "DO_NOT_PUBLISH"
