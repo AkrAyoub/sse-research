@@ -315,3 +315,32 @@ on-chain attestation with paired global Merkle/batched recovery mode.
 Full tests and real deployment on VM4705 remain operator-gated.
 No changes to the running PoS chain/genesis/keystore are needed.
 See docs/research/R16_SSE_POS_DEPLOY_ORDER.md.
+
+## 2026-11-19 13:06 UTC — SSE LIVE ON-CHAIN deployment SUCCESS (R16)
+
+Confirmed by actual VM4705 operator `forge script --broadcast --slow`
+log: 7/7 successfully included transactions in Ethereum-PoS chain31339,
+blocks953–959, total10947092 gas, charged fee
+0.000000000087576736 worthless test ETH. Three live addresses:
+Committee0x9965bAC16C5Df538df0373a906e42eA0E0C327d9,
+Settlement0x879878f7561F5a0a1f6dd22348FfdE81cD5fEe7F,
+Board0xF1147CA8aC9e28F845529A6Ae5837873806C7788.
+Deployment script configured delayedBlockEntropy BEFORE settlement
+binding; actual execution completed without Unauthorized. R16 targeted
+Python PoS 33/33 and Foundry 147/147 pass and all runtime bytecode
+under EIP170. Previously observed chain finality epoch6 and faucet
+1M test ETH. These facts together are proof of real EVM transactions
+on independently bootstrapped PoS consensus, NOT proof that deployed
+TXs have finalized; independent finalized-execution-height check pending.
+
+R17 adds a read-only 7-receipt/nonce/bytecode-routing audit with
+independent Beacon vs execution finality distinction; source-only
+tests and a published operator runbook. No SSE consumer/provider/
+monitor workflow yet executed on chain31339. Next: run attestation
+and receipt audit, fund 7 distinct encrypted test EOAs, bond >=5
+independent monitor identities, perform actual offer/bid/escrow,
+delayed entropy selection, confirm monitors, EIP712-signed protocol
+evidence, settlement/withdraw receipts. Synthetic evidence must
+be explicitly identified as such, not claimed as physical delivery.
+Current VM4705 genesis bootstrap mnemonic was disclosed upstream;
+isolate this test chain and rotate in new genesis before public peers.
