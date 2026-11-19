@@ -24,6 +24,7 @@ import re
 import socket
 import sys
 from urllib.parse import urlsplit
+from types import MappingProxyType
 
 CURRENT_PUBLIC_TARGET_CHAIN=31340
 OLD_EXPOSED_CHAIN=31339
@@ -44,14 +45,16 @@ FIELDS=frozenset((
     "depositContract","bootnodes","permissionlessRoles",
 ))
 B_FIELDS=frozenset(("operatorId","nodeId","executionEnode","consensusENR"))
-ROLE_RULES={
+# Canonical admission policy is immutable. A caller or test manifest must never
+# change the expected policy by aliasing and mutating its dictionary.
+ROLE_RULES=MappingProxyType({
     "observer":"VERIFY_GENESIS_AND_SYNC",
     "full_node":"VERIFY_GENESIS_AND_SYNC",
     "validator":"ETHEREUM_DEPOSIT_AND_BEACON_ACTIVATION",
     "consumer":"WALLET_AND_ESCROW",
     "provider":"REAL_RESOURCE_BID_AND_LIVE_SERVICE",
     "monitor":"ONCHAIN_BOND_AND_COMMITTEE_ELECTION",
-}
+})
 MAX_FILE_SIZE=65536
 
 
@@ -62,6 +65,11 @@ class PublicManifestError(ValueError):
 def _fqdn(name:str)->str:
     if type(name) is not str or not DNS.fullmatch(name):
         raise PublicManifestError("bootstrap requires public DNS hostname, not a fixed IP")
+    # Numeric IPv4 literals (public OR private) match the dotted-label
+    # regex above. Bootnode bootstrap metadata requires a DNS name, not
+    # a hardcoded numeric IP address; reject even malformed numeric labels.
+    if all(label.isdecimal() for label in name.split(".")):
+        raise PublicManifestError("bootstrap must use DNS, not an IP literal")
     if (name.endswith((".local",".internal",".lan",".test",".invalid",".example"))
             or name.endswith((".example.org",".example.com",".example.net"))
             or ".ts.net" in name
@@ -115,7 +123,8 @@ def validate(manifest:dict)->dict:
             not re.fullmatch(r"0x[0-9a-fA-F]{40}\Z",addr)
             or int(addr,16)==0):
         raise PublicManifestError("actual network deposit contract address required")
-    if manifest["permissionlessRoles"]!=ROLE_RULES:
+    roles=manifest["permissionlessRoles"]
+    if type(roles) is not dict or roles!=ROLE_RULES:
         raise PublicManifestError("administrator/overlay role gates are forbidden")
     nodes=manifest["bootnodes"]
     if type(nodes) is not list or not 2<=len(nodes)<=32:
