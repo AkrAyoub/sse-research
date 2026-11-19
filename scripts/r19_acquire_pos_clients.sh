@@ -70,12 +70,19 @@ verify_and_capture() {
   fi
   # No writable mounts, Internet access, ports, validator keys or host shell.
   # A version command is actual client software, NOT a running PoS node.
+  # Besu 26.11.1 ships its own besu-entry.sh wrapper: preserve it so
+  # upstream JVM security options remain active (do not override entrypoint).
+  # Lighthouse's official image documents its binary as "lighthouse".
+  local -a entrypoint_args=()
+  if [[ "$name" == "lighthouse" ]]; then
+    entrypoint_args=(--entrypoint lighthouse)
+  fi
   echo "== $name version from immutable digest with no network =="
   sudo -n docker run --rm --pull never --platform linux/amd64 \
     --network none --read-only --tmpfs /tmp:rw,nosuid,noexec,size=64m \
     --user 65534:65534 --cpus 1 --memory 1g \
     --cap-drop ALL --security-opt no-new-privileges \
-    --entrypoint "$name" "$digest" --version
+    "${entrypoint_args[@]}" "$digest" --version
   echo "R19_${name^^}_IMAGE_DIGEST=$digest"
   sudo -n docker image inspect --format "R19_${name^^}_IMAGE_ID={{.Id}}" "$digest"
 }
