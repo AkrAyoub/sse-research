@@ -148,6 +148,18 @@ def build_report(roles: tuple[str, ...], facts: dict[str, Any]) -> dict[str, Any
             "dynamicDNSConfigured": False,
             "bootstrapDiscoveryVerified": False,
         },
+        "funding": {
+            "nativeCurrency": "valueless_test_eth",
+            "realEthereumMainnetEthRequired": False,
+            "sseAdministratorApprovalForbidden": True,
+            "independentWalletsGenerated": False,
+            "faucetReservesVerified": False,
+            "independentGasSponsorAvailable": False,
+            "onchainGrantFinalized": False,
+            "validatorDepositsFunded": False,
+            "monitorBondsFunded": False,
+            "consumerEscrowFunded": False,
+        },
         "acceptance": {
             "publicSignedReleaseVerified": False,
             "freshPoS31340Joined": False,
