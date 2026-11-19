@@ -31,6 +31,20 @@ The public `validators.txt` parser expects lines shaped:
 
 These placeholders are syntax examples, **NOT usable validators**. Do NOT paste seed phrases into this file. The upstream CLI supports `beaconchain --eth1-config <EL_GENESIS> --config <CL_CONFIG> --additional-validators <PUBLIC_VALIDATORS_TXT> --state-output <GENESIS_SSZ>`. Actual EL+CL config and public contributions need to be independently verified first. Until then, no such command should be executed with fabricated fixture keys.
 
+## Initial operator-local EOA custody checkpoint (new R20 script, NOT YET RUN)
+
+The first operator may create **one actual test-only execution/withdrawal EOA** on its own VM using `scripts/r20_create_local_operator_withdrawal.sh <EXACT_GITHUB_SHA>`. This is a developer-only checkpoint, **not** a central account registration, approved roster, funded account, permissionless join or chain launch. Outside operators will each run their own secure equivalent tool on their own computers, with no key sharing, static public IP or administrator approval.
+
+- The script enforces exact Git source revision, locally observed Foundry v1.9.0 `cast` binary hash `cae9d8a3e9a2c2f121879f39498472fee8a767318fc26ff7e3c73908133fdaa4`, and Lighthouse v8.3.3 exact immutable Docker image, then runs **only help commands offline** to inspect actual BLS/withdrawal workflow flags. Docker is a developer privilege used for **read-only CLI checks**, not a final permission requirement.
+- After an explicit terminal `CREATE` acknowledgment, Foundry creates a new, password-encrypted **Ethereum UTC-V3** EOA keystore. The password is entered interactively and hidden (never supplied via `--unsafe-password`, command-line arguments, environment variables or repo files). Only a public EOA address is printed; command stdout remains temporarily in a private (umask 077) local file, deleted after successful public-only reporting. **No private key, mnemonic, password, private log or keystore may be pasted into chat or uploaded to GitHub.**
+- New keys live only in the local `~/.local/share/sse-r20-operator-private/withdrawal-keystore` directory; scripts refuse overwriting an existing operator directory, repeated wallet generation or untrusted local symlinks. The owner MUST make an independent **offline** encrypted-keystore + password backup before using a future funded account.
+- The EOA is intrinsically Ethereum-compatible on any EVM chain, but it is **designated exclusively for the valueless SSE test-ETH network**. Never transfer valuable ETH/assets to it, reuse it on Mainnet or treat a local source-test key as a trusted production wallet.
+- `tools/sse_pos_local_wallet_report.py` validates only the encrypted UTC-V3 keystore file **structure and Unix access permissions**; it does not decrypt or verify the owner's password/signature, prove independent physical custody, or confirm any funds. Those remain separate live acceptance gates.
+- Actual BLS validator key generation, signed proof of possession and fork-specific deposit-data signatures must wait for independently approved testnet fork config, owner-controlled BLS mnemonic/key custody procedure and explicit verification. Lighthouse's `validator_manager create` can output a *sensitive* `validators.json`; do not pass it through CI, HTTP endpoints, private GitHub, or chat. See [Lighthouse validator creation and export warning](https://lighthouse-book.sigmaprime.io/validator_manager_create.html).
+- Before exposing any EL/CL ports, update/harden the reported Ubuntu VM security patches, establish actual independent Internet TCP/UDP reachability and ensure local wallet controls cannot be manipulated by SSE or Docker control APIs.
+
+**New source gate:** `tests/test_sse_pos_local_wallet_report.py` contains five source/fixture guards (NOT executed on VM4706 as of commit). A test fixture showing a 40-byte public address is **not** a real wallet. The next actual operator run will generate an encrypted EOA only if the operator manually authorizes it.
+
 ## Public contribution file shape (local-generated, real public key data only)
 
 ```json
