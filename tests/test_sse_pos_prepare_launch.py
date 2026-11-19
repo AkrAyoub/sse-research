@@ -28,7 +28,7 @@ def fixtures():
     prior=original.replace(
         b"  fulu_fork_epoch: 18446744073709551615\n",b""
     )
-    manifest={**plan(faucet=FAUCET),"networkConfigCreated":True,
+    manifest={**plan(faucet=FAUCET,participants=2),"networkConfigCreated":True,
               "secretConfigSha256":hashlib.sha256(prior).hexdigest()}
     return prior,manifest
 

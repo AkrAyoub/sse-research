@@ -27,13 +27,13 @@ if [[ "$(stat -c '%a' "$SSE_POS_CONF_DIR")" != 700 ||
   echo "SSE_POS_REFUSED: private directory 0700 and args 0600 required" >&2
   exit 2
 fi
-# The first R12 generator omitted a mandatory fork override. Never
-# launch using an unverified local YAML, stale manifest, or secret-bearing
-# filename without a matching upgraded checksum.
+# The new one-host R13 genesis MUST set Fulu AND five dependent BPO
+# epochs to far future, and match its protected manifest SHA exactly.
+# Never mix old R12 genesis files with this R13 bootstrap.
 SCRIPT_DIR="$(cd -- "$(dirname -- "${BASH_SOURCE[0]}")" && pwd)"
-if ! python3 "$SCRIPT_DIR/../tools/sse_pos_prepare_launch.py" \
+if ! python3 "$SCRIPT_DIR/../tools/sse_pos_launch_preflight.py" \
   --output-dir "$SSE_POS_CONF_DIR" --verify-only >/dev/null; then
-  echo "SSE_POS_REFUSED: run approved sse_pos_prepare_launch.py --apply first" >&2
+  echo "SSE_POS_REFUSED: new R13 genesis failed pinned fork/BPO/source checks" >&2
   exit 2
 fi
 if ! command -v kurtosis >/dev/null 2>&1; then

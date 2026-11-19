@@ -220,3 +220,27 @@ pinned to d3014d6d23d683362025b9e23a0d69de49e77cca. No code
 was run on the user's VMs, no Ethereum mainnet ETH was spent and
 no live chain31339 or contracts have been measured yet.
 See docs/research/R12_OWN_ETHEREUM_POS_NO_REAL_ETH.md.
+
+## 2026-11-19 — VM4705 fresh SSE-PoS R13 single-client bootstrap
+
+VM4704 is DESTROYED by user decision; ALL prior faucet, genesis
+validator mnemonic, validator key and Tailscale enrollment are abandoned,
+with no recovery. VM4705 fresh Ubuntu24.04.4: four vCPU, 11GiB memory,
+93GB free disk, Docker29.1.3 via sudo; not yet a GitHub checkout or
+Kurtosis host. SSH host ED25519 fingerprint:
+
+SHA256:kCbjaZ49EwtsyJ2QgYTt3XjuZqrkju/R+tHIyn0zz/4
+
+Private repo requires a NEW read-only deploy key with GitHub settings
+owner action. R13 GitHub source reduces initial bootstrap from two
+EL/CL/VC stacks to one triple, with 32 provisional genesis BLS validator
+keys, no Dora explorer and no public P2P. Underlying Ethereum-PoS
+consensus remains dynamic and rules-driven, but the one-host initial
+environment is NOT decentralized, not permissionless network-reachable
+and not an economic Sybil resistance experiment. Reviewed upstream
+package d3014d6d requires Fulu AND all five BPO forks be deferred
+for this small smoke profile. New sse_pos_launch_preflight verifies
+source Git SHA, private config SHA256, no default mnemonic, no public
+exposure and correct BPO epochs; launcher refuses other configs.
+No new chain launched and no new keys generated at GitHub commit.
+See docs/research/R13_VM4705_SMALL_POS_BOOTSTRAP.md.

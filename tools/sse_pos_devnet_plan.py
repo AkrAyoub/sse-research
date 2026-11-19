@@ -25,7 +25,10 @@ import os
 from pathlib import Path
 import re
 import stat
+import subprocess
 import sys
+
+SOURCE_ROOT=Path(__file__).resolve().parents[1]
 
 CHAIN_ID=31339
 VALIDATOR_STAKE_ETH=32
@@ -63,7 +66,7 @@ def _checks(*,faucet:str,participants:int,validators_per_node:int,enclave:str,pu
             "enclave":enclave,"publicP2P":public_p2p}
 
 
-def plan(*,faucet:str,participants:int=2,validators_per_node:int=32,
+def plan(*,faucet:str,participants:int=1,validators_per_node:int=32,
          enclave:str="sse-pos-research01",public_p2p:bool=False)->dict:
     d=_checks(faucet=faucet,participants=participants,
               validators_per_node=validators_per_node,
@@ -94,6 +97,7 @@ def plan(*,faucet:str,participants:int=2,validators_per_node:int=32,
         "enclave":enclave,
         "publicP2PRequested":public_p2p,
         "networkConfigCreated":False,
+        "bootstrapProfile":"R13_ONE_NODE_SMALL_HOST_V1",
     }
 
 
@@ -133,9 +137,16 @@ def _render(*,faucet:str,participants:int,validators_per_node:int,
         "  genesis_gaslimit: 30000000",
         # The pinned upstream package defaults Fulu=0 and otherwise
         # REJECTS <16 participants without supernodes/128+ validators.
-        # A 2-node/64-validator smoke devnet must explicitly defer Fulu.
+        # A one-node/32-validator smoke devnet must explicitly defer Fulu.
         # Separate fork-upgrade trials must use a NEW genesis and tests.
         "  fulu_fork_epoch: 18446744073709551615",
+        # Upstream ethpandaops parser refuses every BPO epoch before Fulu;
+        # its default first two BPO epochs are zero. Defer all BPOs.
+        "  bpo_1_epoch: 18446744073709551615",
+        "  bpo_2_epoch: 18446744073709551615",
+        "  bpo_3_epoch: 18446744073709551615",
+        "  bpo_4_epoch: 18446744073709551615",
+        "  bpo_5_epoch: 18446744073709551615",
         f"  num_validator_keys_per_node: {validators_per_node}",
         "  preregistered_validator_count: 0",
         f'  preregistered_validator_keys_mnemonic: "{mnemonic}"',
@@ -148,8 +159,8 @@ def _render(*,faucet:str,participants:int,validators_per_node:int,
         "  cl:",
         f"    enabled: {str(public_p2p).lower()}",
         "    public_port_start: 33000",
-        "additional_services:",
-        "  - dora",
+        # Keep first-host RAM footprint small: no explorer or metrics stack.
+        "additional_services: []",
         "",
     ])
 
@@ -167,7 +178,7 @@ def _file_new(path:Path,payload:bytes):
         os.fsync(f.fileno())
 
 
-def apply(*,directory:Path,faucet:str,participants:int=2,
+def apply(*,directory:Path,faucet:str,participants:int=1,
           validators_per_node:int=32,enclave:str="sse-pos-research01",
           public_p2p:bool=False)->dict:
     config=plan(faucet=faucet,participants=participants,
@@ -181,6 +192,18 @@ def apply(*,directory:Path,faucet:str,participants:int=2,
         raise DevnetError("requires unprivileged POSIX user, existing owner 0700 directory")
     if any((directory/p).exists() for p in ("network_params.yaml","manifest.json")):
         raise DevnetError("refusing to overwrite existing genesis/secret material")
+    try:
+        source_sha=subprocess.check_output(
+            ["git","rev-parse","HEAD"],cwd=SOURCE_ROOT,text=True,timeout=5
+        ).strip()
+        dirty=subprocess.check_output(
+            ["git","status","--porcelain","--untracked-files=no"],
+            cwd=SOURCE_ROOT,text=True,timeout=5
+        ).strip()
+    except (OSError,subprocess.SubprocessError) as exc:
+        raise DevnetError("approved immutable source checkout unavailable") from exc
+    if not DIGEST.fullmatch(source_sha) or dirty:
+        raise DevnetError("source must be pinned to a clean exact GitHub commit")
     # Do NOT use ethpandaops's documented default mnemonic; an adversary
     # could copy those keys and double-sign the new research chain.
     try:
@@ -197,6 +220,11 @@ def apply(*,directory:Path,faucet:str,participants:int=2,
     manifest={
         **config,
         "networkConfigCreated":True,
+        "sourceConfigProfile":"R13_PINNED_ETHEREUM_PACKAGE_SMALL_BOOTSTRAP_V1",
+        "sourceGitSha":source_sha,
+        "expectedFuluForkEpoch":18446744073709551615,
+        "expectedBpoForkEpochs":{f"bpo_{i}_epoch":18446744073709551615 for i in range(1,6)},
+        "explicitPublicP2P":False,
         "secretConfigLocation":str(target),
         "secretConfigSha256":hashlib.sha256(contents).hexdigest(),
         "genesisValidatorMnemonicShown":False,
@@ -213,7 +241,7 @@ def main(argv=None):
     p=argparse.ArgumentParser(description="Own funded ETH PoS devnet; no purchased ETH, no QBFT membership")
     p.add_argument("--faucet-address",required=True)
     p.add_argument("--output-dir",required=True,type=Path)
-    p.add_argument("--nodes",type=int,default=2)
+    p.add_argument("--nodes",type=int,default=1)
     p.add_argument("--validators-per-node",type=int,default=32)
     p.add_argument("--enclave",default="sse-pos-research01")
     p.add_argument("--public-p2p",action="store_true",

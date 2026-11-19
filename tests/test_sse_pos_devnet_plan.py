@@ -20,14 +20,15 @@ class OwnPoSNetworkTests(unittest.TestCase):
         self.assertTrue(p["chainIndependentOfEthereumMainnet"])
         self.assertFalse(p["usesRealEthereum"])
         self.assertEqual(p["minimumValidatorDepositTestEth"],32)
-        self.assertEqual(p["initialBootstrapValidators"],64)
+        self.assertEqual(p["initialBootstrapValidators"],32)
+        self.assertEqual(p["bootstrapProfile"],"R13_ONE_NODE_SMALL_HOST_V1")
         self.assertFalse(p["publicParticipationValidated"])
         self.assertFalse(p["permissionlessEconomicSybilResistanceProved"])
         self.assertEqual(len(p["upstreamCommit"]),40)
         self.assertEqual(p["upstreamCommit"],UPSTREAM_COMMIT)
 
     def test_render_has_secure_nonpublic_bootstrap_and_funded_test_eoa(self):
-        text=_render(faucet=FAUCET,participants=2,validators_per_node=32,
+        text=_render(faucet=FAUCET,participants=1,validators_per_node=32,
                      enclave="sse-pos-research01",mnemonic=MNEMONIC,public_p2p=False)
         for required in (
             'network_id: "31339"','1000000ETH',
@@ -36,6 +37,12 @@ class OwnPoSNetworkTests(unittest.TestCase):
             "el_type: besu","sigp/lighthouse:v8.3.3",
             "hyperledger/besu:26.11.1@sha256:",
             "fulu_fork_epoch: 18446744073709551615",
+            "bpo_1_epoch: 18446744073709551615",
+            "bpo_2_epoch: 18446744073709551615",
+            "bpo_3_epoch: 18446744073709551615",
+            "bpo_4_epoch: 18446744073709551615",
+            "bpo_5_epoch: 18446744073709551615",
+            "additional_services: []",
             "port_publisher:","    enabled: false",
         ):
             self.assertIn(required,text)
@@ -60,8 +67,12 @@ class OwnPoSNetworkTests(unittest.TestCase):
             base=Path(tmp)
             os.chmod(base,0o700)
             with patch("eth_account.Account.create_with_mnemonic",return_value=(None,MNEMONIC)):
-                m=apply(directory=base,faucet=FAUCET,participants=2)
+                m=apply(directory=base,faucet=FAUCET,participants=1)
             self.assertTrue(m["networkConfigCreated"])
+            self.assertEqual(m["initialBootstrapValidators"],32)
+            self.assertEqual(m["sourceConfigProfile"],
+                             "R13_PINNED_ETHEREUM_PACKAGE_SMALL_BOOTSTRAP_V1")
+            self.assertEqual(len(m["sourceGitSha"]),40)
             self.assertFalse(m["walletKeysPrinted"])
             self.assertFalse(m["ethereumTransactionsSent"])
             self.assertEqual((base/"network_params.yaml").stat().st_mode&0o777,0o600)
@@ -75,6 +86,7 @@ class OwnPoSNetworkTests(unittest.TestCase):
         self.assertIn('MODE="${1:---plan}"',script)
         self.assertIn('git -C "$SSE_POS_UPSTREAM_DIR" rev-parse HEAD',script)
         self.assertIn("kurtosis run --enclave",script)
+        self.assertIn("sse_pos_launch_preflight.py",script)
         self.assertNotIn("git reset --hard",script)
         self.assertNotIn("git clean -fd",script)
         self.assertNotIn("kurtosis enclave rm",script)
