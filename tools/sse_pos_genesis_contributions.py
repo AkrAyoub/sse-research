@@ -76,8 +76,9 @@ def collect(paths: list[Path], *, min_operators: int,
     # The initiating operators explicitly publish these *genesis-snapshot*
     # safety thresholds; NO program-wide fixed operator/validator roster.
     # Future validator deposits remain permissionless and uncapped.
-    if min_operators < 2 or min_validators < 1:
-        raise CeremonyError("invalid independent genesis research ceremony minima")
+    if (type(min_operators) is not int or type(min_validators) is not int
+            or min_operators < 2 or min_validators < 1):
+        raise CeremonyError("invalid explicitly declared genesis ceremony minima")
     if len(paths) < min_operators or len(set(paths)) != len(paths):
         raise CeremonyError("too few distinct supplied contribution files")
     operators, pubkeys, withdrawal_owners = set(), set(), {}
