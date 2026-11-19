@@ -1,0 +1,17 @@
+operation,roster_size,global_mode,proof_count,gasleft_delta
+create_lease,16,1,,472682
+create_lease,160,1,,472994
+create_lease,16,0,,975492
+create_lease,160,0,,2579365
+create_lease,4,0,,579503
+create_lease,64,0,,2559465
+global_finalize,16,,10,544367
+global_finalize,160,,10,568910
+register,16,1,,382541
+register,160,1,,399661
+register,16,0,,131436
+register,160,0,,131436
+register,4,0,,131436
+register,64,0,,131436
+vrf_purchase,16,,,451106
+vrf_apply,,,,656963

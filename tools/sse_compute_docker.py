@@ -35,8 +35,14 @@ def local_endpoint(endpoint: str) -> int:
     return port
 
 
-def inspect_container(profile: dict, endpoint: str, container_name: str) -> dict:
-    """Read local Docker config; requires exact image/CPU/memory/port match."""
+def inspect_container(profile: dict, endpoint: str, container_name: str,
+                      strict_hardening: bool = False) -> dict:
+    """Read local Docker config; verify exact image/CPU/memory/port.
+
+    strict_hardening=True is mandatory for the new signed marketplace
+    provider runtime and adds a deny-by-default isolation configuration.
+    Historical WP07 tests continue to use the earlier inspection policy.
+    """
     if not isinstance(container_name, str) or not _CONTAINER.fullmatch(container_name):
         raise ComputeError('invalid container name')
     port = local_endpoint(endpoint)
@@ -79,6 +85,38 @@ def inspect_container(profile: dict, endpoint: str, container_name: str) -> dict
             raise ComputeError('privileged Docker workers forbidden')
         if d.get('Config', {}).get('User') not in ('10001:10001', '10001'):
             raise ComputeError('worker must run as non-root UID 10001')
+        if strict_hardening:
+            # A local Docker configuration inspection is not a hardware or
+            # anti-tamper attestation. It only checks the committed limits.
+            if host.get('NetworkMode') != 'bridge':
+                raise ComputeError('marketplace worker must use isolated bridge network')
+            if host.get('MemorySwap') != profile['memoryBytes']:
+                raise ComputeError('worker swap must not exceed agreed memory cap')
+            if type(host.get('PidsLimit')) is not int or not 1 <= host['PidsLimit'] <= 64:
+                raise ComputeError('worker requires bounded pids limit')
+            caps = host.get('CapDrop')
+            if type(caps) is not list or [x.lower() for x in caps] != ['all']:
+                raise ComputeError('worker requires all Linux capabilities dropped')
+            opts = host.get('SecurityOpt')
+            if (type(opts) is not list or
+                    not any(x in ('no-new-privileges', 'no-new-privileges:true')
+                            for x in opts)):
+                raise ComputeError('worker must prevent privilege escalation')
+            if 'seccomp=builtin' not in opts:
+                raise ComputeError('worker requires built-in seccomp syscall filter')
+            if any(x in ('seccomp=unconfined', 'apparmor=unconfined',
+                         'systempaths=unconfined', 'label=disable') for x in opts):
+                raise ComputeError('worker may not disable confinement')
+            if (host.get('CapAdd') or host.get('Devices') or
+                    host.get('Binds') or host.get('Mounts') or d.get('Mounts')):
+                raise ComputeError('worker cannot add capabilities, devices or mounts')
+            if any(host.get(k) == 'host' for k in
+                   ('NetworkMode','PidMode','IpcMode','UTSMode','UsernsMode','CgroupnsMode')):
+                raise ComputeError('worker cannot share host namespaces')
+            if set(host.get('PortBindings', {})) != {'8877/tcp'}:
+                raise ComputeError('worker cannot expose extra service ports')
+            if host.get('AutoRemove') is not True:
+                raise ComputeError('worker must clean up after stop')
     except (KeyError, TypeError, AttributeError, ValueError) as exc:
         if isinstance(exc, ComputeError):
             raise

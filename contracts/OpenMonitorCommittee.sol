@@ -15,6 +15,8 @@ contract OpenMonitorCommittee {
     uint256 public constant MAX_SNAPSHOT_SCAN = 64;
     uint256 public constant COMMITTEE_SIZE = 4;
     uint256 public constant GLOBAL_SAMPLE_LIMIT = 10;
+    uint256 public constant GLOBAL_RECOVERY_DRAW_LIMIT = 40;
+    uint256 public constant GLOBAL_RECOVERY_BATCH_LIMIT = 8;
     uint256 public constant GLOBAL_MERKLE_CAPACITY = 1 << 20;
     uint256 public constant DELAYED_ENTROPY_BLOCKS = 4;
     bytes32 public constant DELAYED_ENTROPY_DOMAIN = keccak256("SSEDelayedBlockEntropyV1");
@@ -53,6 +55,7 @@ contract OpenMonitorCommittee {
     // Independent opt-in for global indexed election, compatible with any
     // ONE entropy mode. Must be enabled before any candidate is registered.
     bool public globalMerkleElectionEnabled;
+    bool public globalBatchedRecoveryEnabled;
     bool private entered;
 
     // Dense ACTIVE roster. Exited addresses are removed by swap-and-pop,
@@ -75,6 +78,8 @@ contract OpenMonitorCommittee {
     mapping(uint256 => uint256) public globalSnapshotCount;
     mapping(uint256 => uint256) public pendingGlobalSeed;
     mapping(uint256 => bool) public pendingGlobalSeedReady;
+    mapping(uint256 => uint256) public globalRecoveryCursor;
+    mapping(uint256 => uint256) public globalRecoveryLocks;
 
     error InvalidInput();
     error InvalidPhase();
@@ -98,6 +103,10 @@ contract OpenMonitorCommittee {
     event GlobalEligibilityCommitted(uint256 indexed requestId, bytes32 root,
                                      uint256 count, bytes32 requestCommitment);
     event GlobalEntropySeedReady(uint256 indexed requestId, bytes32 seedHash);
+    event GlobalRecoveryBatchAdvanced(uint256 indexed requestId, uint256 cursor,
+                                      uint256 total, uint256 locked);
+    event GlobalRecoveryCompleted(uint256 indexed requestId, uint256 processed,
+                                  uint256 standbyCount);
     event GlobalCommitteeProved(uint256 indexed requestId, bytes32 frozenRoot,
                                 uint256 sampled, uint256 validCandidates);
     event RSARequestCommitted(uint256 indexed requestId, bytes32 requestDigest,
@@ -168,6 +177,14 @@ contract OpenMonitorCommittee {
             activeCandidates.length != 0) revert Unauthorized();
         globalMerkleElectionEnabled = true;
         emit GlobalMerkleElectionEnabled();
+    }
+
+    /// @notice Opt in once, before enrollment and settlement binding.
+    function enableGlobalBatchedRecovery() external {
+        if (msg.sender != bootstrapper || settlement != address(0) ||
+            !globalMerkleElectionEnabled || globalBatchedRecoveryEnabled ||
+            totalRegistrations != 0) revert Unauthorized();
+        globalBatchedRecoveryEnabled = true;
     }
 
     function globalRosterRoot() external view returns (bytes32) {
@@ -424,6 +441,7 @@ contract OpenMonitorCommittee {
     function finalizeGlobalCommittee(
         uint256 id, address[] calldata accounts, bytes32[][] calldata siblingPaths
     ) external {
+        if (globalBatchedRecoveryEnabled) revert InvalidPhase();
         if (!globalMerkleElectionEnabled || !pendingGlobalSeedReady[id])
             revert InvalidPhase();
         Assignment storage r = assignments[id];
@@ -483,6 +501,7 @@ contract OpenMonitorCommittee {
         Assignment storage r = assignments[id];
         RequestStatus previous = r.status;
         if (previous == RequestStatus.AwaitingRandomness) {
+            if (globalBatchedRecoveryEnabled) _clearGlobalRecovery(id);
             if (!globalMerkleElectionEnabled) _unlockSnapshot(id);
             delete pendingGlobalSeedReady[id];
             delete pendingGlobalSeed[id];
@@ -502,10 +521,119 @@ contract OpenMonitorCommittee {
         emit AssignmentCancelled(id, previous);
     }
 
+    /// @notice Seed-derived full historical index order; relayers cannot skip candidates.
+    function globalRecoveryDrawIndexes(uint256 id) external view returns (uint256[] memory) {
+        if (!globalBatchedRecoveryEnabled || !pendingGlobalSeedReady[id] ||
+            assignments[id].status != RequestStatus.AwaitingRandomness)
+            revert InvalidPhase();
+        uint256 n = globalSnapshotCount[id];
+        uint256 count = n < GLOBAL_RECOVERY_DRAW_LIMIT ? n : GLOBAL_RECOVERY_DRAW_LIMIT;
+        return GlobalRosterSampler.draw(pendingGlobalSeed[id], id, n, count);
+    }
+
+    /// @notice Submit the NEXT 1..8 historical leaves of the frozen 40-index draw.
+    /// @dev Partial selected seats are locked against exit; finalization requires all leaves.
+    function advanceGlobalRecovery(
+        uint256 id, address[] calldata accounts, bytes32[][] calldata siblingPaths
+    ) external {
+        if (!globalBatchedRecoveryEnabled || !pendingGlobalSeedReady[id])
+            revert InvalidPhase();
+        Assignment storage r = assignments[id];
+        if (r.status != RequestStatus.AwaitingRandomness ||
+            block.timestamp > uint256(r.requestedAt) + randomnessTimeout)
+            revert InvalidPhase();
+
+        uint256 count = globalSnapshotCount[id];
+        uint256 total = count < GLOBAL_RECOVERY_DRAW_LIMIT
+            ? count : GLOBAL_RECOVERY_DRAW_LIMIT;
+        uint256 cursor = globalRecoveryCursor[id];
+        if (accounts.length == 0 || accounts.length > GLOBAL_RECOVERY_BATCH_LIMIT ||
+            siblingPaths.length != accounts.length || cursor + accounts.length > total)
+            revert InvalidInput();
+
+        _verifyGlobalRecoveryBatch(id, cursor, total, accounts, siblingPaths);
+
+        uint256 nextCursor = cursor + accounts.length;
+        globalRecoveryCursor[id] = nextCursor;
+        emit GlobalRecoveryBatchAdvanced(id, nextCursor, total, globalRecoveryLocks[id]);
+
+        if (nextCursor == total) _completeGlobalRecovery(id, nextCursor);
+    }
+
+    /// @dev Isolate index-array allocation and Merkle checks from state transition.
+    ///      This reduces stack pressure for Solidity 0.8.24 without via-IR.
+    function _verifyGlobalRecoveryBatch(
+        uint256 id, uint256 cursor, uint256 total,
+        address[] calldata accounts, bytes32[][] calldata siblingPaths
+    ) internal {
+        uint256[] memory indexes = GlobalRosterSampler.draw(
+            pendingGlobalSeed[id], id, globalSnapshotCount[id], total
+        );
+        for (uint256 j; j < accounts.length; ++j) {
+            _acceptGlobalRecoveryProof(
+                id, indexes[cursor + j], accounts[j], siblingPaths[j]
+            );
+        }
+    }
+
+    /// @dev The full predetermined draw was verified in order. Never reroll.
+    ///      The fail-closed branch atomically releases all provisional locks.
+    function _completeGlobalRecovery(uint256 id, uint256 processed) internal {
+        Assignment storage r = assignments[id];
+        if (globalRecoveryLocks[id] < COMMITTEE_SIZE) {
+            _clearGlobalRecovery(id);
+            delete pendingGlobalSeedReady[id];
+            delete pendingGlobalSeed[id];
+            r.status = RequestStatus.Expired;
+            emit AssignmentExpired(id);
+            return;
+        }
+        r.status = RequestStatus.Assigned;
+        delete globalRecoveryLocks[id];
+        delete pendingGlobalSeedReady[id];
+        delete pendingGlobalSeed[id];
+        emit GlobalRecoveryCompleted(id, processed, standbyRosters[id].length);
+        emit CommitteeSelected(id, r.committee);
+    }
+
+    function _acceptGlobalRecoveryProof(
+        uint256 id, uint256 index, address account, bytes32[] calldata siblings
+    ) internal {
+        if (!GlobalRosterMerkle.verify(globalSnapshotRoot[id], index, account, siblings))
+            revert InvalidGlobalProof();
+        Assignment storage r = assignments[id];
+        Candidate storage c = candidates[account];
+        if (account == r.consumer || account == r.provider ||
+            !c.active || c.bond < minimumBond) return;
+        uint256 selected = globalRecoveryLocks[id];
+        if (selected < COMMITTEE_SIZE) {
+            r.committee[selected] = account;
+            globalRecoveryLocks[id] = selected + 1;
+            ++c.activeAssignments;
+        } else {
+            standbyRosters[id].push(account);
+        }
+    }
+
+    /// @dev Called only while provisional or expired, never on assigned seats.
+    function _clearGlobalRecovery(uint256 id) internal {
+        Assignment storage r = assignments[id];
+        uint256 locked = globalRecoveryLocks[id];
+        for (uint256 i; i < locked; ++i) {
+            --candidates[r.committee[i]].activeAssignments;
+        }
+        delete r.committee;
+        delete standbyRosters[id];
+        delete nextStandbyIndex[id];
+        delete globalRecoveryLocks[id];
+        delete globalRecoveryCursor[id];
+    }
+
     function expire(uint256 id) external {
         Assignment storage r = assignments[id];
         if (r.status != RequestStatus.AwaitingRandomness ||
             block.timestamp <= uint256(r.requestedAt) + randomnessTimeout) revert InvalidPhase();
+        if (globalBatchedRecoveryEnabled) _clearGlobalRecovery(id);
         if (!globalMerkleElectionEnabled) _unlockSnapshot(id);
         delete pendingGlobalSeedReady[id];
         delete pendingGlobalSeed[id];

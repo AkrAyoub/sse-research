@@ -93,15 +93,31 @@ def validate_provider_payload(raw: bytes, domain, provider: str, scope: Evidence
     return result
 
 
-def fetch_provider_payload(endpoint: str, scope: EvidenceScope, timeout: float = 2.0) -> bytes:
-    """One bounded loopback-only HTTP request. No negative truth inference."""
-    from signed_probe import validate_endpoint
+def fetch_provider_payload(endpoint: str, scope: EvidenceScope,
+                           timeout: float = 2.0, *,
+                           allow_tailnet: bool = False) -> bytes:
+    """Bounded provider challenge, loopback by default; private HTTPS opt-in.
+
+    Tailscale Serve DNS/TLS alone does not independently prove which operator
+    controls the endpoint. An authorized selected lease and tight tailnet ACLs
+    are separate requirements. Redirects and environment proxies are banned.
+    """
     if not isinstance(scope, EvidenceScope):
         raise ValueError('expected evidence scope required')
-    # WP-08B is local only: HTTPS remote and DNS/TLS policy require separate review.
-    url = validate_endpoint(endpoint)
-    if not url.startswith('http://127.0.0.1:'):
-        raise ValueError('WP-08B requires numeric IPv4 loopback (no DNS or remote URL)')
+    if allow_tailnet:
+        from sse_direct_delivery import validate_endpoint_url
+        from urllib.parse import urlsplit
+        validated = validate_endpoint_url(endpoint)
+        hostname = urlsplit(validated).hostname
+        if (not validated.startswith('https://') or not hostname or
+                not hostname.endswith('.ts.net')):
+            raise ValueError('monitor overlay requires HTTPS .ts.net origin')
+        url = validated + '/v1/challenge'
+    else:
+        from signed_probe import validate_endpoint
+        url = validate_endpoint(endpoint)
+        if not url.startswith('http://127.0.0.1:'):
+            raise ValueError('WP-08B requires numeric IPv4 loopback (no DNS or remote URL)')
     if type(timeout) not in (float, int) or not math.isfinite(timeout) or not 0 < timeout <= 60:
         raise ValueError('timeout must be finite and in (0,60]')
     payload = json.dumps({'leaseId': scope.lease_id, 'epochId': scope.epoch_id,
@@ -426,7 +442,8 @@ class EvidenceArchive:
 def capture_response(endpoint: str, domain, expected_provider: str, scope: EvidenceScope,
                      monitor_private_key: str, context: VerificationContext,
                      archive: EvidenceArchive, *, nonce: str | None = None,
-                     timeout: float = 2.0, chain_binding=None, rpc=None) -> CaptureResult:
+                     timeout: float = 2.0, chain_binding=None, rpc=None,
+                     allow_tailnet: bool = False) -> CaptureResult:
     """Signed provider response -> signed raw monitor observation -> archive.
 
     No conversion to QualifiedFact and no on-chain vote/submission.
@@ -434,11 +451,14 @@ def capture_response(endpoint: str, domain, expected_provider: str, scope: Evide
     from eth_account import Account
     if scope.normalized() != context.scope.normalized():
         raise AuthenticationError('monitor verification scope differs from request')
+    if allow_tailnet and (chain_binding is None or rpc is None):
+        raise AuthenticationError('remote monitor capture requires pinned chain provenance')
     sender = Account.from_key(monitor_private_key).address.lower()
     if sender not in {x.lower() for x in context.authorized_monitors}:
         raise AuthenticationError('monitor key not authorized by supplied context')
     lower = int(time.time())
-    raw = fetch_provider_payload(endpoint, scope, timeout)
+    raw = (fetch_provider_payload(endpoint, scope, timeout, allow_tailnet=True)
+           if allow_tailnet else fetch_provider_payload(endpoint, scope, timeout))
     verified_provider = validate_provider_payload(raw, domain, expected_provider, scope)
     upper = max(lower, math.ceil(time.time()))
     chosen_nonce = nonce or ('0x' + secrets.token_bytes(32).hex())

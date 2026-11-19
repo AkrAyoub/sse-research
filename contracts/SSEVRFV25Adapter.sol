@@ -178,7 +178,7 @@ contract SSEVRFV25Adapter {
     }
 
     /// @notice Separate permissionless application; no repeat or reroll.
-    function apply(uint256 assignmentId) external {
+    function applyRandomness(uint256 assignmentId) external {
         uint256 vrfId = requestForAssignment[assignmentId];
         Request storage r = byVrfId[vrfId];
         if (vrfId == 0 || r.assignmentId != assignmentId || r.state != State.Ready ||

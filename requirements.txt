@@ -1,9 +1,9 @@
-fastapi==0.116.1
-httpx==0.28.1
-pydantic==2.11.7
-uvicorn==0.35.0
-pycryptodome==3.23.0
-pypdf==5.9.0
-reportlab==4.4.9
-
+# Current owner-encrypted Ethereum EOA signing + ABI calldata +
+# signed resource-monitor evidence. Python 3.12 on Ubuntu 24.04.
+#
+# FastAPI, Tailscale enrollment, PDF/report packaging and old dashboard
+# dependencies are intentionally excluded from the production mainline.
+# Foundry dependencies are exact Git submodule commits in .gitmodules.
 eth-account==0.14.0
+pycryptodome==3.23.0
+eth-abi==5.2.0
