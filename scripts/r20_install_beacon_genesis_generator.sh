@@ -8,6 +8,8 @@ umask 077
 VERSION="v0.0.8"
 FILE="eth-beacon-genesis_0.0.8_linux_amd64.tar.gz"
 SHA256="73b5e33ed309e7bd98bd5f115b032a462b7ed8f1b67b204ac2000016c2f1856b"
+# Binary SHA-256 observed on VM4706 after verifying the official release archive.
+BIN_SHA256="5ee29389cb29e8a1ace8cfc83ff30a1726409152e88cf07681764740ca9244d2"
 URL="https://github.com/ethpandaops/eth-beacon-genesis/releases/download/$VERSION/$FILE"
 BASE="$HOME/.local/share/sse-r19-toolchains"
 DEST="$BASE/eth-beacon-genesis-$VERSION"
@@ -22,9 +24,36 @@ for cmd in curl sha256sum tar mktemp; do
     exit 2
   }
 done
+# Re-running the same SHA-pinned tool installer must verify, not re-download.
+# Never overwrite any preexisting installation or trust an unverified binary.
+verify_binary() {
+  local binary="$1"
+  if [[ -L "$binary" || ! -f "$binary" || ! -x "$binary" ]]; then
+    echo "R20_GENESIS_TOOL_REFUSED: missing, symlinked or nonexecutable binary: $binary" >&2
+    return 2
+  fi
+  if ! printf '%s  %s\\n' "$BIN_SHA256" "$binary" | sha256sum --check --status; then
+    echo "R20_GENESIS_TOOL_REFUSED: expected generator binary SHA256 mismatch" >&2
+    return 2
+  fi
+  echo "R20_GENESIS_BINARY_SHA256_VERIFIED=true"
+}
+
 if [[ -e "$DEST" || -L "$DEST" ]]; then
-  echo "R20_GENESIS_TOOL_REFUSED: already installed; do not overwrite $DEST" >&2
-  exit 2
+  if [[ -L "$DEST" || ! -d "$DEST" ]]; then
+    echo "R20_GENESIS_TOOL_REFUSED: existing tool location is not a normal directory" >&2
+    exit 2
+  fi
+  verify_binary "$DEST/eth-genesis-state-generator"
+  echo "R20_GENESIS_TOOL_REUSED_VERIFIED=true"
+  echo "== Existing trusted Beacon genesis tool help (no chain generated) =="
+  "$DEST/eth-genesis-state-generator" --help
+  echo "R20_GENESIS_TOOL_PATH=$DEST/eth-genesis-state-generator"
+  sha256sum "$DEST/eth-genesis-state-generator"
+  echo "R20_GENESIS_SSZ_GENERATED=false"
+  echo "R20_INDEPENDENT_BLS_KEYS_EXCHANGED=false"
+  echo "R20_PUBLIC_POS_NETWORK_DEPLOYED=false"
+  exit 0
 fi
 
 mkdir -p -- "$BASE"
@@ -74,6 +103,7 @@ if [[ ! -s "$STAGE/eth-genesis-state-generator" || -L "$STAGE/eth-genesis-state-
   exit 2
 fi
 chmod 0755 "$STAGE/eth-genesis-state-generator"
+verify_binary "$STAGE/eth-genesis-state-generator"
 echo "== Official real Beacon genesis tool help (not generating a chain) =="
 "$STAGE/eth-genesis-state-generator" --help
 mv -- "$STAGE" "$DEST"
