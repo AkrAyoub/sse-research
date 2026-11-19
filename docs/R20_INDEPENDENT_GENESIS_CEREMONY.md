@@ -5,7 +5,7 @@
 ## What MUST happen (no shared mnemonic or central chain administrator)
 
 1. A group of **actually independent real operators** (initial research fault-domain target: four, not a protocol maximum) each locally generates its own encrypted validator BLS keystores and locally controls its *own* EVM withdrawal address. No participant discloses validator secret keys, mnemonic, deposit-cli secret files, signer API, or keystore passwords to the original project operator or a GitHub repository. Distinct operator labels alone **cannot** establish independent people or physical hosts.
-2. Each original genesis operator publishes **only public** validator pubkeys and execution withdrawal credentials in one contribution JSON file using schema `SSE_R20_PUBLIC_GENESIS_VALIDATORS_V1`. For current conservative test-ETH research settings each validator's initial Beacon effective balance is **32,000,000,000 Gwei (32 worthless TEST ETH)**. The first research ceremony has a nominal minimum of 64 active genesis validators, e.g. 16 each from four unrelated operators. This is an explicit configurable **experiment policy**, not a permanent validator limit or a claim that 64 is scientifically optimal; protocol config and performance benchmarks must justify the selected count.
+2. Each original genesis operator publishes **only public** validator pubkeys and execution withdrawal credentials in one contribution JSON file using schema `SSE_R20_PUBLIC_GENESIS_VALIDATORS_V1`. For current conservative test-ETH research settings each validator's initial Beacon effective balance is **32,000,000,000 Gwei (32 worthless TEST ETH)**. An illustrative first research ceremony might select a minimum of 64 initial genesis validators from four unrelated operators, but **the source now requires explicit per-genesis `--min-operators` and `--min-validators` rather than fixed defaults**. This is an explicit configurable **experiment policy**, not a permanent validator limit or a claim that 64 is scientifically optimal; protocol config and performance benchmarks must justify the selected count.
 3. A participant with no privilege to sign for any other participant runs `tools/sse_pos_genesis_contributions.py` against these public files to produce a deterministic `validators.txt` for upstream `eth-beacon-genesis --additional-validators`. The collector rejects duplicate pubkeys, duplicate operator labels, cross-operator same withdrawal address, unversioned/corrupted JSON, secret-key fields and wrong test-ETH balances. It gives a SHA-256 digest of the text. **This is only structural verification**: a 48-byte string is not proof of a valid BLS key; a self-declared operator label is not proof of independence.
 4. **Before a public genesis is trusted:** verify every actual BLS pubkey's subgroup validity and possession through an *independent local signed challenge or valid deposit-data proof* tied to the new genesis fork version and withdrawal credentials. This cryptographic verification is NOT implemented in the R20 collector and is a launch blocker. The actual independent node owners must demonstrate control, not a coordinator forging a validator roster.
 5. Generate an EVM EL `genesis.json` for chain31340 with the proper genuine post-Merge fork schedule, standardized deposit contract/runtime and disclosed native test-ETH allocations. Generate CL `config.yaml` and `genesis.ssz` using a **pinned upstream genesis generator**, matching EL genesis hash, fork activation, deposit contract address and genesis timestamp. Publish actual immutable SHA-256 hashes and Beacon genesis validators root. Verify Besu and Lighthouse actually load them and agree. No 31339 keys/config or shared generated mnemonic.
@@ -63,7 +63,7 @@ The first operator may create **one actual test-only execution/withdrawal EOA** 
 
 The placeholders intentionally are **NOT a runnable JSON example**. Substitute actual PUBLIC data from each operator's independently generated keys; never derive or invent BLS pubkeys from test fixtures.
 
-After four actually independent contributions with actual genesis key material and a verified minimum active count have been collected locally, an unbiased aggregator may run:
+After the *explicitly chosen and documented* initial genesis safety thresholds (which are NOT persistent role limits) and actual independently controlled public key contributions have been verified, an unbiased aggregator may run the following **example** with four different contributors:
 
 ```bash
 python3 -B tools/sse_pos_genesis_contributions.py \
@@ -71,8 +71,13 @@ python3 -B tools/sse_pos_genesis_contributions.py \
   --contribution /path/to/operator-2-public.json \
   --contribution /path/to/operator-3-public.json \
   --contribution /path/to/operator-4-public.json \
+  --min-operators 4 \
+  --min-validators 64 \
   --output /path/to/new-public-validators.txt
 ```
+
+
+**Important:** A finite set at genesis does not restrict subsequent open validator deposits or exits. The explicit values in this command are a fault-domain experiment example, not a network operator cap or admin roster. See [R21 adaptive role and quorum requirements](R21_ADAPTIVE_ROLES_AND_QUORUM.md) and issue #38.
 
 This only creates a new deterministic PUBLIC validators text file, refusing overwrite and reporting explicit `blsProofOfPossessionVerified=false`, `operatorPhysicalIndependenceVerified=false`, `consensusGenesisSszBuilt=false`, `readyToLaunch=false`. The output is **not** a genesis and does not create fake validators.
 
