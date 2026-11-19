@@ -53,7 +53,7 @@ def inspect_encrypted_dir(directory: Path) -> dict:
     if type(crypto) is not dict or not all(key in crypto for key in (
         "cipher", "ciphertext", "cipherparams", "kdf", "kdfparams", "mac"
     )):
-        raise WalletCheckError("keystore has no EIP-2335-compatible/UTC-V3 encryption envelope")
+        raise WalletCheckError("keystore has no Ethereum UTC-V3 encryption envelope")
     if type(crypto["ciphertext"]) is not str or not crypto["ciphertext"]:
         raise WalletCheckError("missing encrypted private key ciphertext")
     if type(document["version"]) is not int or document["version"] != 3:
