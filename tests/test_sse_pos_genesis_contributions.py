@@ -73,6 +73,19 @@ class GenesisPublicContributionsTests(unittest.TestCase):
             self.assertEqual(main(argv), 0)
         self.assertEqual(json.loads(buffer.getvalue())["publicValidatorKeys"], 15)
 
+    def test_invalid_explicit_genesis_threshold_types_rejected(self):
+        files = [self.contribution(i) for i in range(3)]
+        for bad_operators, bad_validators in (
+            (True, 3), (3, True), (0, 3), (3, 0),
+            ("3", 3), (3, "3"), (1, 3)
+        ):
+            with self.subTest(operators=bad_operators, validators=bad_validators):
+                with self.assertRaises(CeremonyError):
+                    collect(
+                        files, min_operators=bad_operators,
+                        min_validators=bad_validators
+                    )
+
     def test_deterministic_public_list_digest_independent_of_file_order(self):
         files = [self.contribution(i, keys=2) for i in range(4)]
         a, ra = collect(files, min_operators=4, min_validators=8)
