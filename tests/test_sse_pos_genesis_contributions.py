@@ -44,7 +44,7 @@ class GenesisPublicContributionsTests(unittest.TestCase):
 
     def test_multioperator_public_only_collection(self):
         files = [self.contribution(i, keys=16) for i in range(4)]
-        listing, review = collect(files)
+        listing, review = collect(files, min_operators=4, min_validators=64)
         self.assertEqual(len(listing.splitlines()), 64)
         self.assertEqual(review["declaredOperators"], 4)
         self.assertEqual(review["publicValidatorKeys"], 64)
@@ -55,19 +55,37 @@ class GenesisPublicContributionsTests(unittest.TestCase):
         self.assertNotIn("mnemonic", listing.lower())
         self.assertNotIn("private", listing.lower())
 
+    def test_genesis_criteria_are_explicit_not_fixed_node_counts(self):
+        # Genesis is a finite snapshot; these values do not whitelist future
+        # joiners or impose an ongoing chain role/validator upper limit.
+        files = [self.contribution(i, keys=3) for i in range(5)]
+        listing, review = collect(files, min_operators=3, min_validators=8)
+        self.assertEqual(len(listing.splitlines()), 15)
+        self.assertEqual(review["declaredOperators"], 5)
+        self.assertEqual(review["publicValidatorKeys"], 15)
+        # A 4/64 default must never be injected into this source path.
+        with self.assertRaises(TypeError):
+            collect(files)
+        # CLI must expose explicit genesis-snapshot requirements.
+        argv = sum((["--contribution", str(p)] for p in files), [])
+        argv += ["--min-operators", "3", "--min-validators", "8"]
+        with redirect_stdout(StringIO()) as buffer:
+            self.assertEqual(main(argv), 0)
+        self.assertEqual(json.loads(buffer.getvalue())["publicValidatorKeys"], 15)
+
     def test_deterministic_public_list_digest_independent_of_file_order(self):
         files = [self.contribution(i, keys=2) for i in range(4)]
-        a, ra = collect(files, min_validators=8)
-        b, rb = collect(list(reversed(files)), min_validators=8)
+        a, ra = collect(files, min_operators=4, min_validators=8)
+        b, rb = collect(list(reversed(files)), min_operators=4, min_validators=8)
         self.assertEqual(a, b)
         self.assertEqual(ra["publicValidatorListSha256"], rb["publicValidatorListSha256"])
 
     def test_fewer_distinct_genesis_operators_fails_closed(self):
         files = [self.contribution(i, keys=16) for i in range(3)]
         with self.assertRaises(CeremonyError):
-            collect(files)
+            collect(files, min_operators=4, min_validators=48)
         with self.assertRaises(CeremonyError):
-            collect(files, min_operators=1)
+            collect(files, min_operators=1, min_validators=48)
 
     def test_duplicate_operator_label_rejected(self):
         files = [self.contribution(i) for i in range(4)]
@@ -75,7 +93,7 @@ class GenesisPublicContributionsTests(unittest.TestCase):
         contents["operatorId"] = "operator-0"
         files[1].write_text(json.dumps(contents))
         with self.assertRaises(CeremonyError):
-            collect(files, min_validators=4)
+            collect(files, min_operators=4, min_validators=4)
 
     def test_same_key_or_same_withdrawal_address_across_operators_rejected(self):
         files = [self.contribution(i) for i in range(4)]
@@ -84,12 +102,12 @@ class GenesisPublicContributionsTests(unittest.TestCase):
         bad["validators"][0]["pubkey"] = good["validators"][0]["pubkey"]
         files[1].write_text(json.dumps(bad))
         with self.assertRaises(CeremonyError):
-            collect(files, min_validators=4)
+            collect(files, min_operators=4, min_validators=4)
         bad["validators"][0]["pubkey"] = "0x" + f"{90000:096x}"
         bad["validators"][0]["withdrawalCredentials"] = good["validators"][0]["withdrawalCredentials"]
         files[1].write_text(json.dumps(bad))
         with self.assertRaises(CeremonyError):
-            collect(files, min_validators=4)
+            collect(files, min_operators=4, min_validators=4)
 
     def test_secret_bearing_fields_and_unknown_keys_rejected(self):
         for forbidden in ("mnemonic", "privateKey", "keystore", "validatorPassword"):
@@ -135,7 +153,7 @@ class GenesisPublicContributionsTests(unittest.TestCase):
         files = [self.contribution(i) for i in range(4)]
         dest = self.dir / "validators.txt"
         cmd = sum((["--contribution", str(p)] for p in files), [])
-        cmd += ["--min-validators", "4", "--output", str(dest)]
+        cmd += ["--min-operators", "4", "--min-validators", "4", "--output", str(dest)]
         with redirect_stdout(StringIO()):
             self.assertEqual(main(cmd), 0)
         self.assertEqual(len(dest.read_text().splitlines()), 4)
@@ -144,7 +162,7 @@ class GenesisPublicContributionsTests(unittest.TestCase):
 
     def test_public_list_format_matches_official_generator(self):
         files = [self.contribution(i) for i in range(4)]
-        listing, result = collect(files, min_validators=4)
+        listing, result = collect(files, min_operators=4, min_validators=4)
         for line in listing.splitlines():
             pub, wd, balance = line.split(":")
             self.assertTrue(pub.startswith("0x"))
