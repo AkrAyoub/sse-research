@@ -1,6 +1,0 @@
-# Minimal manually installed dependencies for a fresh validator VM.
-# Source: requirements.txt in this reviewed GitHub revision.
-# Note: transitive package versions are not yet hash locked; record pip freeze
-# and reproducible artifacts before declaring a production release.
-eth-account==0.14.0
-pycryptodome==3.23.0

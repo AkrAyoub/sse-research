@@ -3,7 +3,7 @@ pragma solidity ^0.8.24;
 
 import "forge-std/Test.sol";
 import {SSEVRFV25Adapter} from "../../contracts/SSEVRFV25Adapter.sol";
-import {MockVRFV25Coordinator} from "../../contracts/MockVRFV25Coordinator.sol";
+import {MockVRFV25Coordinator} from "../mocks/MockVRFV25Coordinator.sol";
 import {OpenMonitorCommittee} from "../../contracts/OpenMonitorCommittee.sol";
 import {SSESettlement} from "../../contracts/SSESettlement.sol";
 import {GlobalRosterMerkle} from "../../contracts/GlobalRosterMerkle.sol";

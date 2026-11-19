@@ -2,6 +2,15 @@
 # Start a pinned, SELF-OWNED Ethereum PoS research devnet, with NO real ETH.
 # Never modifies historical Anvil31337 or QBFT31338 VMs. No Actions or sudo.
 set -euo pipefail
+# NEVER expose this original chain31339 launcher as a public network.
+# VM4705's first upstream run disclosed a shared genesis validator
+# mnemonic and premine private keys. Internet-public SSE requires a
+# NEW chain/genesis with independent operators and verifiable P2P.
+if [[ "${SSE_PUBLIC_NETWORK:-0}" != "0" ||
+      "${SSE_POS_EXPOSE_PUBLIC_P2P:-0}" != "0" ]]; then
+  echo "SSE_POS_REFUSED: 31339 leaked-key smoke genesis MUST NOT become public" >&2
+  exit 2
+fi
 : "${SSE_POS_CONF_DIR:=$HOME/sse-pos-secrets}"
 : "${SSE_POS_UPSTREAM_DIR:=$HOME/sse-pos-ethereum-package-d3014d6d23d6}"
 readonly UPSTREAM_SHA="d3014d6d23d683362025b9e23a0d69de49e77cca"
