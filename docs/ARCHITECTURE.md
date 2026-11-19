@@ -123,20 +123,23 @@ and software versions are actually reviewed. Chain ID alone is NOT
 globally unique and MUST be confirmed alongside the exact execution
 genesis, Beacon validators root and fork config.
 
-A recommended first physical experiment has **four independently
-controlled PoS operators** (each can run EL+CL and optional VC),
-two or more separate Internet-reachable bootnodes, one real provider,
-one real consumer, and four or more independently controlled
-bonded monitors, with a spare. Initial validator stake fractions
-should avoid one host holding >=1/3 active stake; for example,
-four equal operators with 25% each leaves 75% attesting if one host
-fails, nominally above the >2/3 finalization requirement.
-This is a fault-domain/consensus argument, NOT a guarantee of
-liveness under correlated partitions or a permanent four-node
-protocol roster. New validators can deposit and activate later.
-Genesis validator-key count, resource size and block occupancy
-must be measured against protocol requirements and host capacity;
-do not present arbitrary count as research optimization.
+The protocol has **NO fixed number of nodes for ANY role**.
+At genesis, the initiating independently owned validators form a finite
+explicitly documented initial snapshot (not a future-validator cap).
+After genesis, eligible outsiders join through standard Beacon deposits
+and exit rules; users independently choose any combination of full-node,
+validator, consumer, provider, and bonded monitor roles.
+For experimental fault-domain arguments, four independent PoS owners
+with 25% stake each is just ONE example: after one fails, the remaining
+75% nominal stake exceeds the >2/3 finality threshold. It is NOT a
+four-validator/owner admission requirement, persistent roster, proof
+of physical independence or guarantee of liveness under partitions.
+Public discovery uses multiple genuinely independent and replaceable
+reachable seeds; source mirror counts do not constrain P2P membership.
+Genesis count, measured resource sizes, gas utilization, security assumptions
+and active stakes require real benchmarks. Explicit per-genesis acceptance
+thresholds are config inputs, NOT code defaults or global membership caps.
+See [R21 adaptive roles and quorum](R21_ADAPTIVE_ROLES_AND_QUORUM.md).
 
 **Bootstrap/public source distribution:** This repository is PRIVATE.
 The future network's public genesis, Beacon config, client versions,
@@ -159,7 +162,7 @@ Candidate `contracts/OpenTestEthFaucet.sol`, adversarial Foundry tests and desig
 `contracts/SSESettlement.sol`, and
 `contracts/OpenResourceBoard.sol` already implement actual
 bonded registration, global or bounded monitor election, funded
-resource bidding, 3-of-4 threshold reporting and escrow accounting.
+resource bidding, **legacy fixed 3-of-4** threshold reporting and escrow accounting. This fixed committee is NOT the required adaptive production behavior; the R21 dynamic migration is an explicit public-release blocker (#38).
 The current delayed-block entropy is **proposer-biasable**, not a
 strong unbiased VRF. Benchmark/selection/security work remains.
 
@@ -203,10 +206,12 @@ dependencies.
 - [ ] A consumer and provider on separate hosts exchange signed
       live work against an actually allocated pinned worker/container;
       record actual CPU/memory/network metering and request/result.
-- [ ] At least four monitors on independent hosts bond/test real
-      service behavior and commit signed raw evidence tied to the
-      correct canonical lease; 3/4 agree OR an inconclusive window
-      is handled conservatively on-chain.
+- [ ] Vary the REAL population of independently owned bonded monitors,
+      then elect and snapshot a gas/budget/risk-affordable committee of
+      size k for each lease. Freeze a justified threshold q BEFORE votes,
+      verify correct evidence and signed outcomes at q unique seats,
+      and handle all undecided windows as inconclusive on-chain.
+      Neither total monitor membership nor q is fixed to 4/3.
 - [ ] Provider/consumer withdrawals and monitor compensation are
       real successful/finalized transactions with gas and timing
       measurements, signed evidence hash chain and crash recovery.
