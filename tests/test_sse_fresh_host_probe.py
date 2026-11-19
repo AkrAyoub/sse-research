@@ -78,6 +78,10 @@ class FreshHostProbeTests(unittest.TestCase):
         self.assertFalse(r["network"]["externalPeerConnected"])
         self.assertFalse(r["network"]["natOrCGNATDetermined"])
         self.assertFalse(r["roleSelectionIsAdmission"])
+        self.assertEqual(r["funding"]["nativeCurrency"], "valueless_test_eth")
+        self.assertTrue(r["funding"]["sseAdministratorApprovalForbidden"])
+        self.assertFalse(r["funding"]["onchainGrantFinalized"])
+        self.assertFalse(r["funding"]["independentGasSponsorAvailable"])
 
     def test_no_signer_file_private_keys_or_network_touch_claimed(self):
         r = build_report(("provider", "monitor"), host_facts())
