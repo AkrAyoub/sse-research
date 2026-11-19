@@ -6,6 +6,14 @@
 VM4705, single host, exposed bootstrap mnemonic; Anvil31337, permissioned
 QBFT31338 and Tailscale invite-gated networks are NOT this architecture.
 
+## Zero centralized authorization or control — architectural veto
+
+**There is no SSE authority that signs up, approves, permits, updates, controls, funds, or manages every participant.** Network membership depends only on independently verifiable genesis, compatible clients and native P2P; economic roles depend only on the relevant *on-chain/protocol rules*, not the original experiment operator, an admin's wallet, a central registry, privileged invitation, API account, hosted dashboard or Tailscale coordinator. A full node must be able to join after the original deployer, all original bootstrap peers, a single faucet, and a single HTTP/HTTPS mirror are offline, provided other peers and required publicly obtainable test funds remain.
+
+Initial genesis publication and optional signed release snapshots are reproducible **information distribution**, never ongoing approval or unilateral upgrade power. Any user may cache/redistribute genesis and run their own compatible client; release artifacts should have multiple independent mirrors, transparently verifiable code and optional nonexclusive signatures. No mandatory central RPC, seed, VRF/faucet/operator, block explorer, UI relay or global node management service may control consensus or joining.
+
+**Current contracts do not yet satisfy a proven no-central-dependency audit:** pre-binding `bootstrapper` configuration, VRF fee recipient/lifetime cap, a pinned randomness source/coordinator and potentially biasable sortition require real semantic review and engineering. They are **BLOCKERS**, not approval that the project is currently fully decentralized. Exact source findings, no-administrator threat model and independent host acceptance live in [DECENTRALIZATION_INVARIANTS.md](DECENTRALIZATION_INVARIANTS.md). Fresh host provenance, every command, every future fix and remaining automation gaps belong in [the VM4706 experiment journal](experiments/VM4706_2026-11-19.md).
+
 ## Nonnegotiable properties
 
 1. **Our own Ethereum-compatible Proof-of-Stake chain, valueless TEST ETH.**
