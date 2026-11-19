@@ -10,9 +10,11 @@ The smart contracts and local signer MUST enforce every rule independently.
 from __future__ import annotations
 
 from dataclasses import dataclass
+import re
 from typing import FrozenSet
 
 
+ADDRESS = re.compile(r"0x[0-9a-fA-F]{40}\\Z")
 PUBLIC_READ = frozenset({"read_public_chain", "read_public_market", "read_public_node_status"})
 OWNER_READ = frozenset({"read_private_node_metrics"})
 LOCAL_ONLY = frozenset({"enable_local_role", "disable_local_role"})
@@ -72,6 +74,23 @@ def authorize(action: str, evidence: ServerEvidence) -> Decision:
     """
     if type(action) is not str or type(evidence) is not ServerEvidence:
         return Decision(False, "malformed_request")
+    bool_fields = (
+        evidence.owner_authenticated, evidence.origin_verified,
+        evidence.csrf_verified, evidence.node_owned_locally,
+        evidence.onchain_identity_verified, evidence.chain_identity_verified,
+        evidence.signer_consent_verified, evidence.monitor_selected_on_chain,
+        evidence.valid_signed_evidence,
+    )
+    if any(type(flag) is not bool for flag in bool_fields):
+        return Decision(False, "malformed_server_evidence")
+    if (type(evidence.local_roles_enabled) is not frozenset
+            or type(evidence.onchain_roles_verified) is not frozenset
+            or type(evidence.lease_authorized_roles) is not frozenset
+            or any(type(role) is not str for collection in (
+                evidence.local_roles_enabled, evidence.onchain_roles_verified,
+                evidence.lease_authorized_roles
+            ) for role in collection)):
+        return Decision(False, "malformed_server_evidence")
     if action in ABSOLUTE_DENY:
         return Decision(False, "forbidden_dashboard_capability")
     if action in PUBLIC_READ:
@@ -100,9 +119,11 @@ def authorize(action: str, evidence: ServerEvidence) -> Decision:
     ):
         return Decision(False, "no_selected_monitor_or_authenticated_evidence")
     if action == "withdraw_own_credit" and not (
-        evidence.signer_address is not None and
-        evidence.withdrawal_beneficiary is not None and
-        evidence.signer_address.lower() == evidence.withdrawal_beneficiary.lower()
+        type(evidence.signer_address) is str
+        and type(evidence.withdrawal_beneficiary) is str
+        and ADDRESS.fullmatch(evidence.signer_address) is not None
+        and ADDRESS.fullmatch(evidence.withdrawal_beneficiary) is not None
+        and evidence.signer_address.lower() == evidence.withdrawal_beneficiary.lower()
     ):
         return Decision(False, "withdrawal_beneficiary_must_be_local_signer")
     if not evidence.signer_consent_verified:
