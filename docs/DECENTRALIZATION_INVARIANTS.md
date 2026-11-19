@@ -23,6 +23,16 @@ SSE is an open, independently operated, Ethereum-compatible Proof-of-Stake test-
 
 **Dynamic IP:** No participant must buy or own a static address. Outbound-only peers may still synchronize and validate. At least some P2P peers must be discoverable/reachable; DDNS does not bypass CGNAT. Each node UI must have an Internet-accessible HTTPS URL, using a substitutable relay/reverse tunnel if necessary, but that relay must not become an authority over blockchain membership or consensus.
 
+## R21 explicit open-ended role counts and adaptive monitor quorum
+
+No maximum number of `observer`, `full_node`, `validator`, `consumer`, `provider`, `monitor` or multi-role participants may be imposed by SSE operator signup, static contract arrays, per-role allowlists or a permanent Genesis roster. Network capacity, actual gas and registration economics still impose physical/operational limits; transparent bounded **per-transaction** work is allowed, but not a hard protocol-wide enrollment ceiling.
+
+**CURRENT PUBLIC RELEASE FAILURE:** `OpenMonitorCommittee.sol` still hardcodes `COMMITTEE_SIZE=4`, `address[4]`, global active Merkle pool capacity `1<<20`, and fixed selection/snapshot sizes; `SSESettlement.sol` hardcodes `COMMITTEE_SIZE=4`, `QUORUM=3`, `address[4]`, fixed confirmations and reward formulas. These are historical executable constraints that contradict the user's adaptive-committee requirement. They cannot be cured safely by editing a constant alone.
+
+A committee is a **finite set per actual lease**, with size and strict supermajority derived from objective precommitted risk, real eligible independent candidates, incentive escrow and measured EVM gas limits. Proposed `k=min(eligible, gasBoundSeats, floor(monitorBudget/(epochs*rewardPerMonitor)))`, with `k>=3f+1` and `q=floor(2k/3)+1`; never silently reduce `f` or quorum because budget/reports are missing. Distinguish mathematical BFT assumptions from observed independence of individual real operators—bonded EOAs on a valueless TEST ETH chain are Sybil-prone. Inconclusive outcomes must not become unilateral slashing or false SLA success. `contracts/AdaptiveMonitorQuorum.sol` is only a candidate pure math helper; **not yet wired to runtime**. See [R21 design](R21_ADAPTIVE_ROLES_AND_QUORUM.md) and [#38](https://github.com/AkrAyoub/sse-research/issues/38) (blocking).
+
+The initial Genesis is necessarily finite, but `--min-operators` and `--min-validators` are now mandatory explicit ceremony inputs, not hidden 4/64 defaults. This is NOT an admission gate for post-genesis validator deposits.
+
 ## Existing SOURCE-LEVEL centralization findings — BLOCK public release
 
 Audit current retained code by its exact interfaces and deployment bytecode; do not infer decentralization solely from comments.
