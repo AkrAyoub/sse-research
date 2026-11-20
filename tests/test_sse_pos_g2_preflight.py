@@ -69,7 +69,18 @@ class R35G2ExactObservedProvenanceTests(unittest.TestCase):
     def test_public_manifest_duplicate_keys_rejected(self):
         p = self.root / "bad.json"
         p.write_text('{"schema":"x","schema":"y"}', encoding="utf-8")
+        # Explicit safe fixture mode: the owner VM may have group-writable
+        # default umask. Exercise duplicate JSON parsing, not the earlier
+        # (correct) file-permission gate. Never weaken the production gate.
+        p.chmod(0o600)
         with self.assertRaisesRegex(G2PreflightError, "manifest"):
+            json_file(p)
+
+    def test_group_writable_manifest_is_refused_before_json_parsing(self):
+        p = self.root / "unsafe.json"
+        p.write_text('{"schema":"x","schema":"y"}', encoding="utf-8")
+        p.chmod(0o660)
+        with self.assertRaisesRegex(G2PreflightError, "unsafe or unexpected public artifact"):
             json_file(p)
 
     def test_symlinked_public_artifact_rejected(self):
