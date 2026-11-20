@@ -5,6 +5,7 @@ A source-only test cannot establish cryptographic custody or Docker safety.
 """
 from pathlib import Path
 import re
+import subprocess
 import unittest
 
 ROOT = Path(__file__).resolve().parents[1]
@@ -15,6 +16,9 @@ class LighthouseHdWalletSourceGuardTests(unittest.TestCase):
     @classmethod
     def setUpClass(cls):
         cls.src = SCRIPT.read_text(encoding="utf-8")
+
+    def test_shell_syntax_is_valid_without_running_keygen(self):
+        subprocess.run(["bash", "-n", str(SCRIPT)], check=True)
 
     def test_explicit_exact_commit_clean_tree_and_owner_tty_consent(self):
         for required in (
