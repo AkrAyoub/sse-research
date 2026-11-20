@@ -360,7 +360,7 @@ contract SSEAdaptiveVoteLedgerTest is Test {
 
     function testFreezeRejectsZeroShortOrExcessiveConfirmationPeriod() public {
         address[] memory people = _monitors(4);
-        uint64[3] memory invalid = [uint64(0), 59 minutes, 8 days];
+        uint64[3] memory invalid = [uint64(0), uint64(59 minutes), uint64(8 days)];
         for (uint256 i; i < invalid.length; ++i) {
             SSEAdaptiveVoteLedger.FreezeTerms memory p = _terms(1, 4, 1, 4, 40);
             p.confirmationTimeoutSeconds = invalid[i];
