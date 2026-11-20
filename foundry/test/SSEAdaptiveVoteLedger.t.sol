@@ -24,6 +24,7 @@ contract SSEAdaptiveVoteLedgerTest is Test {
     function setUp() public {
         vm.warp(100_000);
         ledger = new SSEAdaptiveVoteLedger(SETTLEMENT);
+        vm.deal(SETTLEMENT, 1_000 ether);
     }
 
     function _monitors(uint256 seats) internal pure returns (address[] memory people) {
@@ -57,7 +58,7 @@ contract SSEAdaptiveVoteLedgerTest is Test {
     {
         people = _monitors(k);
         vm.prank(SETTLEMENT);
-        ledger.freezeCommittee(_terms(leaseId, k, f, k, k * 2 * 5), people);
+        ledger.freezeCommittee{value: k * 2 * 5}(_terms(leaseId, k, f, k, k * 2 * 5), people);
     }
 
     function _confirm(uint256 leaseId, address[] memory people) internal {
@@ -102,11 +103,11 @@ contract SSEAdaptiveVoteLedgerTest is Test {
     function testCannotInitializeFromUntrustedAccountOrOverwriteLease() public {
         address[] memory people = _monitors(4);
         vm.expectRevert(SSEAdaptiveVoteLedger.Unauthorized.selector);
-        ledger.freezeCommittee(_terms(1, 4, 1, 4, 40), people);
+        ledger.freezeCommittee{value: 40}(_terms(1, 4, 1, 4, 40), people);
         _freeze(1, 4, 1);
         vm.expectRevert(SSEAdaptiveVoteLedger.InvalidArgument.selector);
         vm.prank(SETTLEMENT);
-        ledger.freezeCommittee(_terms(1, 4, 1, 4, 40), people);
+        ledger.freezeCommittee{value: 40}(_terms(1, 4, 1, 4, 40), people);
     }
 
     function testDuplicateOrPartyAsMonitorCannotBeSelected() public {
@@ -114,25 +115,25 @@ contract SSEAdaptiveVoteLedgerTest is Test {
         people[3] = people[0];
         vm.expectRevert(SSEAdaptiveVoteLedger.DuplicateMonitor.selector);
         vm.prank(SETTLEMENT);
-        ledger.freezeCommittee(_terms(1, 4, 1, 4, 40), people);
+        ledger.freezeCommittee{value: 40}(_terms(1, 4, 1, 4, 40), people);
         people[3] = PROVIDER;
         vm.expectRevert(SSEAdaptiveVoteLedger.Unauthorized.selector);
         vm.prank(SETTLEMENT);
-        ledger.freezeCommittee(_terms(1, 4, 1, 4, 40), people);
+        ledger.freezeCommittee{value: 40}(_terms(1, 4, 1, 4, 40), people);
     }
 
     function testUnderfundedSnapshotIsRejectedNotDownscaled() public {
         address[] memory people = _monitors(4);
         vm.expectRevert(AdaptiveMonitorQuorum.InsufficientMonitorRewardBudget.selector);
         vm.prank(SETTLEMENT);
-        ledger.freezeCommittee(_terms(1, 4, 1, 4, 39), people);
+        ledger.freezeCommittee{value: 39}(_terms(1, 4, 1, 4, 39), people);
     }
 
     function testInsufficientEligiblePoolIsRejected() public {
         address[] memory people = _monitors(3);
         vm.expectRevert(AdaptiveMonitorQuorum.InsufficientIndependentEligibleMonitors.selector);
         vm.prank(SETTLEMENT);
-        ledger.freezeCommittee(_terms(1, 3, 1, 3, 30), people);
+        ledger.freezeCommittee{value: 30}(_terms(1, 3, 1, 3, 30), people);
     }
 
     function testInvalidOrDuplicateSeatConfirmationRejected() public {
@@ -277,7 +278,7 @@ contract SSEAdaptiveVoteLedgerTest is Test {
         address[] memory people = _monitors(4);
         people[0] = signer;
         vm.prank(SETTLEMENT);
-        ledger.freezeCommittee(_terms(1, 4, 1, 4, 40), people);
+        ledger.freezeCommittee{value: 40}(_terms(1, 4, 1, 4, 40), people);
         _confirm(1, people);
         _open(1, 0);
         vm.prank(SETTLEMENT);
@@ -343,7 +344,7 @@ contract SSEAdaptiveVoteLedgerTest is Test {
         ledger.expireUnconfirmed(7);
         vm.expectRevert(SSEAdaptiveVoteLedger.InvalidArgument.selector);
         vm.prank(SETTLEMENT);
-        ledger.freezeCommittee(_terms(7, 5, 1, 5, 50), people);
+        ledger.freezeCommittee{value: 50}(_terms(7, 5, 1, 5, 50), people);
         vm.expectRevert(SSEAdaptiveVoteLedger.InvalidPhase.selector);
         vm.prank(SETTLEMENT);
         ledger.openEpoch(7, 0, REQUEST, uint64(block.timestamp + 20), uint64(block.timestamp + 40));
@@ -366,7 +367,7 @@ contract SSEAdaptiveVoteLedgerTest is Test {
             p.confirmationTimeoutSeconds = invalid[i];
             vm.expectRevert(SSEAdaptiveVoteLedger.InvalidArgument.selector);
             vm.prank(SETTLEMENT);
-            ledger.freezeCommittee(p, people);
+            ledger.freezeCommittee{value: p.monitorBudget}(p, people);
         }
     }
 
@@ -391,7 +392,7 @@ contract SSEAdaptiveVoteLedgerTest is Test {
         address[] memory people = _monitors(4);
         people[0] = signer;
         vm.prank(SETTLEMENT);
-        ledger.freezeCommittee(_terms(1, 4, 1, 4, 40), people);
+        ledger.freezeCommittee{value: 40}(_terms(1, 4, 1, 4, 40), people);
         _confirm(1, people);
         _open(1, 0);
         vm.prank(SETTLEMENT);
