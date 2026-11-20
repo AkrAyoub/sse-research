@@ -554,6 +554,67 @@ contract SSEAdaptiveVoteLedgerTest is Test {
         assertEq(address(ledger).balance, 35);
     }
 
+
+    function testNativeReportFundsConservedAcrossTwoRealOnchainLeaseBudgets() public {
+        address[] memory first = _freeze(1, 4, 1);
+        address[] memory second = _freeze(2, 5, 1);
+        assertEq(address(ledger).balance, 90);
+        assertEq(ledger.totalUnspentReserves(), 90);
+        assertEq(ledger.totalWithdrawableCredits(), 0);
+        _confirm(1, first);
+        _open(1, 0);
+        vm.prank(SETTLEMENT);
+        ledger.authenticateResponse(1, 0, RESPONSE);
+        vm.prank(first[0]);
+        ledger.submitVoteDirect(1, 0, SSEAdaptiveVoteLedger.Outcome.Success, EVIDENCE);
+        vm.prank(first[1]);
+        ledger.submitVoteDirect(1, 0, SSEAdaptiveVoteLedger.Outcome.Success, EVIDENCE);
+        assertEq(ledger.totalUnspentReserves(), 80);
+        assertEq(ledger.totalWithdrawableCredits(), 10);
+        assertEq(address(ledger).balance, 90);
+        vm.warp(block.timestamp + 41);
+        ledger.seal(1, 0);
+        vm.prank(SETTLEMENT);
+        ledger.closeReporting(1);
+        assertEq(ledger.withdrawable(CONSUMER), 30);
+        assertEq(ledger.totalUnspentReserves(), 50);
+        assertEq(ledger.totalWithdrawableCredits(), 40);
+        uint256 pre = first[0].balance;
+        vm.prank(first[0]);
+        ledger.withdraw();
+        assertEq(first[0].balance, pre + 5);
+        assertEq(ledger.totalUnspentReserves(), 50);
+        assertEq(ledger.totalWithdrawableCredits(), 35);
+        assertEq(address(ledger).balance, 85);
+        uint256 deadline = ledger.committee(2).confirmationDeadline;
+        vm.warp(deadline + 1);
+        ledger.expireUnconfirmed(2);
+        assertEq(ledger.withdrawable(CONSUMER), 80);
+        assertEq(ledger.totalUnspentReserves(), 0);
+        assertEq(ledger.totalWithdrawableCredits(), 85);
+        assertEq(address(ledger).balance, 85);
+        // Second lease committee remains an independent, never-ready state.
+        assertTrue(ledger.committee(2).confirmationExpired);
+        assertFalse(ledger.committee(2).ready);
+        assertEq(second.length, 5);
+    }
+
+    function testNoSelectedMonitorMayWithdrawWithoutRealSignedOrDirectReport() public {
+        address[] memory people = _freeze(1, 4, 1);
+        _confirm(1, people);
+        assertEq(ledger.withdrawable(people[0]), 0);
+        vm.expectRevert(SSEAdaptiveVoteLedger.NoWithdrawal.selector);
+        vm.prank(people[0]);
+        ledger.withdraw();
+        _open(1, 0);
+        vm.prank(people[0]);
+        vm.expectRevert(SSEAdaptiveVoteLedger.InvalidPhase.selector);
+        ledger.submitVoteDirect(1, 0, SSEAdaptiveVoteLedger.Outcome.Success, EVIDENCE);
+        assertEq(ledger.totalUnspentReserves(), 40);
+        assertEq(ledger.totalWithdrawableCredits(), 0);
+        assertEq(address(ledger).balance, 40);
+    }
+
     function testFuzzCommitteeQuorumAlwaysStrictForDynamicSeats(uint8 extra) public {
         uint256 k = 4 + uint256(extra % 30);
         address[] memory people = _freeze(1, k, 1);
