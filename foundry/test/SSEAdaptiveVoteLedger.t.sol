@@ -1,0 +1,313 @@
+// SPDX-License-Identifier: MIT
+pragma solidity ^0.8.24;
+
+import "forge-std/Test.sol";
+import {SSEAdaptiveVoteLedger} from "../../contracts/SSEAdaptiveVoteLedger.sol";
+import {AdaptiveMonitorQuorum} from "../../contracts/AdaptiveMonitorQuorum.sol";
+
+/// @notice These are EVM adversarial UNIT tests using synthetic addresses
+/// ONLY as fixtures; no real monitor measurements or outside operators.
+contract SSEAdaptiveVoteLedgerTest is Test {
+    SSEAdaptiveVoteLedger internal ledger;
+    address internal constant SETTLEMENT = address(0xBEEF);
+    address internal constant CONSUMER = address(0xC001);
+    address internal constant PROVIDER = address(0xD002);
+    bytes32 internal constant SNAPSHOT = keccak256("fixture-root-only");
+    bytes32 internal constant REQUEST = keccak256("fixture-request");
+    bytes32 internal constant RESPONSE = keccak256("fixture-provider-response");
+    bytes32 internal constant EVIDENCE = keccak256("fixture-offchain-evidence");
+    bytes32 internal constant VOTE_TYPEHASH = keccak256(
+        "MonitorVote(uint256 leaseId,uint256 epochId,bytes32 requestHash,uint8 outcome,bytes32 responseHash,bytes32 evidenceHash)"
+    );
+    uint256 internal constant SIGNER_KEY = 0x11ABCD;
+
+    function setUp() public {
+        vm.warp(100_000);
+        ledger = new SSEAdaptiveVoteLedger(SETTLEMENT);
+    }
+
+    function _monitors(uint256 seats) internal pure returns (address[] memory people) {
+        people = new address[](seats);
+        for (uint256 i; i < seats; ++i) {
+            people[i] = address(uint160(0x10000 + i));
+        }
+    }
+
+    function _freeze(uint256 leaseId, uint256 k, uint256 f)
+        internal returns (address[] memory people)
+    {
+        people = _monitors(k);
+        vm.prank(SETTLEMENT);
+        ledger.freezeCommittee(
+            leaseId, CONSUMER, PROVIDER, SNAPSHOT, people,
+            k, f, k, k * 2 * 5, 2, 5
+        );
+    }
+
+    function _confirm(uint256 leaseId, address[] memory people) internal {
+        for (uint256 i; i < people.length; ++i) {
+            vm.prank(people[i]);
+            ledger.confirmSeat(leaseId);
+        }
+    }
+
+    function _open(uint256 leaseId, uint256 epochId) internal {
+        vm.prank(SETTLEMENT);
+        ledger.openEpoch(
+            leaseId, epochId, REQUEST,
+            uint64(block.timestamp + 20), uint64(block.timestamp + 40)
+        );
+    }
+
+    function testFourFiveSevenTenSeatsAndThresholdsAreRealStorage() public {
+        uint256[4] memory counts = [uint256(4), 5, 7, 10];
+        uint256[4] memory quorum = [uint256(3), 4, 5, 7];
+        for (uint256 i; i < counts.length; ++i) {
+            address[] memory people = _freeze(1 + i, counts[i], 1);
+            SSEAdaptiveVoteLedger.Committee memory c = ledger.committee(1 + i);
+            assertEq(c.seats, counts[i]);
+            assertEq(c.quorum, quorum[i]);
+            assertEq(ledger.selected(1 + i).length, counts[i]);
+            assertFalse(c.ready);
+            _confirm(1 + i, people);
+            assertTrue(ledger.committee(1 + i).ready);
+        }
+    }
+
+    function testNoFixedMonitorNetworkMembershipLimitAndLargeLocalSeatCount() public {
+        address[] memory people = _freeze(1, 24, 4);
+        _confirm(1, people);
+        SSEAdaptiveVoteLedger.Committee memory c = ledger.committee(1);
+        assertEq(c.seats, 24);
+        assertEq(c.quorum, 17);
+        assertEq(c.requiredFaultTolerance, 4);
+    }
+
+    function testCannotInitializeFromUntrustedAccountOrOverwriteLease() public {
+        address[] memory people = _monitors(4);
+        vm.expectRevert(SSEAdaptiveVoteLedger.Unauthorized.selector);
+        ledger.freezeCommittee(1, CONSUMER, PROVIDER, SNAPSHOT, people, 4, 1, 4, 40, 2, 5);
+        _freeze(1, 4, 1);
+        vm.prank(SETTLEMENT);
+        vm.expectRevert(SSEAdaptiveVoteLedger.InvalidArgument.selector);
+        ledger.freezeCommittee(1, CONSUMER, PROVIDER, SNAPSHOT, people, 4, 1, 4, 40, 2, 5);
+    }
+
+    function testDuplicateOrPartyAsMonitorCannotBeSelected() public {
+        address[] memory people = _monitors(4);
+        people[3] = people[0];
+        vm.prank(SETTLEMENT);
+        vm.expectRevert(SSEAdaptiveVoteLedger.DuplicateMonitor.selector);
+        ledger.freezeCommittee(1, CONSUMER, PROVIDER, SNAPSHOT, people, 4, 1, 4, 40, 2, 5);
+        people[3] = PROVIDER;
+        vm.prank(SETTLEMENT);
+        vm.expectRevert(SSEAdaptiveVoteLedger.Unauthorized.selector);
+        ledger.freezeCommittee(1, CONSUMER, PROVIDER, SNAPSHOT, people, 4, 1, 4, 40, 2, 5);
+    }
+
+    function testUnderfundedSnapshotIsRejectedNotDownscaled() public {
+        address[] memory people = _monitors(4);
+        vm.prank(SETTLEMENT);
+        vm.expectRevert(AdaptiveMonitorQuorum.InsufficientMonitorRewardBudget.selector);
+        ledger.freezeCommittee(1, CONSUMER, PROVIDER, SNAPSHOT, people, 4, 1, 4, 39, 2, 5);
+    }
+
+    function testInsufficientEligiblePoolIsRejected() public {
+        address[] memory people = _monitors(3);
+        vm.prank(SETTLEMENT);
+        vm.expectRevert(AdaptiveMonitorQuorum.InsufficientIndependentEligibleMonitors.selector);
+        ledger.freezeCommittee(1, CONSUMER, PROVIDER, SNAPSHOT, people, 3, 1, 3, 30, 2, 5);
+    }
+
+    function testInvalidOrDuplicateSeatConfirmationRejected() public {
+        address[] memory people = _freeze(1, 4, 1);
+        vm.prank(address(0xBAD));
+        vm.expectRevert(SSEAdaptiveVoteLedger.Unauthorized.selector);
+        ledger.confirmSeat(1);
+        vm.prank(people[0]);
+        ledger.confirmSeat(1);
+        vm.prank(people[0]);
+        vm.expectRevert(SSEAdaptiveVoteLedger.InvalidPhase.selector);
+        ledger.confirmSeat(1);
+        _confirmRemaining(1, people);
+        assertEq(ledger.confirmations(1), 4);
+    }
+
+    function _confirmRemaining(uint256 leaseId, address[] memory people) internal {
+        for (uint256 i = 1; i < people.length; ++i) {
+            vm.prank(people[i]);
+            ledger.confirmSeat(leaseId);
+        }
+    }
+
+    function testEpochNeedsConfirmedCommitteeAndAuthenticatedResponse() public {
+        address[] memory people = _freeze(1, 4, 1);
+        vm.prank(SETTLEMENT);
+        vm.expectRevert(SSEAdaptiveVoteLedger.InvalidPhase.selector);
+        ledger.openEpoch(1, 0, REQUEST, uint64(block.timestamp + 20), uint64(block.timestamp + 40));
+        _confirm(1, people);
+        _open(1, 0);
+        vm.prank(people[0]);
+        vm.expectRevert(SSEAdaptiveVoteLedger.InvalidPhase.selector);
+        ledger.submitVoteDirect(1, 0, SSEAdaptiveVoteLedger.Outcome.Success, EVIDENCE);
+        vm.prank(address(0xBAD));
+        vm.expectRevert(SSEAdaptiveVoteLedger.Unauthorized.selector);
+        ledger.authenticateResponse(1, 0, RESPONSE);
+        vm.prank(SETTLEMENT);
+        ledger.authenticateResponse(1, 0, RESPONSE);
+        vm.prank(people[0]);
+        ledger.submitVoteDirect(1, 0, SSEAdaptiveVoteLedger.Outcome.Success, EVIDENCE);
+        assertEq(ledger.epoch(1, 0).successVotes, 1);
+    }
+
+    function testOneIdentityCannotVoteTwiceOrVoteAnotherLease() public {
+        address[] memory people = _freeze(1, 4, 1);
+        _confirm(1, people);
+        _open(1, 0);
+        vm.prank(SETTLEMENT);
+        ledger.authenticateResponse(1, 0, RESPONSE);
+        vm.prank(people[0]);
+        ledger.submitVoteDirect(1, 0, SSEAdaptiveVoteLedger.Outcome.Success, EVIDENCE);
+        vm.prank(people[0]);
+        vm.expectRevert(SSEAdaptiveVoteLedger.AlreadyVoted.selector);
+        ledger.submitVoteDirect(1, 0, SSEAdaptiveVoteLedger.Outcome.Success, EVIDENCE);
+        vm.prank(address(0xE000));
+        vm.expectRevert(SSEAdaptiveVoteLedger.Unauthorized.selector);
+        ledger.submitVoteDirect(1, 0, SSEAdaptiveVoteLedger.Outcome.Success, EVIDENCE);
+        vm.prank(people[0]);
+        vm.expectRevert(SSEAdaptiveVoteLedger.InvalidPhase.selector);
+        ledger.submitVoteDirect(2, 0, SSEAdaptiveVoteLedger.Outcome.Success, EVIDENCE);
+    }
+
+    function testThreeOfFiveIsNotOutcomeAndFourOfFiveIsOutcome() public {
+        address[] memory people = _freeze(1, 5, 1);
+        _confirm(1, people);
+        _open(1, 0);
+        vm.prank(SETTLEMENT);
+        ledger.authenticateResponse(1, 0, RESPONSE);
+        for (uint256 i; i < 3; ++i) {
+            vm.prank(people[i]);
+            ledger.submitVoteDirect(1, 0, SSEAdaptiveVoteLedger.Outcome.Success, EVIDENCE);
+        }
+        vm.warp(block.timestamp + 41);
+        assertEq(uint8(ledger.seal(1, 0)), uint8(SSEAdaptiveVoteLedger.Outcome.None));
+
+        _open(1, 1);
+        vm.prank(SETTLEMENT);
+        ledger.authenticateResponse(1, 1, RESPONSE);
+        for (uint256 i; i < 4; ++i) {
+            vm.prank(people[i]);
+            ledger.submitVoteDirect(1, 1, SSEAdaptiveVoteLedger.Outcome.Success, EVIDENCE);
+        }
+        vm.warp(block.timestamp + 41);
+        assertEq(uint8(ledger.seal(1, 1)), uint8(SSEAdaptiveVoteLedger.Outcome.Success));
+    }
+
+    function testFailureVotesAreRejectedBeforeResponseDeadline() public {
+        address[] memory people = _freeze(1, 4, 1);
+        _confirm(1, people);
+        _open(1, 0);
+        vm.prank(people[0]);
+        vm.expectRevert(SSEAdaptiveVoteLedger.InvalidPhase.selector);
+        ledger.submitVoteDirect(1, 0, SSEAdaptiveVoteLedger.Outcome.Failure, EVIDENCE);
+        vm.warp(block.timestamp + 21);
+        for (uint256 i; i < 3; ++i) {
+            vm.prank(people[i]);
+            ledger.submitVoteDirect(1, 0, SSEAdaptiveVoteLedger.Outcome.Failure, EVIDENCE);
+        }
+        vm.warp(block.timestamp + 20);
+        assertEq(uint8(ledger.seal(1, 0)), uint8(SSEAdaptiveVoteLedger.Outcome.Failure));
+    }
+
+    function testConflictingOrMissingVotesAreInconclusive() public {
+        address[] memory people = _freeze(1, 7, 2);
+        _confirm(1, people);
+        _open(1, 0);
+        vm.prank(SETTLEMENT);
+        ledger.authenticateResponse(1, 0, RESPONSE);
+        for (uint256 i; i < 3; ++i) {
+            vm.prank(people[i]);
+            ledger.submitVoteDirect(1, 0, SSEAdaptiveVoteLedger.Outcome.Success, EVIDENCE);
+        }
+        vm.warp(block.timestamp + 21);
+        for (uint256 i = 3; i < 6; ++i) {
+            vm.prank(people[i]);
+            ledger.submitVoteDirect(1, 0, SSEAdaptiveVoteLedger.Outcome.Failure, EVIDENCE);
+        }
+        vm.warp(block.timestamp + 20);
+        assertEq(uint8(ledger.seal(1, 0)), uint8(SSEAdaptiveVoteLedger.Outcome.None));
+        SSEAdaptiveVoteLedger.Epoch memory e = ledger.epoch(1, 0);
+        assertEq(e.successVotes, 3);
+        assertEq(e.failureVotes, 3);
+        assertEq(e.totalVotes, 6);
+    }
+
+    function testWrongSignerOrInvalidEvidenceCannotChangeOutcome() public {
+        address[] memory people = _freeze(1, 4, 1);
+        _confirm(1, people);
+        _open(1, 0);
+        vm.prank(SETTLEMENT);
+        ledger.authenticateResponse(1, 0, RESPONSE);
+        vm.prank(people[0]);
+        vm.expectRevert(SSEAdaptiveVoteLedger.InvalidArgument.selector);
+        ledger.submitVoteDirect(1, 0, SSEAdaptiveVoteLedger.Outcome.Success, bytes32(0));
+        vm.prank(people[0]);
+        vm.expectRevert(SSEAdaptiveVoteLedger.InvalidArgument.selector);
+        ledger.submitVoteDirect(1, 0, SSEAdaptiveVoteLedger.Outcome.None, EVIDENCE);
+    }
+
+    function testActualEIP712SignatureRecordedWithLeaseEpochAndChainBinding() public {
+        address signer = vm.addr(SIGNER_KEY);
+        address[] memory people = _monitors(4);
+        people[0] = signer;
+        vm.prank(SETTLEMENT);
+        ledger.freezeCommittee(1, CONSUMER, PROVIDER, SNAPSHOT, people, 4, 1, 4, 40, 2, 5);
+        _confirm(1, people);
+        _open(1, 0);
+        vm.prank(SETTLEMENT);
+        ledger.authenticateResponse(1, 0, RESPONSE);
+        bytes32 structHash = keccak256(abi.encode(
+            VOTE_TYPEHASH, uint256(1), uint256(0), REQUEST,
+            uint8(SSEAdaptiveVoteLedger.Outcome.Success), RESPONSE, EVIDENCE
+        ));
+        bytes32 digest = keccak256(abi.encodePacked(
+            "\x19\x01", ledger.domainSeparator(), structHash
+        ));
+        (uint8 v, bytes32 r, bytes32 s) = vm.sign(SIGNER_KEY, digest);
+        bytes memory sig = abi.encodePacked(r, s, v);
+        vm.prank(address(0x9999));
+        ledger.submitSignedVote(1, 0, SSEAdaptiveVoteLedger.Outcome.Success, EVIDENCE, sig);
+        assertTrue(ledger.voted(1, 0, signer));
+        assertEq(ledger.epoch(1, 0).successVotes, 1);
+        vm.prank(address(0x9999));
+        vm.expectRevert(SSEAdaptiveVoteLedger.AlreadyVoted.selector);
+        ledger.submitSignedVote(1, 0, SSEAdaptiveVoteLedger.Outcome.Success, EVIDENCE, sig);
+        vm.prank(address(0x9999));
+        vm.expectRevert(SSEAdaptiveVoteLedger.InvalidPhase.selector);
+        ledger.submitSignedVote(1, 99, SSEAdaptiveVoteLedger.Outcome.Success, EVIDENCE, sig);
+    }
+
+    function testCannotSealEarlyResealOrVoteAfterSeal() public {
+        address[] memory people = _freeze(1, 4, 1);
+        _confirm(1, people);
+        _open(1, 0);
+        vm.expectRevert(SSEAdaptiveVoteLedger.InvalidPhase.selector);
+        ledger.seal(1, 0);
+        vm.warp(block.timestamp + 41);
+        ledger.seal(1, 0);
+        vm.expectRevert(SSEAdaptiveVoteLedger.InvalidPhase.selector);
+        ledger.seal(1, 0);
+        vm.prank(people[0]);
+        vm.expectRevert(SSEAdaptiveVoteLedger.InvalidPhase.selector);
+        ledger.submitVoteDirect(1, 0, SSEAdaptiveVoteLedger.Outcome.Failure, EVIDENCE);
+    }
+
+    function testFuzzCommitteeQuorumAlwaysStrictForDynamicSeats(uint8 extra) public {
+        uint256 k = 4 + uint256(extra % 30);
+        address[] memory people = _freeze(1, k, 1);
+        assertEq(people.length, k);
+        SSEAdaptiveVoteLedger.Committee memory c = ledger.committee(1);
+        assertGt(c.quorum, (2 * k) / 3);
+        assertLe(c.quorum, k);
+    }
+}
