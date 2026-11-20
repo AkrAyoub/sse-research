@@ -42,6 +42,12 @@ These paths and address are **placeholders**, not commands ready to execute. Do 
 
 `tests/test_sse_pos_public_keystore_export.py` contains 9 new adversarial synthetic-file tests (not yet VM tested) for owner-only permission enforcement, EIP-2335 shape checks, flat/nested Lighthouse layouts, duplicate/symlink rejection, public-only output and no-overwrite. This is in addition to the 13 R25 genesis builder preflight tests (the additional test rejects fixed roster sizes above a minimum).
 
+## R29 additional fail-closed public Genesis checks (SOURCE ONLY)
+
+After G1 real EOA was verified but BLS wallet creation was declined, we continued **non-secret** public-genesis hardening. The revised `tools/sse_pos_genesis_build.py` now rejects a deceptively configured EL `depositContractAddress` unless the same normalized address has **explicit nonempty bounded EVM runtime `code` in the public genesis `alloc`**, and rejects duplicate allocation aliases differing only in case or the optional `0x` prefix. It records a public SHA256 of that bytecode in `elFields.depositContractBytecodeHashSha256` and **`depositContractRuntimeAuthenticityVerified=false`**. Merely putting arbitrary code at that address cannot demonstrate working deposit and event behavior, and is **NOT permissionless new validator onboarding**. The actual deposited 32-worthless-TEST-ETH contract code and chain initialization must be verified against real Besu+Lighthouse before any public release; never use a mocked/stub deposit runtime to run a real chain.
+
+The genesis test fixtures contain a **deliberate REVERT stub `0x60006000fd`** solely to test parser behavior, with three new negative/shape tests. It is NOT the real Ethereum Beacon deposit contract and MUST NEVER be deployed as it would prevent joining. This raises `test_sse_pos_genesis_build.py` source test count to **16** (the previous 13 methods passed at Step31; all 16 revised methods require new VM validation). The existing 9 public keystore exporter and 16 contribution tests were already verified at older G0 source and were not changed here. Actual G1 BLS approval remains **refused** and cannot be bypassed by these changes.
+
 ## Actual CLI workflow after owner has real public data
 
 **Read-only preflight (safe, no key creation):**
