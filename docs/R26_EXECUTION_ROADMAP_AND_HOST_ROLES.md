@@ -1,0 +1,68 @@
+# R26 — Execution roadmap and real host/role evidence (2026-11-20)
+
+**Status:** action plan; not an execution or deployment claim. Last actually observed VM4706 EVM success: **31/31 focused Solidity tests, 196/196 full across 22 suites** at SHA `298518e51eeaf59477a92450fbec48bb8980eccd` (Entry039). Latest R25 genesis Python user log at `41178778aec4c71f3a534dca504080f1e05a1cea`: **12/13** focused builder tests succeeded, one **ERROR** because a negative fixture wrongly expected `GenesisBuildError` instead of the genuinely thrown `CeremonyError("too few distinct supplied contribution files")`. Collector correctly refused; source test fixed by GitHub commit `8382bf24e300e85313f4d06d71ca53d62a65be20`, NOT yet retested on VM. Under `set -e`, the new public-keystore 9-test suite and existing contributions 16-test suite did NOT run in this batch.
+
+## What VM4706 actually is right now
+
+- Actual: clean Ubuntu VM4706 developer/validation host, **4 vCPU, about 11 GiB RAM and 92 GiB free disk** as observed Entry030. Developer GitHub read-only SSH fetch key; pinned Foundry v1.9.0 + solc 0.8.24; pinned Besu v26.11.1 and Lighthouse v8.3.3 Docker images pulled with real offline version tests; official ethpandaops Beacon Genesis generator v0.0.8 executable checksum-verified. Locally compiled and executed R24 Solidity EVM test fixtures; R25 Python source tests started, one expectation error.
+- Not yet: no running **fresh chain31340** EL/CL containers, no source-confirmed new validator client/proposals/finality, no real owner-encrypted withdrawal wallet or BLS keys from R20 owner approval, no genesis.ssz/EL Genesis, no production SSE deployments/funded native on-chain leases/bonds, no confirmed public P2P ingress, no external laptop peer, no HTTPS node dashboard. A 31/31 Solidity Foundry PASS does **not** place 31 active monitoring agents on this VM.
+- Old VM4705 operated a REAL but isolated **chain31339** with local Besu, Lighthouse and seven SSE contract deployment receipts. Its bootstrap validator mnemonic was exposed in upstream logs and it is **unusable for public SSE chain31340**. Existing `tools/sse_pos_live_roles.py`, `tools/sse_pos_devnet_health.py` and `scripts/sse_pos_launch.sh` target **31339** or private smoke and MUST NOT be reused unreviewed for 31340.
+- Source-only: `SSEAdaptiveVoteLedger.sol` actually passed local EVM tests for variable k/q, EIP712 vote recording and paid monitoring report escrow, but still lacks unbiased on-chain selection and connection to actual provider/consumer SSE settlement. `tools/sse_node_marketplace.py` has owner-signer CLI plans/bids/fund/accept/monitor register/confirm/admit-epoch for prior contracts, not live chain31340 executions. Some provider/monitor direct-work services have local safeguards; they are NOT confirmed running cross-host on VM4706.
+- New R25 `tools/sse_pos_genesis_build.py` and `tools/sse_pos_public_keystore_export.py` are source-only. They do NOT generate EOA or BLS secret keys and do not prove actual possession or physical independence. The genesis builder must be tested against real upstream pinned clients, real deposit-contract code/fork config and real owner-controlled BLS keys before launch.
+
+## Rules that DO NOT change with lab resource count
+
+- Network may grow without **any fixed hardcoded total node count for ANY role**: full node, observer, validator, consumer, provider or monitor. Roles are chosen locally and eligibility is verified by real protocol staking and/or on-chain SSE economics. Same machine may run multiple roles but cannot be counted as multiple fault domains or independent organizations. No inviter, Tailscale roster, centralized node dashboard, fixed IPv4 or shared validator seed.
+- Committee **membership globally unbounded**, each funded lease selects a **bounded finite k** based on verified candidate snapshot/selection proof, gas and actual escrow; q must be fixed **before** voting and satisfy transparent fault assumptions. Legacy V1 fixed `4` seats and `3` votes still BLOCK public deployment. V2 ledger is incomplete until a trust-minimized election actually authenticates `FreezeTerms` and seats, instead of trusting an owner EOA.
+- Proof-of-stake “mining” here means real validator proposals/attestations/finality and protocol rewards/penalties, NOT PoW miners competing for hashes. Measurement of chain gas, slot cadence, missed attestations and resources must be from the real EL/CL client.
+- For SSE world soundness, quorum agreement is only accepted **report evidence**; it is not proof of an actual service-world event. Preserve `L(E)`, `U(E)`, (P=L(E)), (C=V-U(E)), (X=U(E)-L(E)), and `P+C+X=V`. The four passing WorldSoundnessAdversarial CE01–CE04 tests still describe unsafe counterexamples; do not claim them repaired.
+- Use only available VMs and ONE non-VM external laptop for demonstrated experiments; openly label who controls each host. Multiple EVM addresses on one machine are not independent monitoring domains. TEST ETH is valueless and weak against Sybil attacks; state the security assumptions and fail closed when no honest independent quorum exists.
+- Source changes through GitHub draft PR #35, no Actions, no merge without review, no tracked source edits on VM; never upload secrets or share raw keystore/password/mnemonic/JWT or unsafe logs.
+
+## Milestone sequence — exactly when another VM enters
+
+| Gate | Where | Work and reproducible acceptance | Next host? |
+|---|---|---|---|
+| **G0 — R25 correctness** (NOW) | VM4706 only | Recheck Git exact SHA; 13 R25 genesis builder Python tests + 9 public-only encrypted-keystore exporter tests + 16 existing collector regressions. Record actual output, no keys generated | **No second VM yet**; source preflight must pass |
+| **G1 — private chain31340 real keys/genesis** | VM4706 only | With explicit owner consent, create and offline-backup one TEST-only encrypted EOA and real Lighthouse BLS signing keys (no shared mnemonic). Generate PUBLIC contribution file, independently check BLS pubkey validity and signing/PoP. Fix EL/CL chain31340 fork/deposit compatibility using pinned official clients and real deposit contract code; generate real `genesis.json`, `config.yaml`, `genesis.ssz` with hashes. No private keys in repo. Some security PoP proof is still missing in source; do not assert it | Still one host until real clients load genesis |
+| **G2 — actual single-host PoS operation** | VM4706 as **temporary seed / genesis validator host** (if host ingress permits) | Launch pinned real Besu EL + Lighthouse Beacon CL + validator client using actual owner-generated keys, private Engine JWT, loopback-only privileged APIs. Record native block height/slot, signed proposals and attestations, finalized checkpoint, real CPU/RAM, fork compatibility. **One host is not multioperator** | **IMMEDIATELY after G2**, activate additional VM(s) as real peers |
+| **G3 — real inter-VM P2P** | VM4706 + **one available second VM** (not a fixed permanent minimum). Reuse VM4705 only if its old chain data and keys are completely isolated; do not join chain31339 | From *independently installed* new data dir and verified same public genesis, run second real Besu EL + Lighthouse CL; discover and sync via Internet-visible/native P2P TCP+UDP if actually reachable, verify both EL/CL peers, head/finality and disconnection/reconnection. No VM operator count inference. Second node can be full node with **ZERO BLS keys and ZERO TEST ETH** | Once G3 observed, invite the ONE external laptop |
+| **G4 — genuine VM ↔ laptop join** | Current seed(s) + laptop on different Internet path | Laptop obtains public hashed genesis, starts genuine execution/Beacon full node using compatible hardware/client, syncs via native public P2P with no invite/static IP/Tailscale dependency. Measure TCP/UDP reachability, packet direction, NAT/CGNAT, head/finality and reconnect after address change. Laptop is NOT a second independent organization if same owner | Additional VMs can join at any time as actual resources allow |
+| **G5 — live SSE application economic roles** | Hosts that actually have CPU/RAM and objective signing authority | Deploy audited V2 settlement/committee election/funding and resource board/faucet on real chain31340, verify receipts and contract bytecode, deploy real provider CPU/memory workload, run real signed consumer request, monitor from actual other available host(s), write legitimate evidence, earn TEST ETH rewards, preserve conservative escrow. No payout if evidence is insufficient. Never treat four local fixture wallets as four independent monitors | Expand real provider/monitor hosts without any hardcoded cap |
+| **G6 — adversarial and resilience experiments** | Available real VMs and the same laptop; test-only crafted inputs permitted if honestly labeled | Attempt actual unauthorized cross-role/dashboard operations, signature/domain/replay, malicious lease input, wrong monitor, conflicts, downtime, throttling, endpoint/Engine/keymanager access, changed IP and P2P churn. Capture actual system responses and gas/runtime/CPU/network metrics; mark crafted attacks **simulated adversarial inputs**, not real malicious independent organizations. Audit world-soundness and election security before making production claims | Involve independently administered external operators only if genuinely available |
+| **G7 — public acceptance** | Any hosts from strangers, not project VM cap | Public genesis/release through nonexclusive mirrors, on-chain role eligibility and 32-worthless-TEST-ETH Beacon deposit/activation of a **new outside validator**, objectively fair monitor election; external synchronized peers with multiple independent fault domains. Without them label **NOT VERIFIED** instead of faking hosts/keys | No central whitelist; new nodes/roles join continuously |
+
+**Important:** G3 starts right after G2's genuine finalized chain—not after completing V2 SSE marketplace/dashboard. This makes a *real distributed blockchain* a near-term engineering target, while app integration continues in parallel. If no provisionable second VM is available at G3, try the single external laptop for P2P instead; call it a real cross-host trial with the same administrative owner, not independent organizations. If VM4706 cannot accept public ingress, another genuinely reachable VM can act as seed; incoming reachability must be measured, never assumed.
+
+## Minimal host role placement (illustration, not a deployment claim)
+
+| Actual host | Earliest role | Later possible roles | Truth limit |
+|---|---|---|---|
+| VM4706 | Current code/test host; after G2 real Besu EL + Lighthouse CL/validator client | If resources permit: provider or consumer and node-local dashboard/monitor for *other* leases | 4 vCPU/11GiB/92GiB remaining; currently **NO active new chain31340 roles** |
+| Next available independent VM host | G3 EL+CL full node, optionally genesis-registered/late-deposit validator if owner-controlled real BLS keys, gas and CPU permit | real bonded monitor, separate CPU provider, P2P discovery seed if reachable | Another host, possibly same administrator: **not necessarily independent ownership** |
+| User's single laptop | G4 independently booted EL+CL full-node client | Optional consumer UI, actual signed monitor observation; validator ONLY with independently controlled BLS keys and sufficient resources, not required for syncing | One device, not many external nodes; do not require public static IPv4 |
+| Additional available VMs (ONLY if provisionable) | G3–G6 optional real network participants | Any objectively eligible combination of full node, validator, provider, monitor or consumer | Never hardcode how many are needed; evidence varies with actual machine availability |
+
+## Security and operational gate before ANY public port
+
+Review OS updates, firewall, public routability and cloud firewall constraints. Docker access via `sudo -n` is a local privileged act; never grant remote dashboard Docker socket access. Engine API, JWT, validator key manager, wallet signer and local RPC should remain private/loopback. Public P2P may require EL devp2p TCP+UDP and CL gossip/discovery TCP+UDP. Test reachability from a truly separate network; dynamic DNS does NOT traverse CGNAT. No publicly exposed historical 31339 or secret-bearing services.
+
+## Immediate operator-safe command after GitHub test-fix commit
+
+```bash
+(
+  set -e
+  cd "$HOME/sse-research"
+  export GIT_SSH_COMMAND="ssh -i $HOME/.ssh/sse_vm4706_readonly -o IdentitiesOnly=yes -o StrictHostKeyChecking=yes"
+  git fetch --no-tags origin feature/r19-fresh-external-node-preflight
+  EXPECTED_SHA="TO_BE_REPLACED_AFTER_THIS_ROADMAP_COMMIT"
+  git switch --detach "$EXPECTED_SHA"
+  test "$(git rev-parse HEAD)" = "$EXPECTED_SHA"
+  python3 -B -m unittest discover -s tests -p 'test_sse_pos_genesis_build.py' -v
+  python3 -B -m unittest discover -s tests -p 'test_sse_pos_public_keystore_export.py' -v
+  python3 -B -m unittest discover -s tests -p 'test_sse_pos_genesis_contributions.py' -v
+  echo "R25_SOURCE_SECURITY_CHECKS_COMPLETED"
+)
+```
+
+**CAUTION:** the SHA above is a deliberately unresolved documentation placeholder. Use the immutable current PR head in the actual operator command provided in chat after source commits. No implicit wallet creation, genesis build, network start or public port in this check.
