@@ -19,6 +19,7 @@ import subprocess
 import sys
 
 from sse_pos_genesis_contributions import CeremonyError, collect
+from sse_pos_deposit_predeploy import validate_predeploy
 
 CHAIN_ID = 31340
 PINNED_GENERATOR_SHA256 = "5ee29389cb29e8a1ace8cfc83ff30a1726409152e88cf07681764740ca9244d2"
@@ -274,6 +275,12 @@ def checked_generator(path: Path) -> Path:
 def build_lab(args, report: dict, listing: str) -> dict:
     if not args.single_operator_lab or args.min_operators != 1:
         raise GenesisBuildError("no public genesis build without independent BLS custody/PoP verification")
+    # R33: public --inspect remains a shape-only parser for unit fixtures.
+    # A REAL SSZ lab build must reject dummy/gated code and missing constructor state
+    # BEFORE any generator execution or output-directory creation.
+    report["depositPredeployReferenceReview"] = validate_predeploy(
+        args.eth1_genesis, report["elFields"]["depositContractAddress"]
+    )
     generator = checked_generator(args.generator)
     if not args.expected_commit or not re.fullmatch(r"[0-9a-f]{40}", args.expected_commit):
         raise GenesisBuildError("exact reviewed Git SHA required for real genesis invocation")
