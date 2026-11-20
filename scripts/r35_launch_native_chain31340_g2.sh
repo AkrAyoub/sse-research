@@ -110,6 +110,15 @@ for FILE in config.yaml genesis.json deposit_contract.txt deploy_block.txt; do
     refuse "public input changed during copying"
   chmod 644 "$RUN/testnet/$FILE"
 done
+# Lighthouse v8.3.3 requires THIS exact public file basename; upstream
+# Eth2NetworkConfig::load uses load_from_file!(DEPLOY_BLOCK_FILE), not optional.
+# Keep the original R34 deploy_block.txt as immutable provenance.
+[[ ! -e "$RUN/testnet/deposit_contract_block.txt" ]] ||
+  refuse "refuse overwrite of Lighthouse required public testnet block file"
+cp -- "$PUBLIC/deploy_block.txt" "$RUN/testnet/deposit_contract_block.txt"
+cmp -s "$PUBLIC/deploy_block.txt" "$RUN/testnet/deposit_contract_block.txt" ||
+  refuse "Lighthouse required public deposit block copy mismatch"
+chmod 644 "$RUN/testnet/deposit_contract_block.txt"
 cp -- "$PUBLIC/beacon-generated/genesis.ssz" "$RUN/testnet/genesis.ssz"
 cmp -s "$PUBLIC/beacon-generated/genesis.ssz" "$RUN/testnet/genesis.ssz" ||
   refuse "SSZ copying mismatch"
