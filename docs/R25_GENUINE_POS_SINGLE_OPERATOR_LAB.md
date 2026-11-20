@@ -78,6 +78,6 @@ The angle-bracket spans are **placeholders and NOT runnable instructions**: repl
 
 ## Test discipline
 
-`tests/test_sse_pos_genesis_build.py` contains **12** and `tests/test_sse_pos_public_keystore_export.py` contains **9** pure Python unit fixture tests of parsing, wrong-chain/unsafe genesis refusal, secret fields, duplicate input, config mismatch, one-real-operator lab flag, and no generator execution in inspect. These synthetic *unit fixture values* are only shape tests and **must NEVER be used in real Genesis**. New R25 test methods are SOURCE ONLY; none is VM-passed until exact Git checkout and operator `python3 -B -m unittest ...`.
+`tests/test_sse_pos_genesis_build.py` contains **13** and `tests/test_sse_pos_public_keystore_export.py` contains **9** pure Python unit fixture tests of parsing, wrong-chain/unsafe genesis refusal, secret fields, duplicate input, config mismatch, one-real-operator lab flag, and no generator execution in inspect. These synthetic *unit fixture values* are only shape tests and **must NEVER be used in real Genesis**. New R25 test methods are SOURCE ONLY; none is VM-passed until exact Git checkout and operator `python3 -B -m unittest ...`.
 
 Existing old `scripts/sse_pos_launch.sh` is **31339 historical** and must NOT be used for public chain31340: upstream old package emitted known compromised/shared mnemonic; it intentionally refuses public exposure. No main merge or GitHub Actions. This R25 builder provides the actual new Genesis path rather than reusing the compromised historical launcher.
