@@ -31,6 +31,8 @@ contract SSEAdaptiveVoteLedger is EIP712 {
         uint256 monitorBudget;
         uint256 payableEpochs;
         uint256 perMonitorEpochReward;
+        // Frozen once at selection. A bounded pre-epoch confirmation period.
+        uint64 confirmationTimeoutSeconds;
     }
 
     struct Committee {
@@ -40,8 +42,10 @@ contract SSEAdaptiveVoteLedger is EIP712 {
         uint256 seats;
         uint256 quorum;
         uint256 requiredFaultTolerance;
+        uint64 confirmationDeadline;
         bool initialized;
         bool ready;
+        bool confirmationExpired;
     }
 
     struct Epoch {
@@ -78,6 +82,7 @@ contract SSEAdaptiveVoteLedger is EIP712 {
     event CommitteeFrozen(uint256 indexed leaseId, bytes32 indexed snapshotRoot, uint256 seats, uint256 quorum);
     event SeatConfirmed(uint256 indexed leaseId, address indexed monitor, uint256 totalConfirmed);
     event CommitteeReady(uint256 indexed leaseId);
+    event CommitteeConfirmationExpired(uint256 indexed leaseId, uint256 missingConfirmations);
     event EpochOpened(uint256 indexed leaseId, uint256 indexed epochId, bytes32 requestHash);
     event ResponseAuthenticated(uint256 indexed leaseId, uint256 indexed epochId, bytes32 responseHash);
     event VoteRecorded(uint256 indexed leaseId, uint256 indexed epochId, address indexed monitor, Outcome outcome, bytes32 evidenceHash);
@@ -102,7 +107,11 @@ contract SSEAdaptiveVoteLedger is EIP712 {
     {
         if (p.leaseId == 0 || p.consumer == address(0) || p.provider == address(0) ||
             p.consumer == p.provider || p.snapshotRoot == bytes32(0) ||
-            committees[p.leaseId].initialized) revert InvalidArgument();
+            committees[p.leaseId].initialized ||
+            p.confirmationTimeoutSeconds < 1 hours ||
+            p.confirmationTimeoutSeconds > 7 days ||
+            block.timestamp + p.confirmationTimeoutSeconds > type(uint64).max)
+            revert InvalidArgument();
 
         AdaptiveMonitorQuorum.Decision memory plan = AdaptiveMonitorQuorum.decide(
             p.eligibleCount, p.requiredFaultTolerance, p.gasBoundSeats,
@@ -117,6 +126,7 @@ contract SSEAdaptiveVoteLedger is EIP712 {
         c.seats = plan.seats;
         c.quorum = plan.quorum;
         c.requiredFaultTolerance = p.requiredFaultTolerance;
+        c.confirmationDeadline = uint64(block.timestamp + p.confirmationTimeoutSeconds);
         c.initialized = true;
 
         for (uint256 i; i < selectedSeats.length; ++i) {
@@ -132,7 +142,9 @@ contract SSEAdaptiveVoteLedger is EIP712 {
 
     function confirmSeat(uint256 leaseId) external {
         Committee storage c = committees[leaseId];
-        if (!c.initialized || c.ready || !selectedMonitor[leaseId][msg.sender]) revert Unauthorized();
+        if (!c.initialized || c.ready || c.confirmationExpired ||
+            block.timestamp > c.confirmationDeadline ||
+            !selectedMonitor[leaseId][msg.sender]) revert Unauthorized();
         if (confirmedMonitor[leaseId][msg.sender]) revert InvalidPhase();
         confirmedMonitor[leaseId][msg.sender] = true;
         uint256 count = ++confirmations[leaseId];
@@ -143,11 +155,24 @@ contract SSEAdaptiveVoteLedger is EIP712 {
         }
     }
 
+    /// @notice Anyone may expire an incomplete committee AFTER its frozen
+    /// confirmation period; it cannot be reselected under the same lease ID.
+    /// @dev No votes, funds, bonds, or consumer payouts are changed here.
+    /// The future settlement must independently handle a safe lease refund.
+    function expireUnconfirmed(uint256 leaseId) external {
+        Committee storage c = committees[leaseId];
+        if (!c.initialized || c.ready || c.confirmationExpired ||
+            block.timestamp <= c.confirmationDeadline) revert InvalidPhase();
+        c.confirmationExpired = true;
+        emit CommitteeConfirmationExpired(leaseId, c.seats - confirmations[leaseId]);
+    }
+
     function openEpoch(uint256 leaseId, uint256 epochId, bytes32 requestHash,
                        uint64 responseDeadline, uint64 monitoringClose)
         external onlySettlement
     {
-        if (!committees[leaseId].ready || requestHash == bytes32(0) ||
+        if (!committees[leaseId].ready || committees[leaseId].confirmationExpired ||
+            requestHash == bytes32(0) ||
             monitoringClose <= responseDeadline || responseDeadline <= block.timestamp ||
             epochs[leaseId][epochId].exists) revert InvalidPhase();
         Epoch storage e = epochs[leaseId][epochId];
