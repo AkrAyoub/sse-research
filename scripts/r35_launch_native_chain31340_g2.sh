@@ -40,7 +40,7 @@ BHELP="$(sudo -n docker run --rm --pull never --platform linux/amd64 \
   --cap-drop ALL --security-opt no-new-privileges "${REFS[0]}" --help 2>&1)" ||
   refuse "Besu help failed"
 for FLAG in --genesis-file --network-id --p2p-enabled --data-path \
-  --engine-rpc-enabled --engine-rpc-host --engine-host-allowlist \
+  --engine-rpc-enabled --engine-rpc-port --engine-host-allowlist \
   --engine-jwt-secret --rpc-http-enabled --rpc-http-api; do
   [[ "$BHELP" == *"$FLAG"* ]] || refuse "Besu missing $FLAG"
 done
@@ -138,7 +138,7 @@ sudo -n docker run -d --pull never --platform linux/amd64 \
   --p2p-enabled=false \
   --rpc-http-enabled --rpc-http-host=0.0.0.0 --rpc-http-port=8545 \
   --rpc-http-api=ETH,NET,WEB3 --host-allowlist=localhost,127.0.0.1 \
-  --engine-rpc-enabled --engine-rpc-host=0.0.0.0 --engine-rpc-port=8551 \
+  --engine-rpc-enabled --engine-rpc-port=8551 \
   --engine-host-allowlist='*' --engine-jwt-secret=/jwt/engine.jwt >/dev/null ||
   refuse "Besu launch failed; preserve data and containers"
 echo "== SUBMIT PINNED LIGHTHOUSE BEACON =="
