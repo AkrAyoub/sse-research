@@ -91,6 +91,31 @@ class GenesisRealBuilderPreflightTests(unittest.TestCase):
         self.assertFalse(report["permissionlessPublicNetworkReady"])
         self.assertEqual(len(listing.splitlines()), 2)
 
+    def test_multioperator_genesis_threshold_is_not_a_fixed_roster_size(self):
+        # Three public fixture files with min_operators=2 is valid.
+        # No actual independent people or real BLS custody are asserted.
+        sources = [self.contrib]
+        for i in (2, 3):
+            d = json.loads(self.contrib.read_text())
+            d["operatorId"] = f"operator-number-{i}"
+            for j, v in enumerate(d["validators"]):
+                v["pubkey"] = "0x" + f"{i*100+j+1:096x}"
+                v["withdrawalCredentials"] = (
+                    "0x01" + "00" * 11 + f"{i+1:040x}"
+                )
+            p = self.dir / f"operator-{i}.json"
+            p.write_text(json.dumps(d), encoding="utf-8")
+            sources.append(p)
+        report, listing = input_review(
+            self.el, self.cl, sources,
+            min_operators=2, min_validators=2,
+            single_operator_lab=False
+        )
+        self.assertEqual(report["declaredOperators"], 3)
+        self.assertEqual(report["publicValidatorKeys"], 6)
+        self.assertFalse(report["permissionlessPublicNetworkReady"])
+        self.assertEqual(len(listing.splitlines()), 6)
+
     def test_one_operator_requires_explicit_lab_flag_never_default_independence(self):
         with self.assertRaises(CeremonyError):
             collect([self.contrib], min_operators=1, min_validators=2)
