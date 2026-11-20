@@ -27,12 +27,19 @@ class R38NoKeygenLighthouseFilenameAndSafeBesuHintsTests(unittest.TestCase):
             (root / "testnet").mkdir()
             public = root / "testnet/deploy_block.txt"
             public.write_bytes(b"0\n")
-            with self.assertRaisesRegex(Exception, "checksum mismatch"):
-                create_only_public_alias(root)
+            create_only_public_alias(root)
             alias = root / REQUIRED_BLOCK
             self.assertTrue(alias.is_file())
             self.assertEqual(alias.read_bytes(), b"0\n")
             with self.assertRaises(FileExistsError):
+                create_only_public_alias(root)
+
+    def test_repair_refuses_mismatched_public_block_value(self):
+        with tempfile.TemporaryDirectory() as temp:
+            root = Path(temp)
+            (root / "testnet").mkdir()
+            (root / "testnet/deploy_block.txt").write_bytes(b"1\n")
+            with self.assertRaisesRegex(Exception, "checksum mismatch"):
                 create_only_public_alias(root)
 
     def test_fixed_tokens_categorize_besu_genesis_without_log_leak(self):
