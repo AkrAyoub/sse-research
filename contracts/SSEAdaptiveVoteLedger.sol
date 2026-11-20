@@ -18,6 +18,21 @@ contract SSEAdaptiveVoteLedger is EIP712 {
         "MonitorVote(uint256 leaseId,uint256 epochId,bytes32 requestHash,uint8 outcome,bytes32 responseHash,bytes32 evidenceHash)"
     );
 
+    /// @dev One immutable per-lease policy record; struct argument avoids
+    /// unsafe multi-argument ABI/stack pressure when k is dynamic.
+    struct FreezeTerms {
+        uint256 leaseId;
+        address consumer;
+        address provider;
+        bytes32 snapshotRoot;
+        uint256 eligibleCount;
+        uint256 requiredFaultTolerance;
+        uint256 gasBoundSeats;
+        uint256 monitorBudget;
+        uint256 payableEpochs;
+        uint256 perMonitorEpochReward;
+    }
+
     struct Committee {
         address consumer;
         address provider;
@@ -82,47 +97,37 @@ contract SSEAdaptiveVoteLedger is EIP712 {
     /// merely a pure math proposal. Caller must be a future audited settlement
     /// that already verified selection proof and independent candidate policy.
     /// Snapshot hash must be nonzero, frozen and immutable.
-    function freezeCommittee(
-        uint256 leaseId,
-        address consumer,
-        address provider,
-        bytes32 snapshotRoot,
-        address[] calldata selected,
-        uint256 eligibleCount,
-        uint256 requiredFaultTolerance,
-        uint256 gasBoundSeats,
-        uint256 monitorBudget,
-        uint256 payableEpochs,
-        uint256 perMonitorEpochReward
-    ) external onlySettlement {
-        if (leaseId == 0 || consumer == address(0) || provider == address(0) ||
-            consumer == provider || snapshotRoot == bytes32(0) ||
-            committees[leaseId].initialized) revert InvalidArgument();
+    function freezeCommittee(FreezeTerms calldata p, address[] calldata selected)
+        external onlySettlement
+    {
+        if (p.leaseId == 0 || p.consumer == address(0) || p.provider == address(0) ||
+            p.consumer == p.provider || p.snapshotRoot == bytes32(0) ||
+            committees[p.leaseId].initialized) revert InvalidArgument();
 
         AdaptiveMonitorQuorum.Decision memory plan = AdaptiveMonitorQuorum.decide(
-            eligibleCount, requiredFaultTolerance, gasBoundSeats, monitorBudget,
-            payableEpochs, perMonitorEpochReward
+            p.eligibleCount, p.requiredFaultTolerance, p.gasBoundSeats,
+            p.monitorBudget, p.payableEpochs, p.perMonitorEpochReward
         );
         if (selected.length != plan.seats) revert NoSecureCommittee();
 
-        Committee storage c = committees[leaseId];
-        c.consumer = consumer;
-        c.provider = provider;
-        c.eligibilitySnapshotRoot = snapshotRoot;
+        Committee storage c = committees[p.leaseId];
+        c.consumer = p.consumer;
+        c.provider = p.provider;
+        c.eligibilitySnapshotRoot = p.snapshotRoot;
         c.seats = plan.seats;
         c.quorum = plan.quorum;
-        c.requiredFaultTolerance = requiredFaultTolerance;
+        c.requiredFaultTolerance = p.requiredFaultTolerance;
         c.initialized = true;
 
         for (uint256 i; i < selected.length; ++i) {
             address monitor = selected[i];
-            if (monitor == address(0) || monitor == consumer || monitor == provider)
+            if (monitor == address(0) || monitor == p.consumer || monitor == p.provider)
                 revert Unauthorized();
-            if (selectedMonitor[leaseId][monitor]) revert DuplicateMonitor();
-            selectedMonitor[leaseId][monitor] = true;
-            seatsByLease[leaseId].push(monitor);
+            if (selectedMonitor[p.leaseId][monitor]) revert DuplicateMonitor();
+            selectedMonitor[p.leaseId][monitor] = true;
+            seatsByLease[p.leaseId].push(monitor);
         }
-        emit CommitteeFrozen(leaseId, snapshotRoot, c.seats, c.quorum);
+        emit CommitteeFrozen(p.leaseId, p.snapshotRoot, c.seats, c.quorum);
     }
 
     function confirmSeat(uint256 leaseId) external {
