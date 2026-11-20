@@ -180,10 +180,9 @@ def check_consensus_config(blob: bytes, el_info: dict, key_count: int) -> dict:
 def input_review(el: Path, cl: Path, contributions: list[Path],
                  *, min_validators: int, min_operators: int,
                  single_operator_lab: bool) -> tuple[dict, str]:
-    if len(contributions) != min_operators:
-        # This enforces exact ceremony participants in this initial
-        # builder; later addition requires a new explicit ceremony.
-        raise GenesisBuildError("exact declared per-genesis contribution file count required")
+    # MINIMUM operator threshold is not an exact roster size or protocol cap.
+    # Accept any number of independently submitted public contributions >=
+    # threshold; collect() enforces exact one file for lab-only mode.
     listing, summary = collect(
         contributions, min_operators=min_operators,
         min_validators=min_validators,
