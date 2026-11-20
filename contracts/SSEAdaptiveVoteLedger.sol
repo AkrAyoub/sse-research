@@ -54,7 +54,7 @@ contract SSEAdaptiveVoteLedger is EIP712 {
         uint256 totalVotes;
         bool exists;
         bool responseAuthenticated;
-        bool sealed;
+        bool monitoringSealed;
         Outcome outcome;
     }
 
@@ -164,7 +164,7 @@ contract SSEAdaptiveVoteLedger is EIP712 {
         external onlySettlement
     {
         Epoch storage e = epochs[leaseId][epochId];
-        if (!e.exists || e.sealed || responseHash == bytes32(0) ||
+        if (!e.exists || e.monitoringSealed || responseHash == bytes32(0) ||
             e.responseAuthenticated || block.timestamp > e.monitoringClose)
             revert InvalidPhase();
         e.responseHash = responseHash;
@@ -195,7 +195,7 @@ contract SSEAdaptiveVoteLedger is EIP712 {
     function _recordVote(uint256 leaseId, uint256 epochId, Outcome outcome,
                          bytes32 evidenceHash, address signer) internal {
         Epoch storage e = epochs[leaseId][epochId];
-        if (!e.exists || e.sealed || block.timestamp > e.monitoringClose) revert InvalidPhase();
+        if (!e.exists || e.monitoringSealed || block.timestamp > e.monitoringClose) revert InvalidPhase();
         if (!confirmedMonitor[leaseId][signer]) revert Unauthorized();
         if (voted[leaseId][epochId][signer]) revert AlreadyVoted();
         if (evidenceHash == bytes32(0) || outcome == Outcome.None) revert InvalidArgument();
@@ -213,8 +213,8 @@ contract SSEAdaptiveVoteLedger is EIP712 {
     /// Insufficient/conflicting evidence remains None, not a made-up payout.
     function seal(uint256 leaseId, uint256 epochId) external returns (Outcome result) {
         Epoch storage e = epochs[leaseId][epochId];
-        if (!e.exists || e.sealed || block.timestamp <= e.monitoringClose) revert InvalidPhase();
-        e.sealed = true;
+        if (!e.exists || e.monitoringSealed || block.timestamp <= e.monitoringClose) revert InvalidPhase();
+        e.monitoringSealed = true;
         uint256 threshold = committees[leaseId].quorum;
         if (e.successVotes >= threshold) result = Outcome.Success;
         else if (e.failureVotes >= threshold) result = Outcome.Failure;
