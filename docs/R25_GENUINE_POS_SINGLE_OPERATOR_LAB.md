@@ -48,6 +48,12 @@ After G1 real EOA was verified but BLS wallet creation was declined, we continue
 
 The genesis test fixtures contain a **deliberate REVERT stub `0x60006000fd`** solely to test parser behavior, with three new negative/shape tests. It is NOT the real Ethereum Beacon deposit contract and MUST NEVER be deployed as it would prevent joining. This raises `test_sse_pos_genesis_build.py` source test count to **16** (the previous 13 methods passed at Step31; all 16 revised methods require new VM validation). The existing 9 public keystore exporter and 16 contribution tests were already verified at older G0 source and were not changed here. Actual G1 BLS approval remains **refused** and cannot be bypassed by these changes.
 
+## R30 fork-schedule preflight (new GitHub source, NOT VM-tested)
+
+Following the 36/36 Step36 source pass, `tools/sse_pos_genesis_build.py` now refuses **out-of-order EL Shanghai/Cancun/Prague/Osaka timestamp activations**, malformed uint64 timestamps, missing or out-of-order **CL Altair/Bellatrix/Capella/Deneb/Electra/Fulu** fork epochs and invalid/reused four-byte fork versions. The CL config must explicitly declare all six fork versions and epochs. This aligns with the input formats documented by the pinned upstream ethpandaops `eth-beacon-genesis v0.0.8` and Besu's Genesis reference, but **it does NOT establish that a chosen CL epoch and EL timestamp activate at the same real slot**. The public output explicitly labels `executionConsensusForkParityVerified=false`. Actual cross-layer parity, Besu/Lighthouse acceptance, genesis-time/slot mapping and EIP compatibility must be proven before G2.
+
+The test suite `tests/test_sse_pos_genesis_build.py` now has **19 source methods**, including 3 new adversarial fork-policy regression tests. Older 16/16 builder methods were VM-verified at Step36 before this extension; **none of these new edits have been VM-tested yet**. The local test fixture still includes a deliberately **nonfunctional EVM REVERT deposit stub** and fake BLS-shaped values solely for parsing security tests; absolutely never generate a real PoS chain from test fixtures. No human BLS key generation/approval or live public network is implied.
+
 ## Actual CLI workflow after owner has real public data
 
 **Read-only preflight (safe, no key creation):**
