@@ -218,7 +218,7 @@ contract SSEAdaptiveVoteLedgerTest is Test {
         assertEq(uint8(ledger.seal(1, 1)), uint8(SSEAdaptiveVoteLedger.Outcome.Success));
     }
 
-    function testFailureVotesAreRejectedBeforeResponseDeadline() public {
+    function test_RevertFailureVotesBeforeResponseDeadline() public {
         address[] memory people = _freeze(1, 4, 1);
         _confirm(1, people);
         _open(1, 0);
