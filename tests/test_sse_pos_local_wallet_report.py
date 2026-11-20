@@ -65,6 +65,41 @@ class LocalOwnerWithdrawalTests(unittest.TestCase):
         result = inspect_encrypted_dir(self.p)
         self.assertEqual(result["withdrawalAddress"], "0x" + "b" * 40)
 
+    def test_real_cast_eth_keystore_without_embedded_address_is_not_refused(self):
+        # eth-keystore 0.5.0's optional geth-compat feature controls
+        # whether the V3 address field is serialized. Do not invent one.
+        del self.doc["address"]
+        self.write()
+        report = inspect_encrypted_dir(self.p)
+        self.assertIsNone(report["withdrawalAddress"])
+        self.assertIs(report["withdrawalAddressEmbeddedInKeystore"], False)
+        self.assertIs(report["addressCryptographicallyVerified"], False)
+        self.assertTrue(report["encryptedKeystoreStructurePresent"])
+        self.assertNotIn("ciphertext", report)
+
+    def test_address_in_v3_fixture_is_not_password_or_signer_verified(self):
+        report = inspect_encrypted_dir(self.p)
+        self.assertTrue(report["withdrawalAddressEmbeddedInKeystore"])
+        self.assertFalse(report["addressCryptographicallyVerified"])
+        self.assertFalse(report["walletPasswordVerified"])
+
+    def test_extra_plaintext_key_or_dual_encryption_envelope_still_refused(self):
+        self.doc["plainPrivateKey"] = "DO_NOT_REPORT"
+        self.write()
+        with self.assertRaises(WalletCheckError):
+            inspect_encrypted_dir(self.p)
+        del self.doc["plainPrivateKey"]
+        self.doc["Crypto"] = self.doc["crypto"]
+        self.write()
+        with self.assertRaises(WalletCheckError):
+            inspect_encrypted_dir(self.p)
+
+    def test_missing_wallet_id_still_refused_even_if_encrypted(self):
+        del self.doc["id"]
+        self.write()
+        with self.assertRaises(WalletCheckError):
+            inspect_encrypted_dir(self.p)
+
     def test_refuse_plaintext_private_fields(self):
         for bad in ("private_key", "privateKey", "mnemonic", "secretKey"):
             self.doc[bad] = "DO_NOT_PUBLISH"
