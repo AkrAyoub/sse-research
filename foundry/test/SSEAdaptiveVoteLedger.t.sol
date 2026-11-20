@@ -47,7 +47,8 @@ contract SSEAdaptiveVoteLedgerTest is Test {
             gasBoundSeats: gasSeats,
             monitorBudget: budget,
             payableEpochs: 2,
-            perMonitorEpochReward: 5
+            perMonitorEpochReward: 5,
+            confirmationTimeoutSeconds: 1 hours
         });
     }
 
@@ -315,6 +316,58 @@ contract SSEAdaptiveVoteLedgerTest is Test {
         vm.expectRevert(SSEAdaptiveVoteLedger.InvalidPhase.selector);
         vm.prank(people[0]);
         ledger.submitVoteDirect(1, 0, SSEAdaptiveVoteLedger.Outcome.Failure, EVIDENCE);
+    }
+
+    function testAnyoneCanExpireNoShowCommitteeOnlyAfterFrozenDeadline() public {
+        address[] memory people = _freeze(7, 5, 1);
+        SSEAdaptiveVoteLedger.Committee memory before_ = ledger.committee(7);
+        assertEq(before_.confirmationDeadline, block.timestamp + 1 hours);
+        for (uint256 i; i < 4; ++i) {
+            vm.prank(people[i]);
+            ledger.confirmSeat(7);
+        }
+        vm.expectRevert(SSEAdaptiveVoteLedger.InvalidPhase.selector);
+        ledger.expireUnconfirmed(7);
+        vm.warp(uint256(before_.confirmationDeadline) + 1);
+        vm.prank(address(0xDEAD));
+        ledger.expireUnconfirmed(7);
+        SSEAdaptiveVoteLedger.Committee memory after_ = ledger.committee(7);
+        assertTrue(after_.confirmationExpired);
+        assertFalse(after_.ready);
+        assertEq(ledger.confirmations(7), 4);
+        vm.expectRevert(SSEAdaptiveVoteLedger.Unauthorized.selector);
+        vm.prank(people[4]);
+        ledger.confirmSeat(7);
+        vm.expectRevert(SSEAdaptiveVoteLedger.InvalidPhase.selector);
+        vm.prank(address(0xDEAD));
+        ledger.expireUnconfirmed(7);
+        vm.expectRevert(SSEAdaptiveVoteLedger.InvalidArgument.selector);
+        vm.prank(SETTLEMENT);
+        ledger.freezeCommittee(_terms(7, 5, 1, 5, 50), people);
+        vm.expectRevert(SSEAdaptiveVoteLedger.InvalidPhase.selector);
+        vm.prank(SETTLEMENT);
+        ledger.openEpoch(7, 0, REQUEST, uint64(block.timestamp + 20), uint64(block.timestamp + 40));
+    }
+
+    function testReadyCommitteeCannotBeCancelledEvenAfterDeadline() public {
+        address[] memory people = _freeze(1, 4, 1);
+        _confirm(1, people);
+        vm.warp(block.timestamp + 2 hours);
+        vm.expectRevert(SSEAdaptiveVoteLedger.InvalidPhase.selector);
+        ledger.expireUnconfirmed(1);
+        assertTrue(ledger.committee(1).ready);
+    }
+
+    function testFreezeRejectsZeroShortOrExcessiveConfirmationPeriod() public {
+        address[] memory people = _monitors(4);
+        uint64[3] memory invalid = [uint64(0), 59 minutes, 8 days];
+        for (uint256 i; i < invalid.length; ++i) {
+            SSEAdaptiveVoteLedger.FreezeTerms memory p = _terms(1, 4, 1, 4, 40);
+            p.confirmationTimeoutSeconds = invalid[i];
+            vm.expectRevert(SSEAdaptiveVoteLedger.InvalidArgument.selector);
+            vm.prank(SETTLEMENT);
+            ledger.freezeCommittee(p, people);
+        }
     }
 
     function testFuzzCommitteeQuorumAlwaysStrictForDynamicSeats(uint8 extra) public {
