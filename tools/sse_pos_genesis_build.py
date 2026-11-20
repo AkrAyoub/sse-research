@@ -127,10 +127,17 @@ def check_el_genesis(blob: bytes) -> dict:
             or (len(code) - 2) // 2 > 24_576):
         raise GenesisBuildError("deposit contract predeploy must have bounded nonempty EVM runtime bytecode")
     deposit_code_sha256 = sha256_bytes(bytes.fromhex(code[2:]))
-    for field in ("shanghaiTime", "cancunTime", "pragueTime", "osakaTime"):
+    el_fork_fields = ("shanghaiTime", "cancunTime", "pragueTime", "osakaTime")
+    el_fork_times = []
+    for field in el_fork_fields:
         if field not in cfg:
-            raise GenesisBuildError("missing post-Merge EL fork schedule: "+field)
-        quantity(cfg[field])
+            raise GenesisBuildError("missing post-Merge EL fork schedule: " + field)
+        timestamp = quantity(cfg[field])
+        if timestamp > 2**64 - 1:
+            raise GenesisBuildError("execution fork timestamp outside uint64 range")
+        el_fork_times.append(timestamp)
+    if el_fork_times != sorted(el_fork_times):
+        raise GenesisBuildError("execution Shanghai/Cancun/Prague/Osaka fork order inconsistent")
     return {
         "chainId": CHAIN_ID,
         "depositContractAddress": el_deposit.lower(),
@@ -173,6 +180,26 @@ def check_consensus_config(blob: bytes, el_info: dict, key_count: int) -> dict:
         raise GenesisBuildError("invalid CL four-byte GENESIS_FORK_VERSION")
     if seen["GENESIS_FORK_VERSION"].lower() == "0x00000000":
         raise GenesisBuildError("do not reuse Mainnet GENESIS_FORK_VERSION")
+    # The upstream pinned eth-beacon-genesis generator and Lighthouse expect
+    # explicit CL fork versions/epochs. A schedule absent from config.yaml
+    # is not a scientifically reproducible chain fork policy.
+    names = ("ALTAIR", "BELLATRIX", "CAPELLA", "DENEB", "ELECTRA", "FULU")
+    fork_epochs = []
+    fork_versions = [seen["GENESIS_FORK_VERSION"].lower()]
+    for name in names:
+        epoch_key, version_key = name + "_FORK_EPOCH", name + "_FORK_VERSION"
+        if epoch_key not in seen or version_key not in seen:
+            raise GenesisBuildError("missing explicit consensus fork schedule: " + name)
+        epoch = quantity(seen[epoch_key])
+        version = seen[version_key].lower()
+        if epoch > 2**64 - 1 or not FORK_VERSION.fullmatch(version):
+            raise GenesisBuildError("invalid consensus fork epoch/version: " + name)
+        fork_epochs.append(epoch)
+        fork_versions.append(version)
+    if fork_epochs != sorted(fork_epochs):
+        raise GenesisBuildError("consensus fork epochs out of protocol order")
+    if len(set(fork_versions)) != len(fork_versions):
+        raise GenesisBuildError("consensus fork versions must be distinct")
     if quantity(seen["DEPOSIT_CHAIN_ID"]) != CHAIN_ID:
         raise GenesisBuildError("CL deposit chain ID mismatch")
     if seen["DEPOSIT_CONTRACT_ADDRESS"].lower() != el_info["depositContractAddress"]:
@@ -194,6 +221,9 @@ def check_consensus_config(blob: bytes, el_info: dict, key_count: int) -> dict:
         "genesisDelay": delay,
         "depositChainId": CHAIN_ID,
         "depositContractAddress": seen["DEPOSIT_CONTRACT_ADDRESS"].lower(),
+        "checkedConsensusForks": list(names),
+        "consensusForkEpochs": {name: epoch for name, epoch in zip(names, fork_epochs)},
+        "executionConsensusForkParityVerified": False,
     }
 
 
