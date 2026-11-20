@@ -220,7 +220,9 @@ class GenesisRealBuilderPreflightTests(unittest.TestCase):
         self.assertEqual(path.read_bytes(), b"NOT A PINNED REAL GENERATOR")
 
     def test_out_of_range_duplicate_operators_and_fake_distinct_owners_rejected(self):
-        with self.assertRaises(GenesisBuildError):
+        # The public collector, which enforces real declaration-file minima,
+        # correctly raises CeremonyError before EL/CL preflight is reached.
+        with self.assertRaises(CeremonyError):
             input_review(self.el, self.cl, [self.contrib],
                          min_validators=2, min_operators=2, single_operator_lab=False)
         with self.assertRaises(CeremonyError):
