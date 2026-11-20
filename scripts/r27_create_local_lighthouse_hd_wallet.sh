@@ -49,8 +49,8 @@ for flag in "--name" "--password-file" "--mnemonic-output-path"; do
 done
 PARENT_HELP="$(lighthouse_help account wallet)" ||
   refuse "Lighthouse account wallet help failed"
-grep -Fq -- "--wallet-dir" <<< "$PARENT_HELP" ||
-  refuse "pinned Lighthouse account wallet lacks --wallet-dir"
+grep -Fq -- "--wallets-dir" <<< "$PARENT_HELP" ||
+  refuse "pinned Lighthouse account wallet lacks --wallets-dir"
 
 echo "R27_PINNED_LIGHTHOUSE_OFFLINE_HD_WALLET_CLI_VERIFIED=true"
 echo
@@ -81,7 +81,7 @@ if ! sudo -n docker run --rm --pull never --platform linux/amd64 \
   --cap-drop ALL --security-opt no-new-privileges \
   --mount "type=bind,source=$BASE,target=/owner" \
   --entrypoint lighthouse "$LIGHTHOUSE" \
-  account wallet --wallet-dir /owner/wallets create \
+  account wallet --wallets-dir /owner/wallets create \
   --name sse31340-operator --password-file /owner/owner-wallet.pass \
   --mnemonic-output-path /owner/recovery.mnemonic \
   > /dev/null 2> "$LOG"; then
