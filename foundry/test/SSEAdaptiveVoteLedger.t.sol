@@ -88,46 +88,46 @@ contract SSEAdaptiveVoteLedgerTest is Test {
         vm.expectRevert(SSEAdaptiveVoteLedger.Unauthorized.selector);
         ledger.freezeCommittee(1, CONSUMER, PROVIDER, SNAPSHOT, people, 4, 1, 4, 40, 2, 5);
         _freeze(1, 4, 1);
-        vm.prank(SETTLEMENT);
         vm.expectRevert(SSEAdaptiveVoteLedger.InvalidArgument.selector);
+        vm.prank(SETTLEMENT);
         ledger.freezeCommittee(1, CONSUMER, PROVIDER, SNAPSHOT, people, 4, 1, 4, 40, 2, 5);
     }
 
     function testDuplicateOrPartyAsMonitorCannotBeSelected() public {
         address[] memory people = _monitors(4);
         people[3] = people[0];
-        vm.prank(SETTLEMENT);
         vm.expectRevert(SSEAdaptiveVoteLedger.DuplicateMonitor.selector);
+        vm.prank(SETTLEMENT);
         ledger.freezeCommittee(1, CONSUMER, PROVIDER, SNAPSHOT, people, 4, 1, 4, 40, 2, 5);
         people[3] = PROVIDER;
-        vm.prank(SETTLEMENT);
         vm.expectRevert(SSEAdaptiveVoteLedger.Unauthorized.selector);
+        vm.prank(SETTLEMENT);
         ledger.freezeCommittee(1, CONSUMER, PROVIDER, SNAPSHOT, people, 4, 1, 4, 40, 2, 5);
     }
 
     function testUnderfundedSnapshotIsRejectedNotDownscaled() public {
         address[] memory people = _monitors(4);
-        vm.prank(SETTLEMENT);
         vm.expectRevert(AdaptiveMonitorQuorum.InsufficientMonitorRewardBudget.selector);
+        vm.prank(SETTLEMENT);
         ledger.freezeCommittee(1, CONSUMER, PROVIDER, SNAPSHOT, people, 4, 1, 4, 39, 2, 5);
     }
 
     function testInsufficientEligiblePoolIsRejected() public {
         address[] memory people = _monitors(3);
-        vm.prank(SETTLEMENT);
         vm.expectRevert(AdaptiveMonitorQuorum.InsufficientIndependentEligibleMonitors.selector);
+        vm.prank(SETTLEMENT);
         ledger.freezeCommittee(1, CONSUMER, PROVIDER, SNAPSHOT, people, 3, 1, 3, 30, 2, 5);
     }
 
     function testInvalidOrDuplicateSeatConfirmationRejected() public {
         address[] memory people = _freeze(1, 4, 1);
-        vm.prank(address(0xBAD));
         vm.expectRevert(SSEAdaptiveVoteLedger.Unauthorized.selector);
+        vm.prank(address(0xBAD));
         ledger.confirmSeat(1);
         vm.prank(people[0]);
         ledger.confirmSeat(1);
-        vm.prank(people[0]);
         vm.expectRevert(SSEAdaptiveVoteLedger.InvalidPhase.selector);
+        vm.prank(people[0]);
         ledger.confirmSeat(1);
         _confirmRemaining(1, people);
         assertEq(ledger.confirmations(1), 4);
@@ -142,16 +142,16 @@ contract SSEAdaptiveVoteLedgerTest is Test {
 
     function testEpochNeedsConfirmedCommitteeAndAuthenticatedResponse() public {
         address[] memory people = _freeze(1, 4, 1);
-        vm.prank(SETTLEMENT);
         vm.expectRevert(SSEAdaptiveVoteLedger.InvalidPhase.selector);
+        vm.prank(SETTLEMENT);
         ledger.openEpoch(1, 0, REQUEST, uint64(block.timestamp + 20), uint64(block.timestamp + 40));
         _confirm(1, people);
         _open(1, 0);
-        vm.prank(people[0]);
         vm.expectRevert(SSEAdaptiveVoteLedger.InvalidPhase.selector);
+        vm.prank(people[0]);
         ledger.submitVoteDirect(1, 0, SSEAdaptiveVoteLedger.Outcome.Success, EVIDENCE);
-        vm.prank(address(0xBAD));
         vm.expectRevert(SSEAdaptiveVoteLedger.Unauthorized.selector);
+        vm.prank(address(0xBAD));
         ledger.authenticateResponse(1, 0, RESPONSE);
         vm.prank(SETTLEMENT);
         ledger.authenticateResponse(1, 0, RESPONSE);
@@ -168,14 +168,14 @@ contract SSEAdaptiveVoteLedgerTest is Test {
         ledger.authenticateResponse(1, 0, RESPONSE);
         vm.prank(people[0]);
         ledger.submitVoteDirect(1, 0, SSEAdaptiveVoteLedger.Outcome.Success, EVIDENCE);
-        vm.prank(people[0]);
         vm.expectRevert(SSEAdaptiveVoteLedger.AlreadyVoted.selector);
-        ledger.submitVoteDirect(1, 0, SSEAdaptiveVoteLedger.Outcome.Success, EVIDENCE);
-        vm.prank(address(0xE000));
-        vm.expectRevert(SSEAdaptiveVoteLedger.Unauthorized.selector);
-        ledger.submitVoteDirect(1, 0, SSEAdaptiveVoteLedger.Outcome.Success, EVIDENCE);
         vm.prank(people[0]);
+        ledger.submitVoteDirect(1, 0, SSEAdaptiveVoteLedger.Outcome.Success, EVIDENCE);
+        vm.expectRevert(SSEAdaptiveVoteLedger.Unauthorized.selector);
+        vm.prank(address(0xE000));
+        ledger.submitVoteDirect(1, 0, SSEAdaptiveVoteLedger.Outcome.Success, EVIDENCE);
         vm.expectRevert(SSEAdaptiveVoteLedger.InvalidPhase.selector);
+        vm.prank(people[0]);
         ledger.submitVoteDirect(2, 0, SSEAdaptiveVoteLedger.Outcome.Success, EVIDENCE);
     }
 
@@ -207,8 +207,8 @@ contract SSEAdaptiveVoteLedgerTest is Test {
         address[] memory people = _freeze(1, 4, 1);
         _confirm(1, people);
         _open(1, 0);
-        vm.prank(people[0]);
         vm.expectRevert(SSEAdaptiveVoteLedger.InvalidPhase.selector);
+        vm.prank(people[0]);
         ledger.submitVoteDirect(1, 0, SSEAdaptiveVoteLedger.Outcome.Failure, EVIDENCE);
         vm.warp(block.timestamp + 21);
         for (uint256 i; i < 3; ++i) {
@@ -248,11 +248,11 @@ contract SSEAdaptiveVoteLedgerTest is Test {
         _open(1, 0);
         vm.prank(SETTLEMENT);
         ledger.authenticateResponse(1, 0, RESPONSE);
-        vm.prank(people[0]);
         vm.expectRevert(SSEAdaptiveVoteLedger.InvalidArgument.selector);
+        vm.prank(people[0]);
         ledger.submitVoteDirect(1, 0, SSEAdaptiveVoteLedger.Outcome.Success, bytes32(0));
-        vm.prank(people[0]);
         vm.expectRevert(SSEAdaptiveVoteLedger.InvalidArgument.selector);
+        vm.prank(people[0]);
         ledger.submitVoteDirect(1, 0, SSEAdaptiveVoteLedger.Outcome.None, EVIDENCE);
     }
 
@@ -279,11 +279,11 @@ contract SSEAdaptiveVoteLedgerTest is Test {
         ledger.submitSignedVote(1, 0, SSEAdaptiveVoteLedger.Outcome.Success, EVIDENCE, sig);
         assertTrue(ledger.voted(1, 0, signer));
         assertEq(ledger.epoch(1, 0).successVotes, 1);
-        vm.prank(address(0x9999));
         vm.expectRevert(SSEAdaptiveVoteLedger.AlreadyVoted.selector);
-        ledger.submitSignedVote(1, 0, SSEAdaptiveVoteLedger.Outcome.Success, EVIDENCE, sig);
         vm.prank(address(0x9999));
+        ledger.submitSignedVote(1, 0, SSEAdaptiveVoteLedger.Outcome.Success, EVIDENCE, sig);
         vm.expectRevert(SSEAdaptiveVoteLedger.InvalidPhase.selector);
+        vm.prank(address(0x9999));
         ledger.submitSignedVote(1, 99, SSEAdaptiveVoteLedger.Outcome.Success, EVIDENCE, sig);
     }
 
@@ -297,8 +297,8 @@ contract SSEAdaptiveVoteLedgerTest is Test {
         ledger.seal(1, 0);
         vm.expectRevert(SSEAdaptiveVoteLedger.InvalidPhase.selector);
         ledger.seal(1, 0);
-        vm.prank(people[0]);
         vm.expectRevert(SSEAdaptiveVoteLedger.InvalidPhase.selector);
+        vm.prank(people[0]);
         ledger.submitVoteDirect(1, 0, SSEAdaptiveVoteLedger.Outcome.Failure, EVIDENCE);
     }
 
