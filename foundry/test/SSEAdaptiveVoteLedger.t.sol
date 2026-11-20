@@ -370,6 +370,47 @@ contract SSEAdaptiveVoteLedgerTest is Test {
         }
     }
 
+    function testCannotConfirmAfterDeadlineWithoutExplicitExpirationCall() public {
+        address[] memory people = _freeze(5, 4, 1);
+        uint256 frozenDeadline = ledger.committee(5).confirmationDeadline;
+        vm.prank(people[0]);
+        ledger.confirmSeat(5);
+        assertEq(ledger.committee(5).confirmationDeadline, frozenDeadline);
+        vm.warp(frozenDeadline + 1);
+        vm.expectRevert(SSEAdaptiveVoteLedger.Unauthorized.selector);
+        vm.prank(people[1]);
+        ledger.confirmSeat(5);
+        assertEq(ledger.confirmations(5), 1);
+        assertFalse(ledger.committee(5).ready);
+        ledger.expireUnconfirmed(5);
+        assertTrue(ledger.committee(5).confirmationExpired);
+    }
+
+    function testSignedVoteIsNotReplayableAcrossChainIds() public {
+        address signer = vm.addr(SIGNER_KEY);
+        address[] memory people = _monitors(4);
+        people[0] = signer;
+        vm.prank(SETTLEMENT);
+        ledger.freezeCommittee(_terms(1, 4, 1, 4, 40), people);
+        _confirm(1, people);
+        _open(1, 0);
+        vm.prank(SETTLEMENT);
+        ledger.authenticateResponse(1, 0, RESPONSE);
+        bytes32 structHash = keccak256(abi.encode(
+            VOTE_TYPEHASH, uint256(1), uint256(0), REQUEST,
+            uint8(SSEAdaptiveVoteLedger.Outcome.Success), RESPONSE, EVIDENCE
+        ));
+        bytes32 digest = keccak256(abi.encodePacked(
+            "\x19\x01", ledger.domainSeparator(), structHash
+        ));
+        (uint8 v, bytes32 r, bytes32 s) = vm.sign(SIGNER_KEY, digest);
+        bytes memory sig = abi.encodePacked(r, s, v);
+        vm.chainId(block.chainid + 1);
+        vm.expectRevert(SSEAdaptiveVoteLedger.Unauthorized.selector);
+        ledger.submitSignedVote(1, 0, SSEAdaptiveVoteLedger.Outcome.Success, EVIDENCE, sig);
+        assertEq(ledger.epoch(1, 0).totalVotes, 0);
+    }
+
     function testFuzzCommitteeQuorumAlwaysStrictForDynamicSeats(uint8 extra) public {
         uint256 k = 4 + uint256(extra % 30);
         address[] memory people = _freeze(1, k, 1);
