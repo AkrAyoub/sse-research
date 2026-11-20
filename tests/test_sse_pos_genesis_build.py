@@ -54,6 +54,18 @@ class GenesisRealBuilderPreflightTests(unittest.TestCase):
             "DEPOSIT_CHAIN_ID": "31340",
             "DEPOSIT_CONTRACT_ADDRESS": self.deposit,
             "TERMINAL_TOTAL_DIFFICULTY": "0",
+            "ALTAIR_FORK_VERSION": "0xc0de0002",
+            "ALTAIR_FORK_EPOCH": "0",
+            "BELLATRIX_FORK_VERSION": "0xc0de0003",
+            "BELLATRIX_FORK_EPOCH": "0",
+            "CAPELLA_FORK_VERSION": "0xc0de0004",
+            "CAPELLA_FORK_EPOCH": "0",
+            "DENEB_FORK_VERSION": "0xc0de0005",
+            "DENEB_FORK_EPOCH": "0",
+            "ELECTRA_FORK_VERSION": "0xc0de0006",
+            "ELECTRA_FORK_EPOCH": "0",
+            "FULU_FORK_VERSION": "0xc0de0007",
+            "FULU_FORK_EPOCH": "0",
         }
         self.write()
         validators = [
@@ -238,6 +250,65 @@ class GenesisRealBuilderPreflightTests(unittest.TestCase):
         self.write()
         with self.assertRaises(GenesisBuildError):
             self.review()
+
+    def test_execution_forks_cannot_be_out_of_order(self):
+        for bad_schedule in (
+            {"shanghaiTime": 10, "cancunTime": 0},
+            {"cancunTime": 10, "pragueTime": 0},
+            {"pragueTime": 10, "osakaTime": 0},
+        ):
+            with self.subTest(bad_schedule=bad_schedule):
+                self.exec["config"].update({
+                    "shanghaiTime": 0, "cancunTime": 0,
+                    "pragueTime": 0, "osakaTime": 0,
+                })
+                self.exec["config"].update(bad_schedule)
+                self.write()
+                with self.assertRaisesRegex(GenesisBuildError, "fork order inconsistent"):
+                    self.review()
+        self.exec["config"].update({
+            "shanghaiTime": 0, "cancunTime": 0,
+            "pragueTime": 0, "osakaTime": 0,
+        })
+        self.exec["config"]["osakaTime"] = 2**64
+        self.write()
+        with self.assertRaisesRegex(GenesisBuildError, "uint64 range"):
+            self.review()
+
+    def test_consensus_fork_schedule_must_be_explicit_ordered_and_unique(self):
+        original = dict(self.consensus)
+        for missing in ("DENEB_FORK_VERSION", "ELECTRA_FORK_EPOCH", "FULU_FORK_VERSION"):
+            self.consensus = dict(original)
+            del self.consensus[missing]
+            self.write()
+            with self.subTest(missing=missing), self.assertRaisesRegex(
+                GenesisBuildError, "missing explicit consensus fork schedule"
+            ):
+                self.review()
+        self.consensus = dict(original)
+        self.consensus["ELECTRA_FORK_EPOCH"] = "4"
+        self.consensus["FULU_FORK_EPOCH"] = "3"
+        self.write()
+        with self.assertRaisesRegex(GenesisBuildError, "out of protocol order"):
+            self.review()
+        self.consensus = dict(original)
+        self.consensus["FULU_FORK_VERSION"] = self.consensus["DENEB_FORK_VERSION"]
+        self.write()
+        with self.assertRaisesRegex(GenesisBuildError, "versions must be distinct"):
+            self.review()
+        self.consensus = dict(original)
+        self.consensus["FULU_FORK_EPOCH"] = str(2**64)
+        self.write()
+        with self.assertRaisesRegex(GenesisBuildError, "invalid consensus fork epoch"):
+            self.review()
+
+    def test_consensus_fork_preflight_never_claims_el_cl_parity(self):
+        report, _ = self.review()
+        c = report["clFields"]
+        self.assertEqual(len(c["checkedConsensusForks"]), 6)
+        self.assertEqual(c["consensusForkEpochs"]["FULU"], 0)
+        self.assertFalse(c["executionConsensusForkParityVerified"])
+        self.assertFalse(report["actualELAndCLClientsAcceptedArtifacts"])
 
     def test_no_arbitrary_accelerated_slot_time_or_mining_protocol(self):
         self.consensus["SECONDS_PER_SLOT"] = "2"
