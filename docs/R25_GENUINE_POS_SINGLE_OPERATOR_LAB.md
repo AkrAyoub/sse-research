@@ -22,6 +22,24 @@ The original public contribution collector required at least two independent ope
 2. Real owner-controlled **Lighthouse BLS validators** generated using the verified v8.3.3 CLI, encrypted keystores and slashing protection. The R20 step probed the actual available flags `account wallet create --name --password-file`, `account validator create --wallet-name --wallet-password --count`, `validator_manager create --mnemonic-path --eth1-withdrawal-address --testnet-dir`. These are only prior observed `--help` outputs, not a verified end-to-end keygen workflow. Do not assume a named generated key is a cryptographically valid validator without checking custody and fork/withdrawal binding.
 3. Actual, mutually consistent owner-approved EL `genesis.json` and Lighthouse `config.yaml`. The tool does **not guess a deposit-contract runtime**, fake a deployed deposit contract, or make up scientific network timings. Current Besu genesis documentation lists `depositContractAddress`, `terminalTotalDifficulty` and timestamp-based post-Merge milestones. The official eth-beacon-genesis CLI accepts exact files and public `--additional-validators`. Manual/protocol review is mandatory before real startup.
 
+## Local PUBLIC-only export from actual encrypted BLS keystores
+
+New R25 `tools/sse_pos_public_keystore_export.py` extracts **only real EIP-2335 keystore JSON's public `pubkey` metadata**, never imports or decrypts the voting keys or touches wallet passwords. It accepts actual keystore file layouts from EthStaker-style flat `*.json` files or Lighthouse's encrypted `<validator-dir>/voting-keystore.json`, requires every containing directory to be owner-only 0700 and key file to be owner-only 0600, refuses symlinks/duplicates and writes a create-only 0600 **public-only** JSON contribution with the chosen TEST-only EOA withdrawal address. It can use a directory containing genuinely generated encrypted keystores only; the **unit fixture keystores are synthetic** and must never be used to start a chain.
+
+After the owner has explicitly created real locally controlled encrypted validators and a test-only withdrawal EOA (none has yet been created), on the same owner host:
+
+```bash
+python3 -B tools/sse_pos_public_keystore_export.py \
+  --keystore-dir /absolute/OWNER-LOCAL/ENCRYPTED-KEYSTORE-DIR \
+  --operator-id operator-own-one \
+  --withdrawal-address 0xACTUAL_OWNER_TEST_ONLY_EOA_ADDRESS \
+  --output /absolute/OWNER-LOCAL/new-PUBLIC-only-operator.json
+```
+
+These paths and address are **placeholders**, not commands ready to execute. Do not paste a keystore, mnemonic or password in chat/GitHub. `blsPrivateKeyPossessionVerified=false` is intentionally emitted: metadata alone does NOT prove BLS custody. Real testnet/fork-specific proof and validator-client signing checks are still required.
+
+`tests/test_sse_pos_public_keystore_export.py` contains 9 new adversarial synthetic-file tests (not yet VM tested) for owner-only permission enforcement, EIP-2335 shape checks, flat/nested Lighthouse layouts, duplicate/symlink rejection, public-only output and no-overwrite. This is in addition to the 12 R25 genesis builder preflight tests.
+
 ## Actual CLI workflow after owner has real public data
 
 **Read-only preflight (safe, no key creation):**
@@ -60,6 +78,6 @@ The angle-bracket spans are **placeholders and NOT runnable instructions**: repl
 
 ## Test discipline
 
-`tests/test_sse_pos_genesis_build.py` contains **12** pure Python unit fixture tests of parsing, wrong-chain/unsafe genesis refusal, secret fields, duplicate input, config mismatch, one-real-operator lab flag, and no generator execution in inspect. These synthetic *unit fixture values* are only shape tests and **must NEVER be used in real Genesis**. New R25 test methods are SOURCE ONLY; none is VM-passed until exact Git checkout and operator `python3 -B -m unittest ...`.
+`tests/test_sse_pos_genesis_build.py` contains **12** and `tests/test_sse_pos_public_keystore_export.py` contains **9** pure Python unit fixture tests of parsing, wrong-chain/unsafe genesis refusal, secret fields, duplicate input, config mismatch, one-real-operator lab flag, and no generator execution in inspect. These synthetic *unit fixture values* are only shape tests and **must NEVER be used in real Genesis**. New R25 test methods are SOURCE ONLY; none is VM-passed until exact Git checkout and operator `python3 -B -m unittest ...`.
 
 Existing old `scripts/sse_pos_launch.sh` is **31339 historical** and must NOT be used for public chain31340: upstream old package emitted known compromised/shared mnemonic; it intentionally refuses public exposure. No main merge or GitHub Actions. This R25 builder provides the actual new Genesis path rather than reusing the compromised historical launcher.
