@@ -83,7 +83,11 @@ class ExistingCastKeystoreSchemaOnlyTests(unittest.TestCase):
             '{"version":3,"version":3,"crypto":{"ciphertext":"' +
             "f" * 128 + '"}}', encoding="utf-8"
         )
-        with self.assertRaisesRegex(ShapeProbeError, "duplicate"):
+        # The parser detects duplicate keys, while the public-facing probe
+        # intentionally masks parser detail behind a safe, generic error.
+        with self.assertRaisesRegex(
+            ShapeProbeError, "^encrypted keystore is not valid unique-key JSON$"
+        ):
             shape_only(self.directory)
         self.file.write_text(json.dumps({
             "not-safe-key-with-hyphens": "SENSITIVE_NEVER_PRINT" * 6
