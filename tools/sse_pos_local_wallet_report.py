@@ -44,15 +44,24 @@ def inspect_encrypted_dir(directory: Path) -> dict:
         raise WalletCheckError("keystore is not valid JSON") from exc
     if type(document) is not dict or BAD & set(document):
         raise WalletCheckError("sensitive/plaintext or invalid keystore fields")
-    if not {"address", "id", "version"} <= set(document) or len(set(document) - EXPECTED_KEYS) > 0:
+    # eth-keystore v0.5 (used by pinned Cast v1.9) serializes the
+    # address ONLY if built with its optional "geth-compat" feature.
+    # A valid encrypted UTC-V3 wallet can therefore omit "address".
+    # Never invent an address from the filename or from another EOA.
+    if not {"id", "version"} <= set(document) or len(set(document) - EXPECTED_KEYS) > 0:
         raise WalletCheckError("unexpected keystore schema")
-    addr = document["address"]
-    if type(addr) is not str:
-        raise WalletCheckError("encrypted keystore missing EOA address")
-    if addr.startswith("0x"):
-        addr = addr[2:]
-    if not ADDR.fullmatch(addr):
-        raise WalletCheckError("invalid EOA address in encrypted keystore")
+    if ("crypto" in document) == ("Crypto" in document):
+        raise WalletCheckError("expected exactly one crypto envelope")
+    addr = document.get("address")
+    if addr is not None:
+        if type(addr) is not str:
+            raise WalletCheckError("encrypted keystore address must be text")
+        if addr.startswith("0x"):
+            addr = addr[2:]
+        if not ADDR.fullmatch(addr):
+            raise WalletCheckError("invalid EOA address in encrypted keystore")
+    if type(document["id"]) is not str or not document["id"]:
+        raise WalletCheckError("invalid encrypted keystore ID")
     crypto = document.get("crypto", document.get("Crypto"))
     if type(crypto) is not dict or not all(key in crypto for key in (
         "cipher", "ciphertext", "cipherparams", "kdf", "kdfparams", "mac"
@@ -63,7 +72,9 @@ def inspect_encrypted_dir(directory: Path) -> dict:
     if type(document["version"]) is not int or document["version"] != 3:
         raise WalletCheckError("expected encrypted V3 Ethereum keystore")
     return {
-        "withdrawalAddress": "0x" + addr,
+        "withdrawalAddress": ("0x" + addr) if addr is not None else None,
+        "withdrawalAddressEmbeddedInKeystore": addr is not None,
+        "addressCryptographicallyVerified": False,
         "encryptedKeystoreStructurePresent": True,
         "privateKeyPrinted": False,
         "walletPasswordVerified": False,
