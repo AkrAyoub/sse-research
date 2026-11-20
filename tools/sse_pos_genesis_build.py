@@ -100,16 +100,33 @@ def check_el_genesis(blob: bytes) -> dict:
         raise GenesisBuildError("execution gas limit too small for real contracts")
     if type(d.get("alloc")) is not dict:
         raise GenesisBuildError("execution Genesis alloc must be explicit")
+    alloc_by_address = {}
     for a, account in d["alloc"].items():
         if type(a) is not str or not re.fullmatch(r"(?:0x)?[0-9a-fA-F]{40}", a):
             raise GenesisBuildError("invalid genesis funded account address")
         if type(account) is not dict:
             raise GenesisBuildError("invalid genesis alloc item")
+        normalized = a.lower().removeprefix("0x")
+        if normalized in alloc_by_address:
+            raise GenesisBuildError("duplicate genesis alloc address after canonical normalization")
+        alloc_by_address[normalized] = account
         if "balance" in account:
             quantity(account["balance"])
     el_deposit = cfg.get("depositContractAddress")
     if type(el_deposit) is not str or not ADDRESS.fullmatch(el_deposit) or int(el_deposit, 16) == 0:
         raise GenesisBuildError("missing concrete EL deposit contract address")
+    # A mere deposit CONTRACT ADDRESS in config is not an onchain contract.
+    # Without real code at genesis, permissionless new-validator deposits
+    # cannot be accepted until someone actually deploys working runtime.
+    # This is a necessary shape check, NOT an authenticity/runtime proof.
+    deposit_predeploy = alloc_by_address.get(el_deposit[2:].lower())
+    if deposit_predeploy is None:
+        raise GenesisBuildError("deposit contract address must have explicit genesis code predeploy")
+    code = deposit_predeploy.get("code")
+    if (type(code) is not str or not re.fullmatch(r"0x(?:[0-9a-fA-F]{2})+", code)
+            or (len(code) - 2) // 2 > 24_576):
+        raise GenesisBuildError("deposit contract predeploy must have bounded nonempty EVM runtime bytecode")
+    deposit_code_sha256 = sha256_bytes(bytes.fromhex(code[2:]))
     for field in ("shanghaiTime", "cancunTime", "pragueTime", "osakaTime"):
         if field not in cfg:
             raise GenesisBuildError("missing post-Merge EL fork schedule: "+field)
@@ -117,6 +134,9 @@ def check_el_genesis(blob: bytes) -> dict:
     return {
         "chainId": CHAIN_ID,
         "depositContractAddress": el_deposit.lower(),
+        "depositContractRuntimeBytecodePresent": True,
+        "depositContractBytecodeHashSha256": deposit_code_sha256,
+        "depositContractRuntimeAuthenticityVerified": False,
         "gasLimit": quantity(d["gasLimit"]),
         "shanghaiTime": quantity(cfg["shanghaiTime"]),
         "cancunTime": quantity(cfg["cancunTime"]),
