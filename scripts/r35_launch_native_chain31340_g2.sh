@@ -60,7 +60,7 @@ for TYPE in bn vc; do
     --entrypoint lighthouse "${REFS[1]}" "$TYPE" --help 2>&1)" ||
     refuse "Lighthouse $TYPE help failed"
   if [[ "$TYPE" == bn ]]; then
-    for FLAG in --execution-endpoint --execution-jwt --http --http-address; do
+    for FLAG in --execution-endpoint --execution-jwt --http --http-address --suggested-fee-recipient; do
       [[ "$LHELP" == *"$FLAG"* ]] || refuse "Beacon missing $FLAG"
     done
   else
@@ -115,7 +115,7 @@ cmp -s "$PUBLIC/beacon-generated/genesis.ssz" "$RUN/testnet/genesis.ssz" ||
   refuse "SSZ copying mismatch"
 chmod 644 "$RUN/testnet/genesis.ssz"
 JWT="$RUN/engine.jwt"
-( set -C; umask 077; python3 -c 'import secrets; print(secrets.token_hex(32))' > "$JWT" ) ||
+( set -C; umask 077; python3 -c 'import secrets,sys; sys.stdout.write(secrets.token_hex(32))' > "$JWT" ) ||
   refuse "failed create-only 256-bit local JWT"
 [[ "$(stat -c '%u:%a' "$JWT")" == "$(id -u):600" ]] ||
   refuse "local Engine JWT owner-only permissions incorrect"
