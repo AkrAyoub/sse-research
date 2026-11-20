@@ -27,8 +27,8 @@ git diff --quiet --exit-code && git diff --cached --quiet --exit-code ||
   refuse "tracked source changes on VM are prohibited"
 [[ "$(uname -s)" == Linux && "$(uname -m)" == x86_64 ]] ||
   refuse "reviewed owner-local x86_64 Linux only"
-[[ "$(id -u)" != 0 && -t 0 && -t 2 ]] ||
-  refuse "nonroot interactive owner terminal required"
+[[ "$(id -u)" != 0 ]] || refuse "owner account required, not root"
+[[ -t 0 && -t 2 ]] || refuse "interactive owner terminal required"
 
 BASE="$HOME/.local/share/sse-r27-bls-operator-private"
 [[ -d "$BASE" && ! -L "$BASE" && "$(stat -c '%u:%a' "$BASE")" == "$(id -u):700" ]] ||
@@ -118,6 +118,7 @@ fi
 
 [[ -d "$BASE/validators" && -d "$BASE/secrets" ]] ||
   refuse "expected real validator/slashing-protection directories missing"
+# Protect generated voting keystores AND the genuine slashing-protection database.
 # Lighthouse upstream creates keystore files with create_new, but the
 # container umask might be less strict than 077. Private parent is 0700.
 # Refuse symlink trees before normalizing access for local-only exporter.
