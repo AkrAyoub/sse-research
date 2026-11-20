@@ -31,7 +31,7 @@ class R37SafeExistingG2DiagnosticTests(unittest.TestCase):
         self.assertFalse(c["secretsOrKeystoreContentEmitted"])
 
     def test_unknown_error_not_dropped_or_reproduced(self):
-        c = categorize("FATAL VioletDragonEngineException: purposefully arbitrary content")
+        c = categorize("ERROR VioletDragonEngineException: purposefully arbitrary content")
         self.assertEqual(c["unclassifiedPossibleErrorLines"], 1)
         self.assertNotIn("VioletDragonEngineException", str(c))
 
