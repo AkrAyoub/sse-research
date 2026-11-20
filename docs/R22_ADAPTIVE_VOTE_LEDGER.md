@@ -1,0 +1,26 @@
+# R22 — Real on-chain adaptive monitor-vote ledger (staged V2 component)
+
+**Status 2026-11-20:** `contracts/SSEAdaptiveVoteLedger.sol` and `foundry/test/SSEAdaptiveVoteLedger.t.sol` are **committed source only, NOT YET COMPILED or run on VM4706**. This is a concrete real Solidity state-machine component, NOT a deployed public service, not a real monitored SLA outcome, and not a full replacement for legacy `SSESettlement.sol`.
+
+## What is actually implemented
+
+- **Variable-size on-chain committees** using `address[]` per lease, recorded in contract storage with an immutable eligible-population snapshot hash and the chosen `k` and `q`. `k` is bounded per lease by actual monitor reserve model, declared fault tolerance and an application-provided gas-seat budget. No fixed global number of monitor participants is imposed by this module.
+- **Frozen on-chain quorum** from `AdaptiveMonitorQuorum.decide`, `q=floor(2k/3)+1`, with `k>=3f+1` and (f>=1). Duplicate seats, parties monitoring themselves, invalid candidate totals, invalid funding arithmetic and reused lease identifiers revert. The snapshot must be authenticated upstream by an unbiased election; this ledger does not prove roots or election fairness on its own.
+- **Actual on-chain seat confirmation** by each selected monitor. It cannot be confirmed by a foreign address or repeated by the same participant. `openEpoch` only after all selected seats have confirmed.
+- **On-chain vote handling**: selected confirmed addresses can submit a direct vote or a real EIP-712 signed vote (domain includes actual chain id and verifying contract; signed fields include lease/epoch/request/outcome/response/evidence). Unique vote per epoch/seat, no wrong-lease or duplicate voting. Failure reports cannot be accepted before response deadline, success needs a provider-response hash that the future settlement has already verified. Evidence hash is an immutable commitment, not a verified off-chain event.
+- **Conservative outcome**: permissionless seal after monitoring close; if no one outcome receives threshold `q`, `Outcome.None` remains. No amount moves in this ledger; SSE conservative lower/upper payment bounds and exposure must be applied by an independently audited V2 settlement.
+- **Security tests**: 16 new Solidity test methods include 4/5/7/10/24 variable seats; real state writes, 3-of-5 insufficient vote, 4-of-5 success, split 7-seat inconclusive, wrong sender, duplicate/replayed vote, EIP-712 signing, no fake zero-hash evidence, lease/time/response binding, and 256-case fuzz on dynamic quorum. Synthetic EVM fixture addresses/bytes are unit-test inputs only, NOT actual independent people or real workload/SLA measurements.
+
+## Remaining necessary work to integrate and deploy
+
+- A final **honest-selection proof** for the truly permissionless registered monitor pool. Existing `OpenMonitorCommittee` V1 has 4 seats and a finite global `1<<20` pool. It cannot select arbitrary `k` here. The `onlySettlement` writer in this V2 component MUST eventually be an audited immutable new settlement contract that independently verifies eligible snapshot, cryptographic sortition, candidate bond/fault-domain restrictions and committed policies before it calls `freezeCommittee`. Deploying the ledger with an operator-controlled EOA as its settlement writer would be centralized and must be rejected in public release.
+- Variable `k` standby/no-show recovery, on-chain timeout/cancel and bond release when a selected seat does not confirm. Current V2 ledger fail-closes and cannot start epochs until all seats confirm; it does NOT yet implement expired-seat replacement or liveness under dropout.
+- V2 settlement actual real escrow, rewards, EIP712 signed provider response/ack, exposure-aware epoch admission and incompletely authenticated physical delivery. `SSESettlement` V1 remains fixed 4/3, and four world-soundness adversarial counterexamples remain unresolved; adding a signed-vote ledger is NOT a world-soundness proof.
+- End-to-end old market+new settlement integration and new ABI, payout conservation, exact transaction/block gas benchmarks for varying `k`, permissionless participant join/exit and multi-role UI/server endpoints.
+- Fresh chain31340 EL/CL verified Genesis, real BLS validators, source/protocol fork compatibility, test-ETH native grant/deposit, true multi-machine peer discovery and a real VM↔laptop trial. No public chain is currently running.
+
+## Observed gas baseline guiding the V2 migration
+
+The actual VM4706 benchmark Entry 030 reported global Merkle lease create `472727` and `473039` gas for 16 vs 160 active monitors, and 10-proof committee finalize `544487` and `569030` gas, vs legacy lease create `975537` / `2579410`. Global registration `382607` / `399727`. These are **Foundry before/after measured operation gas**, not live PoS gas and NOT proof of unbounded cost. V2 dynamic proof batches must be gas/CPU-tested before choosing production per-task seat counts.
+
+**Next test:** operator checks out exact PR #35 SHA, runs `forge test --match-contract SSEAdaptiveVoteLedgerTest -vv`; if compilation/reverts fail, stop and provide full output. Then `forge test` full suite. No keys, signing secrets, real SLA work, public API or validator registration required for this source regression. All source fixes through GitHub. No GitHub Actions.
