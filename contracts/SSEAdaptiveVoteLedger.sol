@@ -97,7 +97,7 @@ contract SSEAdaptiveVoteLedger is EIP712 {
     /// merely a pure math proposal. Caller must be a future audited settlement
     /// that already verified selection proof and independent candidate policy.
     /// Snapshot hash must be nonzero, frozen and immutable.
-    function freezeCommittee(FreezeTerms calldata p, address[] calldata selected)
+    function freezeCommittee(FreezeTerms calldata p, address[] calldata selectedSeats)
         external onlySettlement
     {
         if (p.leaseId == 0 || p.consumer == address(0) || p.provider == address(0) ||
@@ -108,7 +108,7 @@ contract SSEAdaptiveVoteLedger is EIP712 {
             p.eligibleCount, p.requiredFaultTolerance, p.gasBoundSeats,
             p.monitorBudget, p.payableEpochs, p.perMonitorEpochReward
         );
-        if (selected.length != plan.seats) revert NoSecureCommittee();
+        if (selectedSeats.length != plan.seats) revert NoSecureCommittee();
 
         Committee storage c = committees[p.leaseId];
         c.consumer = p.consumer;
@@ -119,8 +119,8 @@ contract SSEAdaptiveVoteLedger is EIP712 {
         c.requiredFaultTolerance = p.requiredFaultTolerance;
         c.initialized = true;
 
-        for (uint256 i; i < selected.length; ++i) {
-            address monitor = selected[i];
+        for (uint256 i; i < selectedSeats.length; ++i) {
+            address monitor = selectedSeats[i];
             if (monitor == address(0) || monitor == p.consumer || monitor == p.provider)
                 revert Unauthorized();
             if (selectedMonitor[p.leaseId][monitor]) revert DuplicateMonitor();
