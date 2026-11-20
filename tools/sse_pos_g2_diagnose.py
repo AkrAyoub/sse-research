@@ -1,0 +1,168 @@
+#!/usr/bin/env python3
+"""R37: actual G2 Docker failure triage, bounded and WITHOUT raw container logs.
+
+Never prints Docker stdout/stderr, container arguments, mounts, JWT, EIP-2335
+keystore data or validator secret information. Classifications only. Read-only.
+Only exact known chain31340 container names, not arbitrary operator inputs.
+"""
+from __future__ import annotations
+
+import argparse
+import collections
+import json
+import os
+from pathlib import Path
+import re
+import subprocess
+import sys
+import time
+
+ROOT = Path(__file__).resolve().parents[1]
+CONTAINERS = ("sse31340-g2-el", "sse31340-g2-bn", "sse31340-g2-vc")
+MAX_LOG_BYTES = 300_000
+SHA_RE = re.compile(r"[0-9a-f]{40}\Z")
+
+# Ordered, fixed string classifiers. Never emit a raw log line or dynamic
+# group capture: even error messages can accidentally include secrets.
+CATEGORIES = (
+    ("CLI_ARGUMENT_OR_USAGE_ERROR", re.compile(
+        r"unknown (?:argument|option)|unexpected argument|unrecognized option|"
+        r"found argument|invalid (?:option|argument|command)|usage:", re.I)),
+    ("CONFIG_OR_FORK_REJECTED", re.compile(
+        r"(?:config|fork|preset|yaml|network).{0,100}(?:invalid|error|failed|"
+        r"unsupported|mismatch|unable|unrecognized)|"
+        r"(?:invalid|unsupported|mismatch|failed).{0,100}(?:fork|preset|config)", re.I)),
+    ("GENESIS_SSZ_OR_STATE_REJECTED", re.compile(
+        r"(?:genesis|ssz|beacon state|anchor).{0,120}(?:invalid|error|"
+        r"failed|mismatch|decode|deserialize|unsupported|not valid|load)|"
+        r"(?:invalid|failed|mismatch|unable).{0,120}(?:genesis|ssz|beacon state)", re.I)),
+    ("READ_ONLY_OR_PERMISSION_FAILURE", re.compile(
+        r"permission denied|read-only file system|operation not permitted|"
+        r"access denied|eacces|erofs", re.I)),
+    ("MISSING_INPUT_OR_FILE_PATH", re.compile(
+        r"no such file|does not exist|not a file|could not open|"
+        r"failed to open|file not found|unable to read|not found", re.I)),
+    ("ENGINE_JWT_OR_AUTH_FAILURE", re.compile(
+        r"(?:jwt|auth|secret).{0,100}(?:error|invalid|failed|denied|"
+        r"unreadable|missing|malformed|reject)", re.I)),
+    ("EXECUTION_ENDPOINT_UNAVAILABLE", re.compile(
+        r"(?:execution|engine|endpoint|connection).{0,100}(?:refused|"
+        r"unavailable|timeout|failed|unable|disconnected|error)", re.I)),
+    ("PORT_BIND_FAILURE", re.compile(
+        r"address already in use|port.*in use|failed to bind|"
+        r"cannot bind|could not bind|listen.*fail", re.I)),
+    ("RESOURCE_OR_OOM_FAILURE", re.compile(
+        r"out of memory|out-of-memory|oom-kill|resource temporarily|"
+        r"cannot allocate memory|memory allocation failed", re.I)),
+    ("CRYPTOGRAPHIC_OR_VALIDATOR_ERROR", re.compile(
+        r"(?:bls|validator|signature|keystore|slashing).{0,120}(?:"
+        r"invalid|failed|unable|mismatch|error|refused)", re.I)),
+    ("CLIENT_FATAL_OR_STARTUP_FAILURE", re.compile(
+        r"failed to start|startup failed|could not start|"
+        r"shutting down|fatal|panic|thread.*panicked|crit", re.I)),
+)
+ERROR_WORDS = re.compile(
+    r"fatal|critical|crit|panic|failed|error|unable|could not|"
+    r"invalid|unsupported|refused|unrecognized|unknown", re.I)
+
+def categorize(log_output: str) -> dict:
+    """Public-safe summary only; input can contain arbitrary private text."""
+    counts = collections.Counter()
+    lines = log_output.splitlines()
+    error_lines = 0
+    unmatched = 0
+    for line in lines:
+        if not ERROR_WORDS.search(line):
+            continue
+        error_lines += 1
+        found = [name for name, expr in CATEGORIES if expr.search(line)]
+        if found:
+            for name in found:
+                counts[name] += 1
+        else:
+            unmatched += 1
+    return {
+        "logLinesExamined": len(lines),
+        "possibleErrorLines": error_lines,
+        "unclassifiedPossibleErrorLines": unmatched,
+        "errorClassifications": [
+            {"category": name, "matchedLines": counts[name]}
+            for name, _ in CATEGORIES if counts[name]
+        ],
+        "rawLogTextEmitted": False,
+        "secretsOrKeystoreContentEmitted": False,
+    }
+
+def docker(args: list[str]) -> tuple[int, str]:
+    try:
+        out = subprocess.run(["sudo", "-n", "docker", *args],
+                             capture_output=True, timeout=12, check=False)
+    except (OSError, subprocess.TimeoutExpired):
+        return 127, ""
+    if out.returncode:
+        return out.returncode, ""
+    return 0, out.stdout[:MAX_LOG_BYTES].decode("utf-8", errors="replace")
+
+def gate(sha: str) -> None:
+    if not SHA_RE.fullmatch(sha) or os.geteuid() == 0:
+        raise ValueError("exact Git SHA and unprivileged owner account required")
+    actual = subprocess.check_output(
+        ["git", "rev-parse", "--verify", "HEAD^{commit}"],
+        cwd=ROOT, text=True, timeout=6).strip()
+    dirty = subprocess.check_output(
+        ["git", "status", "--porcelain", "--untracked-files=no"],
+        cwd=ROOT, text=True, timeout=6).strip()
+    if actual != sha or dirty:
+        raise ValueError("exact clean GitHub checked-out source required")
+
+def inspect_one(name: str) -> dict:
+    result = {"container": name}
+    rc, raw = docker(["inspect", "--format", "{{json .State}}", name])
+    if rc == 0:
+        try:
+            state = json.loads(raw)
+        except (ValueError, TypeError):
+            state = None
+        if isinstance(state, dict):
+            result["status"] = str(state.get("Status", "unknown"))[:30]
+            result["exitCode"] = (
+                state.get("ExitCode") if type(state.get("ExitCode")) is int else None
+            )
+            result["oomKilled"] = state.get("OOMKilled") is True
+            result["running"] = state.get("Running") is True
+            result["stateErrorPresent"] = bool(state.get("Error"))
+        else:
+            result["inspectParseFailed"] = True
+    else:
+        result["containerInspectAccessible"] = False
+    rc, logs = docker(["logs", "--tail", "160", "--timestamps", name])
+    if rc == 0:
+        result["readOnlyClassification"] = categorize(logs)
+    else:
+        result["containerLogsAccessible"] = False
+    return result
+
+def main() -> int:
+    parser = argparse.ArgumentParser(description="Safe bounded classification of existing chain31340 Docker failures")
+    parser.add_argument("--expected-commit", required=True)
+    args = parser.parse_args()
+    try:
+        gate(args.expected_commit)
+        output = {
+            "schema": "SSE_R37_G2_EXISTING_CONTAINERS_SAFE_DIAGNOSTIC_V1",
+            "sourceGitSha": args.expected_commit,
+            "observationUnixUtcSeconds": int(time.time()),
+            "readOnly": True,
+            "containersCreatedOrStartedByThisCommand": False,
+            "privateJWTOrValidatorSecretsRead": False,
+            "rawDockerLogsEmitted": False,
+            "containers": [inspect_one(name) for name in CONTAINERS],
+        }
+        print(json.dumps(output, sort_keys=True, indent=2))
+        return 0
+    except (ValueError, OSError, subprocess.SubprocessError) as exc:
+        print("R37_SAFE_DIAG_REFUSED: " + type(exc).__name__, file=sys.stderr)
+        return 2
+
+if __name__ == "__main__":
+    raise SystemExit(main())
