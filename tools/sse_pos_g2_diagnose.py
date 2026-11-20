@@ -101,7 +101,7 @@ def docker(args: list[str]) -> tuple[int, str]:
         return 127, ""
     if out.returncode:
         return out.returncode, ""
-    return 0, out.stdout[:MAX_LOG_BYTES].decode("utf-8", errors="replace")
+    return 0, (out.stdout + out.stderr)[:MAX_LOG_BYTES].decode("utf-8", errors="replace")
 
 def gate(sha: str) -> None:
     if not SHA_RE.fullmatch(sha) or os.geteuid() == 0:
