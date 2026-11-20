@@ -46,6 +46,14 @@ contract SSEAdaptiveVoteLedger is EIP712 {
         bool initialized;
         bool ready;
         bool confirmationExpired;
+        // Real, not merely declared, TEST ETH monitoring reward escrow.
+        uint256 rewardPerReport;
+        uint256 originalReportBudget;
+        uint256 unspentReportBudget;
+        uint256 maxPayableEpochs;
+        uint256 openedEpochs;
+        uint256 sealedEpochs;
+        bool reportingClosed;
     }
 
     struct Epoch {
@@ -71,6 +79,8 @@ contract SSEAdaptiveVoteLedger is EIP712 {
     mapping(uint256 => mapping(uint256 => Epoch)) private epochs;
     mapping(uint256 => mapping(uint256 => mapping(address => bool))) public voted;
     mapping(uint256 => mapping(uint256 => mapping(address => bytes32))) public evidenceHashByMonitor;
+    mapping(address => uint256) public withdrawable;
+    bool private withdrawing;
 
     error Unauthorized();
     error InvalidArgument();
@@ -78,6 +88,9 @@ contract SSEAdaptiveVoteLedger is EIP712 {
     error DuplicateMonitor();
     error NoSecureCommittee();
     error AlreadyVoted();
+    error FundingMismatch();
+    error PaymentFailed();
+    error NoWithdrawal();
 
     event CommitteeFrozen(uint256 indexed leaseId, bytes32 indexed snapshotRoot, uint256 seats, uint256 quorum);
     event SeatConfirmed(uint256 indexed leaseId, address indexed monitor, uint256 totalConfirmed);
@@ -87,6 +100,9 @@ contract SSEAdaptiveVoteLedger is EIP712 {
     event ResponseAuthenticated(uint256 indexed leaseId, uint256 indexed epochId, bytes32 responseHash);
     event VoteRecorded(uint256 indexed leaseId, uint256 indexed epochId, address indexed monitor, Outcome outcome, bytes32 evidenceHash);
     event MonitoringSealed(uint256 indexed leaseId, uint256 indexed epochId, Outcome outcome);
+    event ReportRewardEarned(uint256 indexed leaseId, uint256 indexed epochId, address indexed monitor, uint256 amount);
+    event ReportingClosed(uint256 indexed leaseId, uint256 unspentRefunded);
+    event Withdrawal(address indexed beneficiary, uint256 amount);
 
     constructor(address settlement_) EIP712("SSEAdaptiveCommitteeVotes", "1") {
         if (settlement_ == address(0)) revert InvalidArgument();
@@ -103,7 +119,7 @@ contract SSEAdaptiveVoteLedger is EIP712 {
     /// that already verified selection proof and independent candidate policy.
     /// Snapshot hash must be nonzero, frozen and immutable.
     function freezeCommittee(FreezeTerms calldata p, address[] calldata selectedSeats)
-        external onlySettlement
+        external payable onlySettlement
     {
         if (p.leaseId == 0 || p.consumer == address(0) || p.provider == address(0) ||
             p.consumer == p.provider || p.snapshotRoot == bytes32(0) ||
@@ -113,11 +129,17 @@ contract SSEAdaptiveVoteLedger is EIP712 {
             block.timestamp + p.confirmationTimeoutSeconds > type(uint64).max)
             revert InvalidArgument();
 
+        if (msg.value != p.monitorBudget) revert FundingMismatch();
         AdaptiveMonitorQuorum.Decision memory plan = AdaptiveMonitorQuorum.decide(
             p.eligibleCount, p.requiredFaultTolerance, p.gasBoundSeats,
             p.monitorBudget, p.payableEpochs, p.perMonitorEpochReward
         );
         if (selectedSeats.length != plan.seats) revert NoSecureCommittee();
+        // Prevent an unexpected monetary surplus from being trapped on deposit.
+        // Every selected seat has exact guaranteed reward funding for every
+        // committed report epoch; this is REAL native TEST ETH held here.
+        if (p.monitorBudget != plan.seats * (p.payableEpochs * p.perMonitorEpochReward))
+            revert FundingMismatch();
 
         Committee storage c = committees[p.leaseId];
         c.consumer = p.consumer;
@@ -127,6 +149,10 @@ contract SSEAdaptiveVoteLedger is EIP712 {
         c.quorum = plan.quorum;
         c.requiredFaultTolerance = p.requiredFaultTolerance;
         c.confirmationDeadline = uint64(block.timestamp + p.confirmationTimeoutSeconds);
+        c.rewardPerReport = p.perMonitorEpochReward;
+        c.originalReportBudget = msg.value;
+        c.unspentReportBudget = msg.value;
+        c.maxPayableEpochs = p.payableEpochs;
         c.initialized = true;
 
         for (uint256 i; i < selectedSeats.length; ++i) {
@@ -164,15 +190,22 @@ contract SSEAdaptiveVoteLedger is EIP712 {
         if (!c.initialized || c.ready || c.confirmationExpired ||
             block.timestamp <= c.confirmationDeadline) revert InvalidPhase();
         c.confirmationExpired = true;
+        c.reportingClosed = true;
+        uint256 refund = c.unspentReportBudget;
+        c.unspentReportBudget = 0;
+        withdrawable[c.consumer] += refund;
         emit CommitteeConfirmationExpired(leaseId, c.seats - confirmations[leaseId]);
+        emit ReportingClosed(leaseId, refund);
     }
 
     function openEpoch(uint256 leaseId, uint256 epochId, bytes32 requestHash,
                        uint64 responseDeadline, uint64 monitoringClose)
         external onlySettlement
     {
-        if (!committees[leaseId].ready || committees[leaseId].confirmationExpired ||
-            requestHash == bytes32(0) ||
+        Committee storage c = committees[leaseId];
+        if (!c.ready || c.reportingClosed || c.confirmationExpired ||
+            requestHash == bytes32(0) || epochId != c.openedEpochs ||
+            c.openedEpochs >= c.maxPayableEpochs ||
             monitoringClose <= responseDeadline || responseDeadline <= block.timestamp ||
             epochs[leaseId][epochId].exists) revert InvalidPhase();
         Epoch storage e = epochs[leaseId][epochId];
@@ -180,6 +213,7 @@ contract SSEAdaptiveVoteLedger is EIP712 {
         e.responseDeadline = responseDeadline;
         e.monitoringClose = monitoringClose;
         e.exists = true;
+        ++c.openedEpochs;
         emit EpochOpened(leaseId, epochId, requestHash);
     }
 
@@ -231,7 +265,14 @@ contract SSEAdaptiveVoteLedger is EIP712 {
         ++e.totalVotes;
         if (outcome == Outcome.Success) ++e.successVotes;
         else ++e.failureVotes;
+        Committee storage c = committees[leaseId];
+        // One paid report per selected signer and epoch (voted enforces this).
+        // Reward eligibility does not mean that the signed report is true.
+        uint256 reward = c.rewardPerReport;
+        c.unspentReportBudget -= reward;
+        withdrawable[signer] += reward;
         emit VoteRecorded(leaseId, epochId, signer, outcome, evidenceHash);
+        emit ReportRewardEarned(leaseId, epochId, signer, reward);
     }
 
     /// @notice Permissionless sealing does NOT assert physical truth of an SLA.
@@ -245,7 +286,35 @@ contract SSEAdaptiveVoteLedger is EIP712 {
         else if (e.failureVotes >= threshold) result = Outcome.Failure;
         else result = Outcome.None;
         e.outcome = result;
+        ++committees[leaseId].sealedEpochs;
         emit MonitoringSealed(leaseId, epochId, result);
+    }
+
+    /// @notice Called only by the future audited settlement on lease close.
+    /// Cannot return reserved rewards while ANY accepted epoch is unsealed.
+    /// Refund goes to recorded consumer's owner account, not msg.sender.
+    function closeReporting(uint256 leaseId) external onlySettlement {
+        Committee storage c = committees[leaseId];
+        if (!c.initialized || !c.ready || c.reportingClosed ||
+            c.openedEpochs != c.sealedEpochs) revert InvalidPhase();
+        c.reportingClosed = true;
+        uint256 refund = c.unspentReportBudget;
+        c.unspentReportBudget = 0;
+        withdrawable[c.consumer] += refund;
+        emit ReportingClosed(leaseId, refund);
+    }
+
+    /// @notice Pull-payment; no report/timeout caller chooses a destination.
+    function withdraw() external {
+        if (withdrawing) revert InvalidPhase();
+        uint256 amount = withdrawable[msg.sender];
+        if (amount == 0) revert NoWithdrawal();
+        withdrawing = true;
+        withdrawable[msg.sender] = 0;
+        (bool ok,) = payable(msg.sender).call{value: amount}("");
+        if (!ok) revert PaymentFailed();
+        withdrawing = false;
+        emit Withdrawal(msg.sender, amount);
     }
 
     function committee(uint256 leaseId) external view returns (Committee memory) {
