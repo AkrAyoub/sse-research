@@ -34,11 +34,25 @@ def secure_keystore_dir(directory: Path) -> list[Path]:
     ds = directory.stat()
     if ds.st_uid != os.geteuid() or stat.S_IMODE(ds.st_mode) != 0o700:
         raise PublicKeystoreExportError("keystore directory must be owner-owned 0700")
-    # Paths are not a whitelist; the owner chooses an exact private directory.
-    files = sorted(directory.glob("*.json"))
+    # EIP-2335 export folders have flat keystore-*.json; Lighthouse local
+    # account CLI also writes <validator_pubkey>/voting-keystore.json.
+    # Only these exact shapes are supported. Password files are never read.
+    flats = sorted(directory.glob("*.json"))
+    nested = sorted(directory.glob("*/voting-keystore.json"))
+    files = flats + nested
+    if len(set(files)) != len(files):
+        raise PublicKeystoreExportError("duplicate keystore path")
     if not 1 <= len(files) <= MAX_LOCAL_KEYS:
         raise PublicKeystoreExportError("must contain actual local encrypted validator key files")
     for p in files:
+        if p.parent != directory:
+            folder = p.parent
+            if folder.is_symlink() or not folder.is_dir():
+                raise PublicKeystoreExportError("nested validator dir invalid")
+            fs_dir = folder.stat()
+            if (fs_dir.st_uid != os.geteuid()
+                    or stat.S_IMODE(fs_dir.st_mode) != 0o700):
+                raise PublicKeystoreExportError("nested validator dir must be 0700 owner")
         if p.is_symlink() or not p.is_file():
             raise PublicKeystoreExportError("keystore symlink/non-file refused")
         fs = p.stat()
