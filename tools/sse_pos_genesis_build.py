@@ -128,7 +128,11 @@ def check_el_genesis(blob: bytes) -> dict:
             or (len(code) - 2) // 2 > 24_576):
         raise GenesisBuildError("deposit contract predeploy must have bounded nonempty EVM runtime bytecode")
     deposit_code_sha256 = sha256_bytes(bytes.fromhex(code[2:]))
-    el_fork_fields = ("shanghaiTime", "cancunTime", "pragueTime", "osakaTime")
+    # Osaka may legitimately remain unscheduled when Fulu is FAR_FUTURE.
+    # R34 actual-build parity enforces the corresponding Beacon schedule.
+    el_fork_fields = ("shanghaiTime", "cancunTime", "pragueTime") + (
+        ("osakaTime",) if "osakaTime" in cfg else ()
+    )
     el_fork_times = []
     for field in el_fork_fields:
         if field not in cfg:
@@ -149,7 +153,7 @@ def check_el_genesis(blob: bytes) -> dict:
         "shanghaiTime": quantity(cfg["shanghaiTime"]),
         "cancunTime": quantity(cfg["cancunTime"]),
         "pragueTime": quantity(cfg["pragueTime"]),
-        "osakaTime": quantity(cfg["osakaTime"]),
+        "osakaTime": quantity(cfg["osakaTime"]) if "osakaTime" in cfg else None,
     }
 
 
@@ -278,6 +282,11 @@ def build_lab(args, report: dict, listing: str) -> dict:
     # R33: public --inspect remains a shape-only parser for unit fixtures.
     # A REAL SSZ lab build must reject dummy/gated code and missing constructor state
     # BEFORE any generator execution or output-directory creation.
+    # Static genesis-phase parity, not a substitute for native client acceptance.
+    from sse_pos_chain31340_inputs import verify_fork_pair
+    report["genesisConfigurationForkPairReview"] = verify_fork_pair(
+        args.eth1_genesis, args.consensus_config
+    )
     report["depositPredeployReferenceReview"] = validate_predeploy(
         args.eth1_genesis, report["elFields"]["depositContractAddress"]
     )
