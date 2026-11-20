@@ -80,6 +80,10 @@ contract SSEAdaptiveVoteLedger is EIP712 {
     mapping(uint256 => mapping(uint256 => mapping(address => bool))) public voted;
     mapping(uint256 => mapping(uint256 => mapping(address => bytes32))) public evidenceHashByMonitor;
     mapping(address => uint256) public withdrawable;
+    // Conservation: total actual received report ETH still held =
+    // totalUnspentReserves + totalWithdrawableCredits (unless external forced ETH).
+    uint256 public totalUnspentReserves;
+    uint256 public totalWithdrawableCredits;
     bool private withdrawing;
 
     error Unauthorized();
@@ -101,6 +105,7 @@ contract SSEAdaptiveVoteLedger is EIP712 {
     event VoteRecorded(uint256 indexed leaseId, uint256 indexed epochId, address indexed monitor, Outcome outcome, bytes32 evidenceHash);
     event MonitoringSealed(uint256 indexed leaseId, uint256 indexed epochId, Outcome outcome);
     event ReportRewardEarned(uint256 indexed leaseId, uint256 indexed epochId, address indexed monitor, uint256 amount);
+    event SeatSelected(uint256 indexed leaseId, address indexed monitor);
     event ReportingClosed(uint256 indexed leaseId, uint256 unspentRefunded);
     event Withdrawal(address indexed beneficiary, uint256 amount);
 
@@ -152,6 +157,7 @@ contract SSEAdaptiveVoteLedger is EIP712 {
         c.rewardPerReport = p.perMonitorEpochReward;
         c.originalReportBudget = msg.value;
         c.unspentReportBudget = msg.value;
+        totalUnspentReserves += msg.value;
         c.maxPayableEpochs = p.payableEpochs;
         c.initialized = true;
 
@@ -162,6 +168,7 @@ contract SSEAdaptiveVoteLedger is EIP712 {
             if (selectedMonitor[p.leaseId][monitor]) revert DuplicateMonitor();
             selectedMonitor[p.leaseId][monitor] = true;
             seatsByLease[p.leaseId].push(monitor);
+            emit SeatSelected(p.leaseId, monitor);
         }
         emit CommitteeFrozen(p.leaseId, p.snapshotRoot, c.seats, c.quorum);
     }
@@ -193,6 +200,8 @@ contract SSEAdaptiveVoteLedger is EIP712 {
         c.reportingClosed = true;
         uint256 refund = c.unspentReportBudget;
         c.unspentReportBudget = 0;
+        totalUnspentReserves -= refund;
+        totalWithdrawableCredits += refund;
         withdrawable[c.consumer] += refund;
         emit CommitteeConfirmationExpired(leaseId, c.seats - confirmations[leaseId]);
         emit ReportingClosed(leaseId, refund);
@@ -270,6 +279,8 @@ contract SSEAdaptiveVoteLedger is EIP712 {
         // Reward eligibility does not mean that the signed report is true.
         uint256 reward = c.rewardPerReport;
         c.unspentReportBudget -= reward;
+        totalUnspentReserves -= reward;
+        totalWithdrawableCredits += reward;
         withdrawable[signer] += reward;
         emit VoteRecorded(leaseId, epochId, signer, outcome, evidenceHash);
         emit ReportRewardEarned(leaseId, epochId, signer, reward);
@@ -300,6 +311,8 @@ contract SSEAdaptiveVoteLedger is EIP712 {
         c.reportingClosed = true;
         uint256 refund = c.unspentReportBudget;
         c.unspentReportBudget = 0;
+        totalUnspentReserves -= refund;
+        totalWithdrawableCredits += refund;
         withdrawable[c.consumer] += refund;
         emit ReportingClosed(leaseId, refund);
     }
@@ -311,6 +324,7 @@ contract SSEAdaptiveVoteLedger is EIP712 {
         if (amount == 0) revert NoWithdrawal();
         withdrawing = true;
         withdrawable[msg.sender] = 0;
+        totalWithdrawableCredits -= amount;
         (bool ok,) = payable(msg.sender).call{value: amount}("");
         if (!ok) revert PaymentFailed();
         withdrawing = false;
