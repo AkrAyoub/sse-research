@@ -41,7 +41,9 @@ class GenesisRealBuilderPreflightTests(unittest.TestCase):
             },
             "nonce": "0x0", "difficulty": "0x0",
             "gasLimit": "0x1c9c380",
-            "alloc": {},
+            # Source TEST FIXTURE bytecode only (REVERT stub), not the
+            # authentic deposit contract. Never use to launch a real chain.
+            "alloc": {self.deposit: {"code": "0x60006000fd"}},
         }
         self.consensus = {
             "PRESET_BASE": "mainnet",
@@ -156,6 +158,43 @@ class GenesisRealBuilderPreflightTests(unittest.TestCase):
         self.write()
         with self.assertRaises(GenesisBuildError):
             self.review()
+
+    def test_deposit_address_alone_without_predeployed_bytecode_is_rejected(self):
+        # Prevent a chain that advertises a deposit address but has NO
+        # working contract, blocking actual post-genesis validator joining.
+        # This is a shape test only: our fixture bytecode is a REVERT stub.
+        self.exec["alloc"] = {}
+        self.write()
+        with self.assertRaisesRegex(GenesisBuildError, "explicit genesis code predeploy"):
+            self.review()
+        self.exec["alloc"] = {self.deposit: {}}
+        self.write()
+        with self.assertRaisesRegex(GenesisBuildError, "nonempty EVM runtime bytecode"):
+            self.review()
+        self.exec["alloc"] = {self.deposit: {"code": "0x"}}
+        self.write()
+        with self.assertRaisesRegex(GenesisBuildError, "nonempty EVM runtime bytecode"):
+            self.review()
+        self.exec["alloc"] = {self.deposit: {"code": "0xzz"}}
+        self.write()
+        with self.assertRaisesRegex(GenesisBuildError, "nonempty EVM runtime bytecode"):
+            self.review()
+
+    def test_duplicate_alloc_addresses_must_not_hide_deposit_contract_code(self):
+        self.exec["alloc"] = {
+            self.deposit: {"code": "0x60006000fd"},
+            self.deposit.upper().replace("0X", ""): {"code": "0x60006000fd"},
+        }
+        self.write()
+        with self.assertRaisesRegex(GenesisBuildError, "duplicate genesis alloc address"):
+            self.review()
+
+    def test_deposit_predeploy_is_present_but_not_claimed_audited(self):
+        report, _ = self.review()
+        el = report["elFields"]
+        self.assertTrue(el["depositContractRuntimeBytecodePresent"])
+        self.assertFalse(el["depositContractRuntimeAuthenticityVerified"])
+        self.assertEqual(len(el["depositContractBytecodeHashSha256"]), 64)
 
     def test_bad_deposit_contract_or_el_cl_mismatch_refused(self):
         self.consensus["DEPOSIT_CONTRACT_ADDRESS"] = "0x" + "e" * 40
