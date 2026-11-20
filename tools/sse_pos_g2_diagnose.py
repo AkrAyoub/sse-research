@@ -61,6 +61,39 @@ CATEGORIES = (
         r"failed to start|startup failed|could not start|"
         r"shutting down|fatal|panic|thread.*panicked|crit", re.I)),
 )
+
+# Safe, deliberately fixed dictionaries for deeper diagnoses. Only the label
+# below is returned, NEVER text from a container's raw, potentially secret logs.
+ROOT_CAUSE_HINTS = (
+    ("GENESIS_JSON_LOADING", re.compile(r"genesis.{0,160}(?:json|parse|read|load|invalid|not valid|unsupported|error|fail)|(?:invalid|unable|parse|failed|read).{0,160}genesis", re.I)),
+    ("GENESIS_ALLOC_ACCOUNT_FORMAT", re.compile(r"(?:alloc|predeploy|genesis account|balance|storage root|nonce|code hash).{0,140}(?:invalid|parse|error|fail|unsupported)", re.I)),
+    ("EXECUTION_FORK_SCHEDULE", re.compile(r"(?:prague|cancun|shanghai|osaka|fulu|blob|paris|terminal.total.difficulty|fork schedule)", re.I)),
+    ("EXECUTION_GENESIS_FIELDS", re.compile(r"(?:chain.?id|base.?fee|gas.?limit|header|difficulty|timestamp|mix.?hash|parent.?hash)", re.I)),
+    ("JAVA_EXCEPTION_CLASS", re.compile(r"(?:\bException\b|\bError\b|Exception:|java\.lang\.)", re.I)),
+    ("JAVA_ERROR_BAD_ARGUMENT", re.compile(r"(?:IllegalArgumentException|IllegalStateException|ParameterException|PicocliException|missing required option)", re.I)),
+    ("JAVA_ERROR_OUT_OF_MEMORY", re.compile(r"(?:OutOfMemoryError|memory allocation|cannot allocate|oom)", re.I)),
+    ("JAVA_ERROR_FILE_IO", re.compile(r"(?:NoSuchFileException|FileNotFoundException|AccessDeniedException|IOException|ReadOnlyFileSystemException)", re.I)),
+    ("JAVA_ERROR_NETWORK", re.compile(r"(?:UnknownHostException|ConnectException|BindException|NoRouteToHostException)", re.I)),
+    ("JAVA_ERROR_DATABASE", re.compile(r"(?:RocksDBException|rocksdb|database.{0,80}(?:open|error|fail|corrupt))", re.I)),
+    ("ENGINE_AUTH_OR_JWT", re.compile(r"(?:jwt|engine[- ]?rpc|authentication|authorized|token)", re.I)),
+    ("LIGHTHOUSE_TESTNET_DEPLOY_BLOCK", re.compile(r"deposit_contract_block\.txt|DEPLOY_BLOCK_FILE|Unable to open deploy_block|Unable to open deposit_contract_block", re.I)),
+    ("LIGHTHOUSE_PRIVATE_VALIDATOR_DEF", re.compile(r"validator_definitions\.yml|voting-keystore\.json|secrets.dir|slashing_protection", re.I)),
+    ("DOCKER_R35_READONLY_ROOT", re.compile(r"(?:read.only.file.system|Permission denied|AccessDeniedException|erofs)", re.I)),
+    ("RPC_HOST_OR_LISTEN", re.compile(r"(?:host.?allowlist|hostname|socket|listen|address already in use)", re.I)),
+)
+
+def safe_root_hints(log_output: str) -> dict:
+    """Allowlisted, static lexical indicators only: never reproduce log data."""
+    counts = collections.Counter()
+    # Security: evaluate only candidate error lines, not incidental success messages.
+    for line in log_output.splitlines():
+        if not ERROR_WORDS.search(line) and not re.search(r"Caused by|Exception|Traceback", line, re.I):
+            continue
+        for name, expr in ROOT_CAUSE_HINTS:
+            if expr.search(line):
+                counts[name] += 1
+    return {name: counts[name] for name, _ in ROOT_CAUSE_HINTS if counts[name]}
+
 ERROR_WORDS = re.compile(
     r"fatal|critical|crit|panic|failed|error|unable|could not|"
     r"invalid|unsupported|refused|unrecognized|unknown", re.I)
@@ -138,6 +171,7 @@ def inspect_one(name: str) -> dict:
     rc, logs = docker(["logs", "--tail", "160", "--timestamps", name])
     if rc == 0:
         result["readOnlyClassification"] = categorize(logs)
+        result["staticRootCauseHints"] = safe_root_hints(logs)
     else:
         result["containerLogsAccessible"] = False
     return result
