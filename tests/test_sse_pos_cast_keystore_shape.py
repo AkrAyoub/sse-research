@@ -80,13 +80,13 @@ class ExistingCastKeystoreSchemaOnlyTests(unittest.TestCase):
 
     def test_duplicate_or_unsafe_json_field_names_refused(self):
         self.file.write_text(
-            '{"version":3,"version":3,"crypto":{"cipher":"mock"}}',
-            encoding="utf-8"
+            '{"version":3,"version":3,"crypto":{"ciphertext":"' +
+            "f" * 128 + '"}}', encoding="utf-8"
         )
-        with self.assertRaises(ShapeProbeError):
+        with self.assertRaisesRegex(ShapeProbeError, "duplicate"):
             shape_only(self.directory)
         self.file.write_text(json.dumps({
-            "not-safe-key-with-hyphens": "SENSITIVE_NEVER_PRINT"
+            "not-safe-key-with-hyphens": "SENSITIVE_NEVER_PRINT" * 6
         }), encoding="utf-8")
         with self.assertRaises(ShapeProbeError):
             shape_only(self.directory)
