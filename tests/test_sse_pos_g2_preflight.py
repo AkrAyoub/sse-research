@@ -91,6 +91,17 @@ class R35G2ExactObservedProvenanceTests(unittest.TestCase):
         with self.assertRaisesRegex(G2PreflightError, "unsafe"):
             strict_file(link)
 
+    def test_g2_besu_engine_api_uses_supported_port_not_unsupported_host(self):
+        launcher = (ROOT / "scripts/r35_launch_native_chain31340_g2.sh").read_text(
+            encoding="utf-8"
+        )
+        self.assertNotIn("--engine-rpc-host", launcher)
+        self.assertIn("--engine-rpc-port=8551", launcher)
+        self.assertIn("--engine-rpc-port --engine-host-allowlist", launcher)
+        self.assertIn("--engine-jwt-secret=/jwt/engine.jwt", launcher)
+        self.assertIn("--network \"$NET\"", launcher)
+        self.assertIn("--p2p-enabled=false", launcher)
+
     def test_any_public_artifact_mutation_changes_sha(self):
         p = self.root / "genesis.json"
         p.write_text("real input", encoding="utf-8")
