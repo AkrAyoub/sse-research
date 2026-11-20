@@ -38,7 +38,7 @@ python3 -B tools/sse_pos_public_keystore_export.py \
 
 These paths and address are **placeholders**, not commands ready to execute. Do not paste a keystore, mnemonic or password in chat/GitHub. `blsPrivateKeyPossessionVerified=false` is intentionally emitted: metadata alone does NOT prove BLS custody. Real testnet/fork-specific proof and validator-client signing checks are still required.
 
-`tests/test_sse_pos_public_keystore_export.py` contains 9 new adversarial synthetic-file tests (not yet VM tested) for owner-only permission enforcement, EIP-2335 shape checks, flat/nested Lighthouse layouts, duplicate/symlink rejection, public-only output and no-overwrite. This is in addition to the 12 R25 genesis builder preflight tests.
+`tests/test_sse_pos_public_keystore_export.py` contains 9 new adversarial synthetic-file tests (not yet VM tested) for owner-only permission enforcement, EIP-2335 shape checks, flat/nested Lighthouse layouts, duplicate/symlink rejection, public-only output and no-overwrite. This is in addition to the 13 R25 genesis builder preflight tests (the additional test rejects fixed roster sizes above a minimum).
 
 ## Actual CLI workflow after owner has real public data
 
