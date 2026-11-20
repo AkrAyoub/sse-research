@@ -5,6 +5,33 @@ import "forge-std/Test.sol";
 import {SSEAdaptiveVoteLedger} from "../../contracts/SSEAdaptiveVoteLedger.sol";
 import {AdaptiveMonitorQuorum} from "../../contracts/AdaptiveMonitorQuorum.sol";
 
+/// @dev Reenters ledger.withdraw() from an actual ETH receiving fallback.
+/// This is an EVM security test contract, NOT an Internet monitor participant.
+contract R24ReentrantMonitorRecipient {
+    SSEAdaptiveVoteLedger public immutable ledger;
+    bool public attemptedReentry;
+    bool public reentryRejected;
+
+    constructor(SSEAdaptiveVoteLedger ledger_) {
+        ledger = ledger_;
+    }
+
+    receive() external payable {
+        if (!attemptedReentry) {
+            attemptedReentry = true;
+            try ledger.withdraw() {
+                // The test below MUST fail if the second withdrawal succeeds.
+            } catch {
+                reentryRejected = true;
+            }
+        }
+    }
+
+    function claim() external {
+        ledger.withdraw();
+    }
+}
+
 /// @notice These are EVM adversarial UNIT tests using synthetic addresses
 /// ONLY as fixtures; no real monitor measurements or outside operators.
 contract SSEAdaptiveVoteLedgerTest is Test {
@@ -613,6 +640,29 @@ contract SSEAdaptiveVoteLedgerTest is Test {
         assertEq(ledger.totalUnspentReserves(), 40);
         assertEq(ledger.totalWithdrawableCredits(), 0);
         assertEq(address(ledger).balance, 40);
+    }
+
+    function testReentrantMonitorCannotWithdrawAlreadySpentCredit() public {
+        R24ReentrantMonitorRecipient attacker = new R24ReentrantMonitorRecipient(ledger);
+        address[] memory people = _monitors(4);
+        people[0] = address(attacker);
+        vm.prank(SETTLEMENT);
+        ledger.freezeCommittee{value: 40}(_terms(1, 4, 1, 4, 40), people);
+        _confirm(1, people);
+        _open(1, 0);
+        vm.prank(SETTLEMENT);
+        ledger.authenticateResponse(1, 0, RESPONSE);
+        vm.prank(address(attacker));
+        ledger.submitVoteDirect(1, 0, SSEAdaptiveVoteLedger.Outcome.Success, EVIDENCE);
+        assertEq(ledger.withdrawable(address(attacker)), 5);
+        attacker.claim();
+        assertTrue(attacker.attemptedReentry());
+        assertTrue(attacker.reentryRejected());
+        assertEq(address(attacker).balance, 5);
+        assertEq(ledger.withdrawable(address(attacker)), 0);
+        assertEq(ledger.totalWithdrawableCredits(), 0);
+        assertEq(ledger.totalUnspentReserves(), 35);
+        assertEq(address(ledger).balance, 35);
     }
 
     function testFuzzCommitteeQuorumAlwaysStrictForDynamicSeats(uint8 extra) public {
