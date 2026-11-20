@@ -412,6 +412,148 @@ contract SSEAdaptiveVoteLedgerTest is Test {
         assertEq(ledger.epoch(1, 0).totalVotes, 0);
     }
 
+
+    function testNativeReportRewardBudgetMustActuallyBeDeposited() public {
+        address[] memory people = _monitors(4);
+        vm.expectRevert(SSEAdaptiveVoteLedger.FundingMismatch.selector);
+        vm.prank(SETTLEMENT);
+        ledger.freezeCommittee(_terms(1, 4, 1, 4, 40), people);
+        assertEq(address(ledger).balance, 0);
+        vm.prank(SETTLEMENT);
+        ledger.freezeCommittee{value: 40}(_terms(1, 4, 1, 4, 40), people);
+        assertEq(address(ledger).balance, 40);
+        assertEq(ledger.committee(1).unspentReportBudget, 40);
+        assertEq(ledger.committee(1).originalReportBudget, 40);
+    }
+
+    function testExcessDeclaredBudgetFailsWithoutTrappingFunds() public {
+        address[] memory people = _monitors(4);
+        vm.expectRevert(SSEAdaptiveVoteLedger.FundingMismatch.selector);
+        vm.prank(SETTLEMENT);
+        ledger.freezeCommittee{value: 60}(_terms(1, 4, 1, 4, 60), people);
+        assertEq(address(ledger).balance, 0);
+    }
+
+    function testDissentingReportEarnsTheSameFundedReward() public {
+        address[] memory people = _freeze(1, 5, 1);
+        _confirm(1, people);
+        _open(1, 0);
+        vm.prank(SETTLEMENT);
+        ledger.authenticateResponse(1, 0, RESPONSE);
+        for (uint256 i; i < 3; ++i) {
+            vm.prank(people[i]);
+            ledger.submitVoteDirect(1, 0, SSEAdaptiveVoteLedger.Outcome.Success, EVIDENCE);
+        }
+        vm.warp(block.timestamp + 21);
+        for (uint256 i = 3; i < 5; ++i) {
+            vm.prank(people[i]);
+            ledger.submitVoteDirect(1, 0, SSEAdaptiveVoteLedger.Outcome.Failure, EVIDENCE);
+        }
+        for (uint256 i; i < people.length; ++i) {
+            assertEq(ledger.withdrawable(people[i]), 5);
+        }
+        assertEq(ledger.committee(1).unspentReportBudget, 25);
+        assertEq(address(ledger).balance, 50);
+        vm.warp(block.timestamp + 20);
+        assertEq(uint8(ledger.seal(1, 0)), uint8(SSEAdaptiveVoteLedger.Outcome.None));
+        assertEq(ledger.epoch(1, 0).totalVotes, 5);
+    }
+
+    function testNoShowExpiresAndRefundsOnlyRealConsumerOnce() public {
+        address[] memory people = _freeze(7, 5, 1);
+        vm.deal(CONSUMER, 100);
+        vm.prank(people[0]);
+        ledger.confirmSeat(7);
+        uint256 deadline = ledger.committee(7).confirmationDeadline;
+        vm.warp(deadline + 1);
+        vm.prank(address(0xBAD));
+        ledger.expireUnconfirmed(7);
+        assertEq(ledger.withdrawable(CONSUMER), 50);
+        assertEq(ledger.committee(7).unspentReportBudget, 0);
+        assertEq(ledger.withdrawable(PROVIDER), 0);
+        vm.expectRevert(SSEAdaptiveVoteLedger.NoWithdrawal.selector);
+        vm.prank(PROVIDER);
+        ledger.withdraw();
+        uint256 before_ = CONSUMER.balance;
+        vm.prank(CONSUMER);
+        ledger.withdraw();
+        assertEq(CONSUMER.balance, before_ + 50);
+        assertEq(ledger.withdrawable(CONSUMER), 0);
+        assertEq(address(ledger).balance, 0);
+        vm.expectRevert(SSEAdaptiveVoteLedger.NoWithdrawal.selector);
+        vm.prank(CONSUMER);
+        ledger.withdraw();
+        vm.expectRevert(SSEAdaptiveVoteLedger.InvalidPhase.selector);
+        ledger.expireUnconfirmed(7);
+    }
+
+    function testCloseReportingRefundsUnspentAfterSealedEpoch() public {
+        address[] memory people = _freeze(1, 4, 1);
+        _confirm(1, people);
+        _open(1, 0);
+        vm.prank(SETTLEMENT);
+        ledger.authenticateResponse(1, 0, RESPONSE);
+        vm.prank(people[0]);
+        ledger.submitVoteDirect(1, 0, SSEAdaptiveVoteLedger.Outcome.Success, EVIDENCE);
+        assertEq(ledger.withdrawable(people[0]), 5);
+        vm.expectRevert(SSEAdaptiveVoteLedger.InvalidPhase.selector);
+        vm.prank(SETTLEMENT);
+        ledger.closeReporting(1);
+        vm.warp(block.timestamp + 41);
+        ledger.seal(1, 0);
+        vm.expectRevert(SSEAdaptiveVoteLedger.Unauthorized.selector);
+        vm.prank(address(0xBAD));
+        ledger.closeReporting(1);
+        vm.prank(SETTLEMENT);
+        ledger.closeReporting(1);
+        assertEq(ledger.withdrawable(CONSUMER), 35);
+        assertEq(ledger.committee(1).unspentReportBudget, 0);
+        assertTrue(ledger.committee(1).reportingClosed);
+        assertEq(ledger.withdrawable(people[0]), 5);
+        vm.expectRevert(SSEAdaptiveVoteLedger.InvalidPhase.selector);
+        vm.prank(SETTLEMENT);
+        ledger.closeReporting(1);
+        vm.expectRevert(SSEAdaptiveVoteLedger.InvalidPhase.selector);
+        vm.prank(SETTLEMENT);
+        ledger.openEpoch(1, 1, REQUEST, uint64(block.timestamp + 20), uint64(block.timestamp + 40));
+    }
+
+    function testCannotOpenMoreEpochsThanNativeRewardsFund() public {
+        address[] memory people = _freeze(1, 4, 1);
+        _confirm(1, people);
+        _open(1, 0);
+        _open(1, 1);
+        assertEq(ledger.committee(1).openedEpochs, 2);
+        vm.expectRevert(SSEAdaptiveVoteLedger.InvalidPhase.selector);
+        vm.prank(SETTLEMENT);
+        ledger.openEpoch(1, 2, REQUEST, uint64(block.timestamp + 20), uint64(block.timestamp + 40));
+        vm.expectRevert(SSEAdaptiveVoteLedger.InvalidPhase.selector);
+        vm.prank(SETTLEMENT);
+        ledger.openEpoch(1, 0, REQUEST, uint64(block.timestamp + 20), uint64(block.timestamp + 40));
+    }
+
+    function testNativeRewardWithdrawCannotStealOtherMonitorCredit() public {
+        address[] memory people = _freeze(1, 4, 1);
+        _confirm(1, people);
+        _open(1, 0);
+        vm.prank(SETTLEMENT);
+        ledger.authenticateResponse(1, 0, RESPONSE);
+        vm.prank(people[0]);
+        ledger.submitVoteDirect(1, 0, SSEAdaptiveVoteLedger.Outcome.Success, EVIDENCE);
+        vm.expectRevert(SSEAdaptiveVoteLedger.NoWithdrawal.selector);
+        vm.prank(people[1]);
+        ledger.withdraw();
+        uint256 before_ = people[0].balance;
+        vm.prank(people[0]);
+        ledger.withdraw();
+        assertEq(people[0].balance, before_ + 5);
+        assertEq(ledger.withdrawable(people[0]), 0);
+        vm.expectRevert(SSEAdaptiveVoteLedger.NoWithdrawal.selector);
+        vm.prank(people[0]);
+        ledger.withdraw();
+        assertEq(address(ledger).balance, 35);
+    }
+
     function testFuzzCommitteeQuorumAlwaysStrictForDynamicSeats(uint8 extra) public {
         uint256 k = 4 + uint256(extra % 30);
         address[] memory people = _freeze(1, k, 1);
