@@ -58,6 +58,13 @@ class LighthouseHdWalletSourceGuardTests(unittest.TestCase):
         ):
             self.assertIn(flag, self.src)
 
+    def test_cli_uses_upstream_v833_wallets_dir_not_singular_wallet_dir(self):
+        # Lighthouse v8.3.3 upstream account_manager/src/lib.rs:
+        # WALLETS_DIR_FLAG = "wallets-dir" (plural).
+        self.assertIn('--wallets-dir', self.src)
+        self.assertIn('account wallet --wallets-dir /owner/wallets create', self.src)
+        self.assertNotIn('--wallet-dir ', self.src)
+
     def test_random_hd_wallet_not_reused_or_initialized_twice(self):
         self.assertIn('[[ ! -e "$BASE" && ! -L "$BASE" ]]', self.src)
         self.assertIn('mkdir -m 0700 -- "$BASE"', self.src)
