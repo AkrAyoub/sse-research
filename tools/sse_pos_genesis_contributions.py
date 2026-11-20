@@ -72,13 +72,20 @@ def read_contribution(path: Path):
 
 
 def collect(paths: list[Path], *, min_operators: int,
-            min_validators: int) -> tuple[str, dict]:
+            min_validators: int, single_operator_lab: bool = False) -> tuple[str, dict]:
     # The initiating operators explicitly publish these *genesis-snapshot*
     # safety thresholds; NO program-wide fixed operator/validator roster.
     # Future validator deposits remain permissionless and uncapped.
     if (type(min_operators) is not int or type(min_validators) is not int
-            or min_operators < 2 or min_validators < 1):
+            or type(single_operator_lab) is not bool
+            or min_operators < 1 or min_validators < 1):
         raise CeremonyError("invalid explicitly declared genesis ceremony minima")
+    # One actual operator is permitted only for a GENUINE client smoke lab.
+    # It is never evidence of an independent public multioperator network.
+    if single_operator_lab != (min_operators == 1):
+        raise CeremonyError("one-operator genesis requires explicit --single-operator-lab; never pretend independence")
+    if single_operator_lab and len(paths) != 1:
+        raise CeremonyError("one-operator lab must have exactly one real operator's contribution")
     if len(paths) < min_operators or len(set(paths)) != len(paths):
         raise CeremonyError("too few distinct supplied contribution files")
     operators, pubkeys, withdrawal_owners = set(), set(), {}
@@ -117,6 +124,8 @@ def collect(paths: list[Path], *, min_operators: int,
         "consensusGenesisSszBuilt": False,
         "beaconDepositsOrActivationExecuted": False,
         "readyToLaunch": False,
+        "singleOperatorLabOnly": single_operator_lab,
+        "publicMultioperatorNetworkReady": False,
     }
     return output, summary
 
@@ -129,12 +138,15 @@ def main(argv=None) -> int:
                    help="documented independent fault-domain target for THIS genesis; not a membership cap")
     p.add_argument("--min-validators", type=int, required=True,
                    help="documented active-key target for THIS genesis; future deposits are open")
+    p.add_argument("--single-operator-lab", action="store_true",
+                   help="permit exactly ONE real operator for LOCAL PoS client smoke only; NEVER independent/public acceptance")
     p.add_argument("--output", type=Path, help="write new provisional public validators.txt, never overwrite")
     args = p.parse_args(argv)
     try:
         listing, result = collect(args.contribution,
                                   min_operators=args.min_operators,
-                                  min_validators=args.min_validators)
+                                  min_validators=args.min_validators,
+                                  single_operator_lab=args.single_operator_lab)
         if args.output is not None:
             # The public metadata is safe to publish. The owner signs nothing.
             with args.output.open("x", encoding="utf-8", newline="\n") as f:
