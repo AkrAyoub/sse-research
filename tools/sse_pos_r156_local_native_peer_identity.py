@@ -75,7 +75,9 @@ def read_json(url, *, method="GET", rpc_method=None):
         raise Refused("local Lighthouse response missing data")
     return value["data"]
 
-def rlp_item(blob, start=0):
+def rlp_item(blob, start=0, depth=0):
+    if depth>2:
+        raise Refused("excessive nested ENR RLP")
     """Strict bounded RLP parse; returns (byte-string or list, cursor)."""
     if start>=len(blob):
         raise Refused("truncated ENR RLP")
@@ -109,7 +111,7 @@ def rlp_item(blob, start=0):
         end=at+size
         if end>len(blob):
             raise Refused("truncated ENR list")
-        return rlp_list(blob,at,end),end
+        return rlp_list(blob,at,end,depth+1),end
     digits=p-0xf7
     at=start+1
     if at+digits>len(blob) or blob[at]==0:
@@ -120,12 +122,12 @@ def rlp_item(blob, start=0):
     end=at+digits+size
     if end>len(blob):
         raise Refused("truncated ENR list")
-    return rlp_list(blob,at+digits,end),end
+    return rlp_list(blob,at+digits,end,depth+1),end
 
-def rlp_list(blob,start,end):
+def rlp_list(blob,start,end,depth):
     items=[]
     while start<end:
-        item,nxt=rlp_item(blob,start)
+        item,nxt=rlp_item(blob,start,depth)
         if nxt>end:
             raise Refused("ENR RLP nested item overshoot")
         items.append(item)
@@ -184,7 +186,7 @@ def make_record(node_id, overlay, enode, beacon_enr,
                 chain, beacon_genesis):
     if type(node_id) is not str or not NODE_ID.fullmatch(node_id):
         raise Refused("invalid locally selected node identity")
-    if chain!=31340 or beacon_genesis.lower()!=genesis.CL_GENESIS:
+    if chain!=31340 or type(beacon_genesis) is not str or beacon_genesis.lower()!=genesis.CL_GENESIS:
         raise Refused("incorrect actual chain31340 identity")
     found=ENODE.fullmatch(enode) if type(enode) is str else None
     if not found:
