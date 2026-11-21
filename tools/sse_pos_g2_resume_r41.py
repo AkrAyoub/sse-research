@@ -105,7 +105,7 @@ def wire(method: str, port: int, path: str, body: dict | None) -> str:
     request = "\r\n".join(parts) + "\r\n\r\n" + data.decode("ascii")
     return (f"exec 3<>/dev/tcp/127.0.0.1/{port} || exit 17\n"
             + "printf '%s' " + shlex.quote(request) + " >&3\n"
-            + "timeout 5 cat <&3")
+            + "timeout 5 cat <&3 || test $? -eq 124")
 
 def parse_http(raw: bytes) -> tuple[str, dict | None]:
     headers, sep, body = raw.partition(b"\r\n\r\n")
