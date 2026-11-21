@@ -7,7 +7,7 @@ StartLimitIntervalSec=0
 [Service]
 Type=oneshot
 Environment=R106_BOOT_SERVICE=true
-ExecStart=/usr/bin/bash /usr/local/libexec/sse31340-owner-native-network-recovery.sh --apply
+ExecStart=/usr/bin/bash /usr/local/libexec/sse31340-owner-native-network-orchestrator.sh
 Restart=on-failure
 RestartSec=30s
 TimeoutStartSec=180s
