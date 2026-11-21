@@ -17,3 +17,16 @@ NEW GitHub source tools/sse_pos_r53_relay_transport_probe.py: pure Python stdlib
 5. Stop test tunnels by IDs shown from pinggy ps, via pinggy stop TUNNEL_ID. Loopback test server exits after matching both echo requests or at 12 min.
 
 After BOTH actual public relay transports work, transfer only the 16,218-byte ORIGINAL real public chain31340 genesis archive (SHA256 1d21e6bfb7609d1797edd9d36561b1dc47a520153d1c6f698f807c29266c2ce7), install strictly pinned Besu26.11.1/Lighthouse8.3.3 on VM4707 with NEW local Engine JWT and non-signing data, verify native TCP+UDP advertised signed peer records through relay, and only then review controlled original VM4706 P2P maintenance while preserving its sole signer. Continue building public installer using stable verified bootstrap manifest independent of relay vendor; private GitHub repo and expiring free tunnels are remaining permissionless-release blockers. Never claim permissionless participation without genuinely reachable native external peer handshakes.
+
+
+## Simplest VM4707 relay trial with official Pinggy Docker image, no Pinggy installation
+
+Official source: https://pinggy.io/docs/docker/ confirms Linux host-network Docker image for both raw TCP and UDP (UDP cannot be handled by plain SSH). For the 12-minute echo trial only, on VM4707 TWO NEW terminal tabs, execute each command in FOREGROUND:
+
+TCP terminal:
+    sudo -n docker run --rm --net=host -it --name sse-r53-tcp pinggy/pinggy -p 443 -R0:localhost:23353 tcp@free.pinggy.io
+
+UDP terminal:
+    sudo -n docker run --rm --net=host -it --name sse-r53-udp pinggy/pinggy -p 443 -R0:localhost:23354 udp@free.pinggy.io
+
+The third-party Docker containers must NOT have access to Docker daemon socket, signer keys, Engine JWT, or any host mount. No validator on this host. Do NOT copy them to the original signer VM4706. The image tag is unpinned upstream for this initial disposable trial; record actual pulled immutable image ID/digest before trusting a long-running implementation, and never treat temporary output as verified identity. Pinggy returns actual PUBLIC TCP and UDP endpoint hostnames/ports; don't invent any. Keep a third VM4707 terminal running R53 --server on loopback before launching either tunnel. Then on VM4706 run R53 --check with the two actual public host:port pairs. Stop the two foreground Docker terminals with Ctrl+C after test. VM4707 relay is non-signing; VM4706 original finality is untouched.
