@@ -99,8 +99,9 @@ def preflight(archive: Path, commit: str,
     if (exists("network", NETWORK)
             or any(exists("container", n) for n in (EL, BN, "sse31340-g2-vc"))):
         raise ExternalObserverRefused("observer Docker state exists or original signer present")
-    if archive.is_symlink() or not archive.is_file():
-        raise ExternalObserverRefused("original public genesis tarball must be a regular file")
+    if (archive.is_symlink() or not archive.is_file()
+            or not 0 < archive.stat().st_size <= bundle.MAX_TARBALL):
+        raise ExternalObserverRefused("original public genesis tarball must be a bounded regular file")
     if bundle.digest(archive.read_bytes()) != BUNDLE_SHA256:
         raise ExternalObserverRefused("transferred public archive differs from real owner Step54 SHA256")
     checked = bundle.verify_bundle(archive)
