@@ -147,6 +147,11 @@ def interface_ip_observation() -> dict:
 def run(sha: str) -> dict:
     # Exact clean source and PUBLIC CL/EL/SSZ checks before any host inspection.
     health.require_actual_source(sha)
+    if health.rpc("eth_chainId") != hex(31340):
+        raise ReadinessRefused("live execution client is not the original chain31340")
+    gen = health.beacon("/eth/v1/beacon/genesis")
+    if type(gen) is not dict or str(gen.get("genesis_time")) != str(base.GENESIS_TIME):
+        raise ReadinessRefused("running Beacon does not accept real original genesis time")
     el = classify_bindings(EL)
     beacon = classify_bindings(BN)
     if (not el["currentlyRunning"] or not beacon["currentlyRunning"]
@@ -176,25 +181,25 @@ def run(sha: str) -> dict:
         "actualClientInspections": [el, beacon],
         "hostInterfaces": interfaces,
         "privateDockerNetworkInternal": True,
-        "existingG2P2pEnabledForExternalPeers": (
+        "allNeededP2pPortBindingsConfigured": bool(
             not el["ethereumExecutionP2pExplicitlyDisabled"]
             and el["p2pInboundTcpPublished"] and el["p2pInboundUdpPublished"]
             and beacon["p2pInboundTcpPublished"] and beacon["p2pInboundUdpPublished"]
-            and False  # no external handshake verified; never infer from bindings
         ),
+        "existingG2P2pEnabledForExternalPeers": False, # original bridge is internal-only
         "nativeExecutionDevp2pHandshakeProven": False,
         "consensusLibp2pAndDiscv5HandshakeProven": False,
         "incomingInternetReachabilityProven": False,
         "dynamicDnsConfiguredAndResolved": False,
         "carrierGradeNatTraversalProven": False,
-        "independentPhysicalOperatorsConfirmed": 1,
+        "declaredPhysicalOwnerFaultDomains": 1,
         "permissionlessInternetParticipationProven": False,
         "publicReleaseRequiresAtLeastTwoIndependentSeedOperators": True,
         "designRequiresPubliclyReachableTCPAndUDPBootstrap": True,
         "staticPublicIpOnEveryParticipantRequired": False,
         "originalValidatorJwtKeysAndSlashingDataRead": False,
         "clientContainersOrNetworksModified": False,
-        "manualNetworkMigrationRequiredWithoutReusingSigningKeys": True,
+        "networkMigrationRequiredPreservingOriginalValidatorSigningKey": True,
     }
 
 def main() -> int:
