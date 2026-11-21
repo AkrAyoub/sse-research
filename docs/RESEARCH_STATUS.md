@@ -1,4 +1,55 @@
-# Verified state and gaps — 2026-11-19
+# Verified state and gaps — updated 2026-11-21
+
+## CURRENT chain31340 live evidence — supersedes older dated status entries below
+
+**Live operator observations, 2026-11-21:** VM4706 runs original
+Besu execution + Lighthouse Beacon and ONE original signing validator.
+VM4707 runs separate real nonsigning Besu+Lighthouse peers.
+On owner head slot 6549 (epoch 204) and observer head slot 6550
+(epoch 204), both independently reported **previous justified epoch 201**,
+**current justified epoch 202**, **finalized epoch 200**, identical
+finalized root
+`0x0e870e8687dd93737daf777c0a9c690a9ddc73bca03ac6b62fa44b3579a0a467`.
+VM4707 Beacon `/eth/v1/node/syncing`: `is_syncing=false`,
+`is_optimistic=false`, `el_offline=false`, sync distance 0.
+Owner Beacon logs reported one native consensus peer, verified execution
+payload hashes and advancing blocks. This is **REAL PoS FINALITY**;
+historical entries stating that chain31340 has not launched are now stale.
+
+**Limits of this milestone:** one BLS signing key/operator and two
+same-cloud VMs, not multiple independent validator owners.
+Dynamic Internet-wide P2P onboarding, outside-provider independent
+connectivity, real third-party validator deposit/activation, authenticated
+real cross-host resource leasing, monitor quorum and conservative SLA
+settlement remain **NOT VERIFIED**. ZeroTier ad-hoc IPv6 is a public
+controllerless overlay but still depends on ZeroTier underlay/root/relay
+services; a VM overlay IP is not proof of ISP or physical independence.
+
+**GitHub verification, 2026-11-21:** VM4707 tested R136/R137
+targeted suites (6+7), corrected R54/R69 suites (11+6).
+At integration revision `bb7d3db455231771a2b4eb5390aa185b77656070`
+using isolated `.venv-tests`, full Python discovery ran
+**920 tests, 1 failure, 0 errors, 3 skipped**. The sole failure was a
+source-tree integrity conflict: obsolete `services/role-agent` existed
+from a prior research restoration. New GitHub-only remediation moves
+the legitimate non-signing monitor snapshot console to
+`services/node-console`, updates its behavioral test and deletes
+the obsolete `services/role-agent` path. **That remediation has not
+yet been VM retested.**
+
+**R140 current source-only:** finalized-chain31340 read-only marketplace
+runtime/contract-binding audit tool and tests. No actual chain31340
+marketplace contracts, bonds, leases or withdrawals are claimed.
+The old `script/DeploySSEPos.s.sol` is explicitly chain31339;
+`OpenMonitorCommittee` and `SSESettlement` still have fixed 4/3
+committees. Adaptive and evidence-sound contract migration is a blocker
+before the research-marketplace deployment.
+
+Older entries below are retained as historical evidence of earlier stages
+and MUST NOT be interpreted as current deployment status.
+
+---
+
 
 ## Latest ACTUAL VM4706 checkpoint — 2026-11-20 Step40
 
