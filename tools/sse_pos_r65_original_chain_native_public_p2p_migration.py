@@ -66,6 +66,62 @@ def not_exists(kind:str,name:str)->None:
     if p.returncode!=1:
         raise R65Refused("cannot prove migration resource absent")
 
+def normalized_entrypoint(value:object)->tuple[str,...]:
+    """Normalize only Docker's absent/empty Entrypoint representation."""
+    if value is None or value==[]:
+        return ()
+    if not isinstance(value,list) or any(
+        not isinstance(item,str) or not item for item in value
+    ):
+        raise R65Refused("container/image entrypoint metadata invalid")
+    return tuple(value)
+
+
+def normalized_env(value:object)->dict[str,str]:
+    """Compare exact environment keys AND values; print neither.
+
+    Order is not semantically significant for Docker's environment entries.
+    Reject duplicate variables rather than accidentally accepting ambiguity.
+    """
+    if value is None or value==[]:
+        return {}
+    if not isinstance(value,list):
+        raise R65Refused("container/image environment metadata invalid")
+    result:dict[str,str]={}
+    for item in value:
+        if not isinstance(item,str) or "=" not in item:
+            raise R65Refused("container/image environment metadata malformed")
+        key,val=item.split("=",1)
+        if not re.fullmatch(r"[A-Za-z_][A-Za-z0-9_]{0,100}",key) or key in result:
+            raise R65Refused("container/image environment key invalid or duplicated")
+        if len(val)>32768 or "\x00" in val:
+            raise R65Refused("container/image environment value malformed")
+        result[key]=val
+    return result
+
+
+def verify_unmodified_image_launch_config(container:dict,image:dict)->None:
+    """Never loosen runtime defaults or repeat unreviewed environment secrets."""
+    a=normalized_entrypoint(container.get("Entrypoint"))
+    b=normalized_entrypoint(image.get("Entrypoint"))
+    if a!=b:
+        raise R65Refused(
+            "original entrypoint differs from immutable image: "
+            f"container_argv_count={len(a)} image_argv_count={len(b)}"
+        )
+    aenv=normalized_env(container.get("Env"))
+    benv=normalized_env(image.get("Env"))
+    added=set(aenv)-set(benv)
+    missing=set(benv)-set(aenv)
+    changed={key for key in set(aenv)&set(benv) if aenv[key]!=benv[key]}
+    if added or missing or changed:
+        raise R65Refused(
+            "original environment differs from immutable image: "
+            f"added_key_count={len(added)} missing_key_count={len(missing)} "
+            f"changed_value_count={len(changed)}; no contents shown"
+        )
+
+
 def original_definition(name:str)->dict:
     if name not in (EL,BN):
         raise R65Refused("only original execution and beacon processes may be re-created")
@@ -88,8 +144,7 @@ def original_definition(name:str)->dict:
     image=get_json(["image","inspect","--format","{{json .Config}}",ref])
     if not isinstance(image,dict):
         raise R65Refused("pinned image config unreadable")
-    if config.get("Entrypoint")!=image.get("Entrypoint") or config.get("Env")!=image.get("Env"):
-        raise R65Refused("custom entrypoint/environment requires separate source review")
+    verify_unmodified_image_launch_config(config,image)
     if config.get("WorkingDir")!=image.get("WorkingDir"):
         raise R65Refused("custom working directory requires separate review")
     if host.get("Privileged") or host.get("ReadonlyRootfs") is not True:
