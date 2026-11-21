@@ -101,14 +101,25 @@ class R157Tests(unittest.TestCase):
         with self.assertRaises(m.Refused):
             m.build([item],now=NOW)
 
-    def test_public_file_is_create_only(self):
+    def test_public_file_rotates_atomically_when_peer_ttl_changes(self):
         with tempfile.TemporaryDirectory() as tmp:
             path=Path(tmp)/"public/peers.json"
             report=m.build([fixture()],now=NOW)
-            m.write_new(path,report)
+            m.write_rotating(path,report)
             self.assertTrue(path.is_file())
+            newer=m.build([fixture(now=NOW+60)],now=NOW+60)
+            m.write_rotating(path,newer)
+            self.assertEqual(json.loads(path.read_text())["expiresAt"],NOW+360)
+
+    def test_public_directory_symlink_refused_even_during_refresh(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            secret=Path(tmp)/"protected"
+            secret.write_text("do not overwrite")
+            link=Path(tmp)/"peers.json"
+            link.symlink_to(secret)
             with self.assertRaises(m.Refused):
-                m.write_new(path,report)
+                m.write_rotating(link,m.build([fixture()],now=NOW))
+            self.assertEqual(secret.read_text(),"do not overwrite")
 
     def test_public_file_duplicate_json_fields_rejected(self):
         with tempfile.TemporaryDirectory() as tmp:
