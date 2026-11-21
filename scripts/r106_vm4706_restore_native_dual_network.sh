@@ -28,12 +28,10 @@ check_role(){
   hostip || die "ZeroTier 6plane IPv6 not assigned yet"
   [[ "$("${D[@]}" network inspect "$TRUST" --format '{{.Internal}}:{{.Driver}}')" == 'true:bridge' ]] || die "private bridge changed"
   [[ "$("${D[@]}" network inspect "$PUBLIC" --format '{{.Internal}}:{{.Driver}}:{{.EnableIPv6}}')" == 'false:bridge:true' ]] || die "public bridge not normal IPv6 bridge"
-  [[ "$("${D[@]}" inspect "$VC" --format '{{.State.Running}}')" == false ]] || die "validator running: no automatic EL BN maintenance"
   for C in "$EL" "$BN"; do
     [[ "$("${D[@]}" inspect "$C" --format '{{.HostConfig.NetworkMode}}')" == "$TRUST" ]] || die "$C unexpected primary network"
     # R65 originals have exact host-only published API and advertised 6plane P2P
     [[ "$("${D[@]}" inspect "$C" --format '{{json .HostConfig.PortBindings}}')" != *'"8551/tcp"'* ]] || die "Engine host publication detected"
-    [[ "$("${D[@]}" inspect "$C" --format '{{.State.Running}}')" == true ]] || die "$C not running"
   done
   [[ "$("${D[@]}" inspect "$EL" --format '{{with index .NetworkSettings.Networks "sse31340-g2-internal"}}{{.IPAddress}}{{end}}')" == 172.18.0.2 ]] || die "EL private IP changed"
   [[ "$("${D[@]}" inspect "$BN" --format '{{with index .NetworkSettings.Networks "sse31340-g2-internal"}}{{.IPAddress}}{{end}}')" == 172.18.0.3 ]] || die "BN private IP changed"
@@ -69,13 +67,15 @@ if [[ "$MODE" == "--plan" ]]; then
 fi
 # Idempotent: never disturb already restored native ports.
 if [[ "$(attachment "$EL")" == yes && "$(attachment "$BN")" == yes ]] &&
+   [[ "$("${D[@]}" inspect "$EL" --format '{{.State.Running}}')" == true ]] &&
+   [[ "$("${D[@]}" inspect "$BN" --format '{{.State.Running}}')" == true ]] &&
    effective "$EL" && effective "$BN"; then
   echo "R106_ALREADY_RECOVERED=true"
   exit 0
 fi
-# Restrict this intervention to the observed lost-public-endpoint case.
-[[ "$(attachment "$EL")" == no && "$(attachment "$BN")" == no ]] ||
-  die "mixed public bridge state: manual inspection required"
+# Never restart a client while the sole signer may be active.
+[[ "$("${D[@]}" inspect "$VC" --format '{{.State.Running}}')" == false ]] || die "validator running; no automatic client restart"
+# Partial previous recovery is supported idempotently. Unknown networks refuse above.
 # Do not bring up original Docker published ports while R92 holds them.
 if systemctl is-active --quiet "$RELAY"; then
   echo "R106_STAGE=STOP_TEMPORARY_RELAY"
@@ -84,12 +84,22 @@ fi
 # Relay must stay disabled after native restoration, including subsequent reboots.
 # Disable after native checks succeed, not before.
 for C in "$EL" "$BN"; do
-  echo "R106_STAGE=REATTACH_EXISTING_PUBLIC_BRIDGE $C"
-  "${D[@]}" network connect "$PUBLIC" "$C" ||
-    die "public connect failed; DO NOT RETRY BLINDLY"
-  echo "R106_STAGE=RESTART_EXISTING_CLIENT $C"
-  "${D[@]}" restart --time 60 "$C" ||
-    die "restart failed; DO NOT RETRY BLINDLY"
+  if [[ "$(attachment "$C")" == no ]]; then
+    echo "R106_STAGE=REATTACH_EXISTING_PUBLIC_BRIDGE $C"
+    "${D[@]}" network connect "$PUBLIC" "$C" ||
+      die "public connect failed; check state before retry"
+  fi
+  if [[ "$("${D[@]}" inspect "$C" --format '{{.State.Running}}')" == true ]]; then
+    if ! effective "$C"; then
+      echo "R106_STAGE=RESTART_EXISTING_CLIENT $C"
+      "${D[@]}" restart --timeout 60 "$C" ||
+        die "restart failed; check state before retry"
+    fi
+  else
+    echo "R106_STAGE=START_EXISTING_CLIENT $C"
+    "${D[@]}" start "$C" ||
+      die "start failed; check state before retry"
+  fi
   [[ "$(attachment "$C")" == yes ]] || die "public endpoint missing"
   effective "$C" || die "Docker effective port publishing missing"
 done
@@ -98,6 +108,8 @@ for C in "$EL" "$BN"; do
   check_public_set "$C"
   effective "$C" || die "$C port publication missing"
 done
-sudo -n systemctl disable "$RELAY" >/dev/null
+if systemctl is-enabled --quiet "$RELAY"; then
+  sudo -n systemctl disable "$RELAY" >/dev/null
+fi
 echo "R106_NATIVE_DUAL_NETWORK_PORTS_RESTORED=true"
 echo "R106_VALIDATOR_UNTOUCHED=true"
