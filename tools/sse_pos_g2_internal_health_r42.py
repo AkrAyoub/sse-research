@@ -49,7 +49,16 @@ def in_docker(name: str, method: str, path: str, payload: dict | None) -> tuple[
         raw = internal.docker(["exec", name, "/bin/bash", "-c", cmd])
     except internal.Refuse:
         return "DOCKER_EXEC_FAILED", None
-    return internal.parse_http(raw)
+    # Besu replies to large eth_getCode results using MULTIPLE HTTP chunks.
+    # The earlier R41 parser decoded only the first chunk and produced None;
+    # use the fully bounded R44 decoder rather than reporting false missing
+    # code. Imported here (not at module level) to avoid a circular import:
+    # R44 diagnostic imports this actual chain31340 health reader.
+    from sse_pos_g2_rpc_deposit_r44 import unpack_http
+    metadata, parsed = unpack_http(raw)
+    if metadata["transportStatus"] == "HTTP_200_JSON_OBJECT":
+        return "HTTP_200", parsed
+    return metadata["transportStatus"], None
 
 def rpc(method: str, params: list | None = None):
     status, parsed = in_docker(
