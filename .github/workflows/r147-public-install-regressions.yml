@@ -33,6 +33,8 @@ jobs:
         run: python3 -B -m unittest discover -s tests -p 'test_sse_pos_r150_verified_genesis_release.py' -v
       - name: R151 local-role-authorized unattended real EL CL runtime tests
         run: python3 -B -m unittest discover -s tests -p 'test_sse_pos_r151_unattended_full_node.py' -v
+      - name: R152 verified unattended host dependencies
+        run: python3 -B -m unittest discover -s tests -p 'test_sse_pos_r152_unattended_host_dependencies.py' -v
       - name: All relevant unified/VM onboarding guard tests
         run: |
           python3 -B -m unittest discover -s tests -p 'test_sse_join.py' -v
