@@ -91,17 +91,47 @@ def read_manifest(path):
     except (ValueError,UnicodeError) as exc:
         raise Refused("malformed release manifest") from exc
 
-class _NoRedirect(urllib.request.HTTPRedirectHandler):
-    def redirect_request(self,*args,**kwargs):
-        return None
+class _ReleaseRedirects(urllib.request.HTTPRedirectHandler):
+    """Only GitHub's authenticated public release CDN may redirect.
+
+    GitHub's public release asset URL normally redirects to a signed,
+    short-lived HTTPS CDN URL. Reject all redirects for unrelated
+    mirrors and reject HTTPS-to-HTTP or untrusted redirect hosts.
+    """
+    def __init__(self, source):
+        super().__init__()
+        self.source=source
+        self.count=0
+
+    def redirect_request(self, req, fp, code, msg, headers, newurl):
+        original=urllib.parse.urlsplit(self.source)
+        approved=(original.scheme=="https"
+                  and original.hostname=="github.com"
+                  and original.path==(
+                     "/AkrAyoub/sse-research/releases/download/"
+                     "chain31340-genesis-v1/"
+                     "chain31340-public-native-observer-v1.tar.gz"))
+        new=urllib.parse.urlsplit(newurl)
+        hosts={"release-assets.githubusercontent.com",
+               "objects.githubusercontent.com",
+               "github.com"}
+        if (not approved or self.count>=3 or new.scheme!="https"
+                or new.hostname not in hosts
+                or new.username is not None or new.password is not None
+                or new.port not in (None,443)):
+            raise Refused("untrusted or excessive original artifact redirect")
+        self.count+=1
+        return super().redirect_request(req,fp,code,msg,headers,newurl)
 
 def download(url):
     verify_url(url)
-    opener=urllib.request.build_opener(urllib.request.HTTPSHandler(),_NoRedirect())
+    opener=urllib.request.build_opener(urllib.request.HTTPSHandler(),
+                                       _ReleaseRedirects(url),
+                                       urllib.request.ProxyHandler({}))
     try:
         with opener.open(urllib.request.Request(
                 url,headers={"Accept":"application/octet-stream"}),timeout=15) as response:
-            if response.status!=200 or response.url!=url:
+            if response.status!=200:
                 raise Refused("unexpected artifact response")
             blob=response.read(MAX_ARCHIVE+1)
     except (OSError,ValueError) as exc:
