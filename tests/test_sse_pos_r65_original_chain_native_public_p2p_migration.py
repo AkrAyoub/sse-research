@@ -99,7 +99,6 @@ class R65NativePublicOwnerMigrationTests(unittest.TestCase):
         self.assertIn('m.get("RW") is not False',source)
         self.assertIn('m.get("RW") is not True',source)
         self.assertIn('str(owner_root)',source)
-        self.assertIn('"same-data"',source) if False else None
         self.assertIn('os.path.commonpath',source)
 
     def test_refuse_original_client_already_migrated(self):
