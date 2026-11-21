@@ -4,6 +4,13 @@
 set -euo pipefail
 [[ "$(id -u)" == 0 ]] || { echo "R110_REFUSED: must run as root"; exit 2; }
 D=(docker)
+STALE=/usr/local/libexec/sse_pos_r117_owner_stale_stopped_endpoint_recovery.py
+# Exact stopped, empty-endpoint Docker 29 reboot failure: only this recovery
+# may detach stale records; never do so on running or unexpected containers.
+if /usr/bin/python3 -B "$STALE" --plan >/dev/null 2>&1; then
+  echo "R110_STAGE=RECOVER_EXACT_STALE_STOPPED_DUAL_NETWORK"
+  /usr/bin/python3 -B "$STALE" --apply
+fi
 EL=sse31340-g2-el-r40
 BN=sse31340-g2-bn
 PRIVATE=sse31340-g2-internal
