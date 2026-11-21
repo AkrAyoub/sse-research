@@ -12,7 +12,9 @@ class R106NativeRecoveryTests(unittest.TestCase):
     def test_never_modifies_validator_or_recreates_client(self):
         s=SCRIPT.read_text()
         self.assertIn('VC=sse31340-g2-vc',s)
-        self.assertIn('validator running: no automatic EL BN maintenance',s)
+        self.assertIn('validator running; no automatic client restart',s)
+        self.assertIn('grep -Fq "$IP/40"',s)
+        self.assertIn('do [[ "$payload" == *"$binding"* ]]',s)
         self.assertNotIn('docker run ',s)
         self.assertNotIn('docker rm ',s)
         self.assertNotIn('network create ',s)
