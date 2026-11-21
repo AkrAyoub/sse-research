@@ -100,7 +100,6 @@ def original_container(name: str) -> dict:
         raise R64Refused("original native client image identity invalid")
     return {
         "originalStillRunning":True,
-        "restartCount":state.get("RestartCount"),  # not present in .State (observed separately)
         "originalDockerInternalOnly":True,
         "noExtraAttachedNetworks":True,
         "immutableDockerImageIdentityPresent":True,
