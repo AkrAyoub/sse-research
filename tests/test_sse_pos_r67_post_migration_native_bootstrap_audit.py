@@ -144,7 +144,7 @@ class R67RealPostMigrationSafetyTests(unittest.TestCase):
                           '"docker","create"', '"docker","start"',
                           '"docker","network","connect"', "public-key export",
                           "node-private-key", "slashing_protection", ".pem",
-                          "zerotier-cli\",\"join", "tf.extract", "wallets"):
+                          "zerotier-cli\",\"join", "tf.extract", "read_bytes("):
             self.assertNotIn(forbidden,src)
         self.assertIn('net_enode',src)
         self.assertIn('/eth/v1/node/identity',src)
