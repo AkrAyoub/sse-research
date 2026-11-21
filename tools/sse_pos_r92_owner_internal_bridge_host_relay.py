@@ -21,11 +21,14 @@ OWNER = "fca0:2328:776e:4750:395b::1"
 EL = "172.18.0.2"
 BN = "172.18.0.3"
 # Protocol, listen IP, listen port, internal-only destination IP, destination port.
+# Native host IPv6 30404 maps to Besu internal IPv4 30303 (verified namespace
+# socket 2026-11-21); forwarding AF_INET to 30404 reaches IPv6 socket only.
+# Lighthouse [::] listeners MUST still be tested for IPv4-mapped handling.
 FORWARDS = (
     ("tcp", "127.0.0.1", 18545, EL, 8545),
     ("tcp", "127.0.0.1", 15052, BN, 5052),
-    ("tcp", OWNER, 30404, EL, 30404),
-    ("udp", OWNER, 30404, EL, 30404),
+    ("tcp", OWNER, 30404, EL, 30303),
+    ("udp", OWNER, 30404, EL, 30303),
     ("tcp", OWNER, 9000, BN, 9000),
     ("udp", OWNER, 9000, BN, 9000),
     ("udp", OWNER, 9001, BN, 9001),
