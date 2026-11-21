@@ -25,7 +25,7 @@ import sse_pos_r60_owner_native_p2p_readonly_audit as r60
 NETWORK = "ff2328775f000000"
 VERSION = "1.16.2"
 KEY_FINGERPRINT = "74A5E9C458E1A431F1DA57A71657198823E52A61"
-KEY_URL = "https://raw.githubusercontent.com/zerotier/ZeroTierOne/master/doc/contact%40zerotier.com.gpg"
+KEY_URL = "https://raw.githubusercontent.com/zerotier/ZeroTierOne/main/doc/contact%40zerotier.com.gpg"
 APT_REPO = "deb [signed-by=/usr/share/keyrings/zerotier-debian-package-key.gpg] https://download.zerotier.com/debian/noble noble main\n"
 ROOT_KEY = "/usr/share/keyrings/zerotier-debian-package-key.gpg"
 ROOT_SOURCE = "/etc/apt/sources.list.d/zerotier-sse.list"
