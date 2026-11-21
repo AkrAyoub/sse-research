@@ -508,7 +508,11 @@ def apply(commit:str, backup_attested:bool)->dict:
           "stopped containers are preserved for rollback. This creates native "
           "public P2P on your actual ZeroTier IPv6, NOT on provider-private LAN. "
           "This may interrupt solo-validator finality. Existing recoverable "
-          "backup is your responsibility. Do not rerun after partial failure.",
+          "backup is your responsibility. After stopping all original "
+          "clients this tool also writes a NEW local mode-0600 UNENCRYPTED "
+          "recovery TAR containing original private validator signing/slashing "
+          "material, JWT and chain databases. Protect and encrypt it offline. "
+          "Do not rerun after partial failure.",
           file=sys.stderr,flush=True)
     token=input("Type MIGRATE-EXISTING-CHAIN31340-NATIVE-P2P: ")
     if token!="MIGRATE-EXISTING-CHAIN31340-NATIVE-P2P":
