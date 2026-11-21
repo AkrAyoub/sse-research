@@ -272,12 +272,14 @@ class R65NativePublicOwnerMigrationTests(unittest.TestCase):
         plan={"actualOpenOverlayIPv6":IP}
         from unittest.mock import patch as mp
         with mp.object(m,"read_only_plan",return_value=(plan,{},{})),mp.object(
-             m.sys.stdin,"isatty",return_value=True),mp.object(
-             m.sys.stderr,"isatty",return_value=True),mp(
+             m.sys,"stdin") as stdin,mp.object(
+             m.sys,"stderr") as stderr,mp(
              "builtins.input",return_value="MIGRATE-EXISTING-CHAIN31340-NATIVE-P2P"),mp.object(
              m,"docker",return_value=""),mp.object(
              m.r66,"snapshot_consistent_original_state",side_effect=m.r66.R66Refused("test failure")),mp.object(
              m,"rollback") as rollback:
+            stdin.isatty.return_value=True
+            stderr.isatty.return_value=True
             with self.assertRaises(m.R65Refused):
                 m.apply("a"*40,True)
         rollback.assert_called_once_with(set(),set())
