@@ -19,6 +19,7 @@ import sys
 import tempfile
 
 import sse_pos_r141_independent_fleet_audit as r141
+import sse_public_genesis as original_chain
 
 SCHEMA = "SSE_R153_UNATTENDED_CHAIN31340_OBSERVATION_V1"
 SERVICE = "sse31340-local-evidence"
@@ -36,6 +37,14 @@ def observe(node, el="http://127.0.0.1:28545",
     try:
         report=collector(node,el,bn)
         r141.validate_report(report)
+        # R141 validates report structure and on-chain chainId, not exact
+        # original genesis identity or native peer counts. An unrelated
+        # chain with chainId=31340 must never become "verified" here.
+        if (report["executionGenesisHash"].lower()!=original_chain.EL_GENESIS
+                or report["beaconGenesisValidatorsRoot"].lower()!=original_chain.CL_GENESIS):
+            raise r141.Refused("local node follows a different genesis")
+        if (report["executionNativePeers"]<1 or report["beaconNativePeers"]<1):
+            raise r141.Refused("live native EL/CL peering not established")
         return {
             "schema":SCHEMA,"nodeId":node,
             "observedAtUtc":datetime.now(timezone.utc).isoformat(),
