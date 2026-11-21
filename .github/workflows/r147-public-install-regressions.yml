@@ -29,6 +29,10 @@ jobs:
         run: python3 -B -m unittest discover -s tests -p 'test_sse_join_phase.py' -v
       - name: R149 original public-genesis release verification
         run: python3 -B -m unittest discover -s tests -p 'test_sse_public_genesis.py' -v
+      - name: R150 exact original genesis public-only export
+        run: python3 -B -m unittest discover -s tests -p 'test_sse_pos_r150_verified_genesis_release.py' -v
+      - name: R151 local-role-authorized unattended real EL CL runtime tests
+        run: python3 -B -m unittest discover -s tests -p 'test_sse_pos_r151_unattended_full_node.py' -v
       - name: All relevant unified/VM onboarding guard tests
         run: |
           python3 -B -m unittest discover -s tests -p 'test_sse_join.py' -v
