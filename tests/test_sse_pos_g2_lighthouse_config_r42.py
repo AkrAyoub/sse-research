@@ -75,6 +75,19 @@ class R42PinnedLighthouseConfigTests(unittest.TestCase):
         with self.assertRaisesRegex(ConfigRefused, "missing mandatory config"):
             synthesize(self.baseline.replace("SECONDS_PER_ETH1_BLOCK:", "SECONDS_PER_ETH1_BLOCK_X:"), self.original)
 
+    def test_resume_rechecks_exact_upstream_render_and_r34_backup(self):
+        source = (ROOT / "tools/sse_pos_g2_resume_r41.py").read_text("utf-8")
+        self.assertIn("BASELINE_GIT_BLOB", source)
+        self.assertIn("old.safe_public(BACKUP", source)
+        self.assertIn("synthesize(", source)
+        self.assertIn('if name != "testnet/config.yaml":', source)
+
+    def test_original_public_config_backup_is_hardlinked_without_destroying_ssz(self):
+        source = (ROOT / "tools/sse_pos_g2_lighthouse_config_r42.py").read_text("utf-8")
+        self.assertIn("os.link(TARGET, BACKUP)", source)
+        self.assertIn("os.replace(TEMP, TARGET)", source)
+        self.assertIn("testnet/genesis.ssz", source)
+
     def test_repair_never_starts_docker_or_modifies_keys(self):
         source = (ROOT / "tools/sse_pos_g2_lighthouse_config_r42.py").read_text("utf-8")
         self.assertNotIn('"start"', source)
