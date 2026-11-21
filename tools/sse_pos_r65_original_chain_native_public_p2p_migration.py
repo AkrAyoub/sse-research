@@ -458,6 +458,8 @@ def read_only_plan(commit:str)->tuple[dict,dict,dict]:
         "oldELAndBNContainersPreservedStoppedForRollback":list(PRESERVED.values()),
         "nativeOutsideProviderP2pPeerAndContinuedFinalityStillUnverified":True,
         "ownerBackupAndMaintenanceConsentRequiredBeforeApply":True,
+        "singleVmRecoveryRiskModeAvailableWithSeparateTypedWarning":True,
+        "singleVmRiskModeStillRequiresVerifiedStoppedOriginalStateSnapshot":True,
         "additionalConsistentLocalOwnerStateSnapshotPlannedAfterStop":True,
         "additionalSnapshotMustVerifyBeforeOriginalDatabaseReopen":True,
         "additionalSnapshotMustBeProtectedAndCopiedOfflineByOwner":True,
@@ -516,10 +518,14 @@ def rollback(renamed:set[str],created:set[str])->None:
     except R65Refused:
         print("R65_ROLLBACK_HEALTH_UNVERIFIED_ORIGINAL_SIGNER_LEFT_STOPPED=true",file=sys.stderr,flush=True)
 
-def apply(commit:str, backup_attested:bool)->dict:
+def apply(
+    commit:str,backup_attested:bool,accept_single_vm_recovery_risk:bool=False
+)->dict:
     plan,el,bn=read_only_plan(commit)
-    if not backup_attested:
-        raise R65Refused("owner has not attested recoverable signing/chain backup")
+    if backup_attested and accept_single_vm_recovery_risk:
+        raise R65Refused("choose either verified external backup or single-VM risk, not both")
+    if not backup_attested and not accept_single_vm_recovery_risk:
+        raise R65Refused("require an honestly declared backup mode before original maintenance")
     if not (sys.stdin.isatty() and sys.stderr.isatty()):
         raise R65Refused("local owner terminal required")
     print("R65 WILL STOP the sole original VC, Beacon and EL and recreate ONLY the "
@@ -533,6 +539,16 @@ def apply(commit:str, backup_attested:bool)->dict:
           "material, JWT and chain databases. Protect and encrypt it offline. "
           "Do not rerun after partial failure.",
           file=sys.stderr,flush=True)
+    if accept_single_vm_recovery_risk:
+        print("R65_SINGLE_VM_RISK=EXTERNAL_BACKUP_ABSENT: This is a "
+              "higher-risk experiment. A loss, deletion or corruption of "
+              "VM4706 or its storage can permanently destroy original "
+              "chain31340 and the only validator's recoverable state. "
+              "The local R66 archive is NOT independently protected.",
+              file=sys.stderr,flush=True)
+        loss_token=input("Type I-ACCEPT-PERMANENT-CHAIN-LOSS-RISK: ")
+        if loss_token!="I-ACCEPT-PERMANENT-CHAIN-LOSS-RISK":
+            raise R65Refused("single-VM recovery risk not explicitly accepted")
     token=input("Type MIGRATE-EXISTING-CHAIN31340-NATIVE-P2P: ")
     if token!="MIGRATE-EXISTING-CHAIN31340-NATIVE-P2P":
         raise R65Refused("explicit owner maintenance approval absent")
@@ -582,6 +598,8 @@ def apply(commit:str, backup_attested:bool)->dict:
         # Original validator is resumed only after authentic EL/BN chain API.
         print("R65_ORIGINAL_SINGLE_VALIDATOR_RESTARTED=true",flush=True)
         return {**plan,**ports,**snapshot,"mode":"owner_approved_original_state_native_p2p_migrated",
+                "externalBackupIndependentlyVerified":False,
+                "singleVmRecoveryRiskAcceptedByOperator":accept_single_vm_recovery_risk,
                 "nothingModifiedByPlan":False,
                 "originalSingleSignerRunningAfterMaintenance":True,
                 "originalOldELAndBeaconContainersStoppedPreserved":True,
@@ -597,13 +615,19 @@ def main()->int:
     x.add_argument("--plan",action="store_true")
     x.add_argument("--apply",action="store_true")
     p.add_argument("--expected-commit",required=True)
-    p.add_argument("--backup-attested",action="store_true")
+    authorization=p.add_mutually_exclusive_group()
+    authorization.add_argument("--backup-attested",action="store_true")
+    authorization.add_argument("--accept-single-vm-recovery-risk",action="store_true")
     args=p.parse_args()
     try:
         if args.plan:
             result,_,_=read_only_plan(args.expected_commit)
         else:
-            result=apply(args.expected_commit,args.backup_attested)
+            result=apply(
+                args.expected_commit,
+                args.backup_attested,
+                args.accept_single_vm_recovery_risk
+            )
         print(json.dumps(result,sort_keys=True,indent=2))
         return 0
     except R65Refused as exc:
