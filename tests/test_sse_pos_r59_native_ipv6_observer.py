@@ -26,7 +26,7 @@ class R59NativeObserverTests(unittest.TestCase):
     def test_overlay_p2p_bind_exact_ipv6_not_wildcard(self):
         ip = "fca0:2328:77b8:6578:a55::1"
         self.assertEqual(m.port_bindings(ip, True), [
-            f"[{ip}]:30303:30303/tcp", f"[{ip}]:30303:30303/udp",
+            f"[{ip}]:30404:30404/tcp", f"[{ip}]:30404:30404/udp",
             "127.0.0.1:28545:8545/tcp"])
         self.assertEqual(m.port_bindings(ip, False), [
             f"[{ip}]:9000:9000/tcp", f"[{ip}]:9000:9000/udp",
@@ -51,7 +51,18 @@ class R59NativeObserverTests(unittest.TestCase):
             m.bootnodes("enr:" + "A"*90, "enr:" + "A"*90)
         with self.assertRaises(m.R59Refused):
             m.bootnodes("enode://" + "A"*90, "enr:" + "B"*90)
-        self.assertTrue(m.bootnodes("enr:" + "A"*90, "enr:" + "B"*90))
+        # Besu EL wants enode URL (not consensus ENR); Lighthouse wants ENR.
+        enode6 = "enode://" + "a"*128 + "@[fca0:2328:776e:4750:395b::1]:30404"
+        self.assertTrue(m.bootnodes(enode6, "enr:" + "B"*90))
+        with self.assertRaises(m.R59Refused):
+            m.bootnodes("enode://" + "a"*128 + "@[2001:db8::1]:30404", "enr:" + "B"*90)
+
+    def test_besu_separate_ipv6_port_and_seed_protocol(self):
+        src=(ROOT/"tools/sse_pos_r59_native_ipv6_observer.py").read_text("utf-8")
+        self.assertIn('"--p2p-port-ipv6=30404"',src)
+        self.assertIn('p.add_argument("--execution-seed-enode-v6")',src)
+        self.assertNotIn('"--p2p-port-ipv6=30303"',src)
+        self.assertNotIn('p.add_argument("--execution-seed-enr")',src)
 
     def test_verify_image_id_platform_does_not_accept_tag_only(self):
         with patch.object(m, "docker", side_effect=["sha256:"+"b"*64, "linux/amd64"]):
@@ -89,8 +100,8 @@ class R59NativeObserverTests(unittest.TestCase):
     def test_docker_host_port_postinspection_exact_match(self):
         ip = "fca0:2328:77b8:6578:a55::1"
         config = {
-            "30303/tcp": [{"HostIp": ip, "HostPort": "30303"}],
-            "30303/udp": [{"HostIp": ip, "HostPort": "30303"}],
+            "30404/tcp": [{"HostIp": ip, "HostPort": "30404"}],
+            "30404/udp": [{"HostIp": ip, "HostPort": "30404"}],
             "8545/tcp": [{"HostIp": "127.0.0.1", "HostPort": "28545"}],
         }
         with patch.object(m, "docker", side_effect=[m.BESU_ID, json.dumps(config)]):
@@ -99,8 +110,8 @@ class R59NativeObserverTests(unittest.TestCase):
     def test_refuse_unplanned_exposure_after_container_start(self):
         ip = "fca0:2328:77b8:6578:a55::1"
         config = {
-            "30303/tcp": [{"HostIp": ip, "HostPort": "30303"}],
-            "30303/udp": [{"HostIp": ip, "HostPort": "30303"}],
+            "30404/tcp": [{"HostIp": ip, "HostPort": "30404"}],
+            "30404/udp": [{"HostIp": ip, "HostPort": "30404"}],
             "8545/tcp": [{"HostIp": "0.0.0.0", "HostPort": "28545"}],
         }
         with patch.object(m, "docker", side_effect=[m.BESU_ID, json.dumps(config)]):
