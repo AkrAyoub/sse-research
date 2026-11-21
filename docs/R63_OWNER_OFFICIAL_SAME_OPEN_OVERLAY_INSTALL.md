@@ -32,7 +32,7 @@ Use owner-local GitHub read-only fetch, pinned detached checkout, run **16 R63 r
   cd "$HOME/sse-research"
   export GIT_SSH_COMMAND="ssh -i $HOME/.ssh/sse_vm4706_readonly -o IdentitiesOnly=yes -o StrictHostKeyChecking=yes -o BatchMode=yes"
   git fetch --no-tags origin feature/r19-fresh-external-node-preflight
-  SHA="bfd604f6f379d18980de4154cea4bf5f0e38fd57"
+  SHA="9f2eaee97c234afadf1de1dc47492a8a4d5b31ac"
   git switch --detach "$SHA"
   test "$(git rev-parse HEAD)" = "$SHA"
   python3 -B -m unittest discover -s tests -p 'test_sse_pos_r63_owner_open_overlay_install.py' -v
