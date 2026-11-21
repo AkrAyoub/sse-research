@@ -22,6 +22,7 @@ import sse_pos_r136_independent_observer_preflight as r136
 import sse_pos_r137_independent_observer_create_once as r137
 import sse_pos_r142_public_peer_discovery as r142
 import sse_public_genesis as public_genesis
+import sse_pos_r152_unattended_host_dependencies as host_packages
 
 class Refused(ValueError):
     pass
@@ -171,6 +172,10 @@ def main(argv=None):
         # Archive is verified before being staged in the previously tested
         # R59 path (only for execute, never for plan).
         if args.execute:
+            # Actual fresh-host dependencies, not the user's manual task:
+            # signed Ubuntu Docker, verified ZeroTier package installer,
+            # controllerless public overlay and immutable OCI image digests.
+            host_packages.setup(execute=True)
             archive=prepare_original_archive(archive)
         ready=plan(selection,descriptor,archive,
                    observe=r137.preflight if args.execute else None)
@@ -200,7 +205,7 @@ def main(argv=None):
         print(json.dumps(ready,sort_keys=True,indent=2,default=str))
         return 0
     except (Refused,r59.R59Refused,r136.Refused,r137.Refused,
-            r142.Refused,public_genesis.Refused,OSError,ValueError,TypeError,KeyError) as exc:
+            r142.Refused,public_genesis.Refused,host_packages.Refused,OSError,ValueError,TypeError,KeyError) as exc:
         print("R151_UNATTENDED_NODE_REFUSED: "+str(exc),file=sys.stderr)
         return 2
 
