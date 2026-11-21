@@ -124,16 +124,16 @@ class R65NativePublicOwnerMigrationTests(unittest.TestCase):
 
     def test_rollback_never_deletes_original_containers_before_rename(self):
         with patch.object(m,"docker",return_value="true") as run,patch.object(
-             m,"wait_client",return_value=True):
+             m,"wait_client",return_value=True),patch.object(m,"start_if_stopped") as start:
             m.rollback(set(),set())
         args=[x.args[0] for x in run.call_args_list]
         self.assertFalse(any(a[0]=="rm" for a in args))
         self.assertFalse(any(a[0]=="rename" for a in args))
-        self.assertIn(["start",m.VC],args)
+        start.assert_any_call(m.VC)
 
     def test_rollback_removes_only_created_new_and_restores_exact_old_names(self):
         with patch.object(m,"docker",return_value="true") as run,patch.object(
-             m,"wait_client",return_value=True):
+             m,"wait_client",return_value=True),patch.object(m,"start_if_stopped") as start:
             m.rollback({m.EL,m.BN},{m.EL,m.BN})
         args=[x.args[0] for x in run.call_args_list]
         self.assertIn(["rm",m.EL],args)
@@ -142,6 +142,14 @@ class R65NativePublicOwnerMigrationTests(unittest.TestCase):
         self.assertIn(["rename",m.PRESERVED[m.BN],m.BN],args)
         self.assertNotIn(["rm",m.VC],args)
         self.assertNotIn(["rename",m.VC,m.VC],args)
+
+    def test_rollback_does_not_restart_already_running_client(self):
+        with patch.object(m,"get_json",return_value={"Running":True}),patch.object(m,"docker") as run:
+            m.start_if_stopped(m.EL)
+        run.assert_not_called()
+        with patch.object(m,"get_json",return_value={"Running":False}),patch.object(m,"docker") as run:
+            m.start_if_stopped(m.BN)
+        run.assert_called_once_with(["start",m.BN],timeout=35)
 
     def test_original_validator_only_started_after_EL_and_BN_healthy(self):
         source=(ROOT/"tools/sse_pos_r65_original_chain_native_public_p2p_migration.py").read_text("utf-8")
