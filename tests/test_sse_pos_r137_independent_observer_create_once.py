@@ -24,8 +24,8 @@ class R137Tests(unittest.TestCase):
                 m.require_absent(Path("/already-present"), m.names("other-operator"))
 
     def test_existing_resources_block_creation(self):
-        with patch.object(Path, "exists", return_value=False), \\
-             patch.object(Path, "is_symlink", return_value=False), \\
+        with patch.object(Path, "exists", return_value=False), \
+             patch.object(Path, "is_symlink", return_value=False), \
              patch.object(m.r59, "resource_exists", side_effect=[False, True]):
             with self.assertRaises(m.Refused):
                 m.require_absent(Path("/absent"), m.names("third-party"))
@@ -41,8 +41,8 @@ class R137Tests(unittest.TestCase):
         def fake_docker(command, timeout=25):
             captured.append(command)
             return "dummy"
-        with patch.object(m.r59, "docker", side_effect=fake_docker), \\
-             patch.object(m.os, "geteuid", return_value=1000), \\
+        with patch.object(m.r59, "docker", side_effect=fake_docker), \
+             patch.object(m.os, "geteuid", return_value=1000), \
              patch.object(m.os, "getegid", return_value=1000):
             m.docker_run("pinned", "independent-el", "independent-network",
                          Path("/home/operator/state"),
@@ -60,8 +60,8 @@ class R137Tests(unittest.TestCase):
     def test_refuses_noninteractive_apply_without_mutation(self):
         plan = {"resources": m.names("third-party"), "root": Path("/tmp/unused"),
                 "ip": "fca0:2328:7777:8888:9999::1"}
-        with patch.object(m.sys.stdin, "isatty", return_value=False), \\
-             patch.object(m.sys.stderr, "isatty", return_value=False), \\
+        with patch.object(m.sys.stdin, "isatty", return_value=False), \
+             patch.object(m.sys.stderr, "isatty", return_value=False), \
              patch.object(m.r59, "docker") as docker:
             with self.assertRaises(m.Refused):
                 m.apply(plan, "dummy", "dummy")
@@ -72,7 +72,7 @@ class R137Tests(unittest.TestCase):
                 "manifest": {"nodeId": "third-party"},
                 "ip": "fca0:2328:7777:8888:9999::1",
                 "resources": m.names("third-party"),
-                "root": Path("/tmp/third-party")}), \\
+                "root": Path("/tmp/third-party")}), \
              patch.object(m, "apply") as apply:
             self.assertEqual(m.main([
                 "--plan", "--manifest", "/tmp/manifest",
