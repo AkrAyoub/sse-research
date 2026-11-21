@@ -48,3 +48,9 @@ Incident date: 2026-11-21. Applies to VM4706 owner / VM4707 non-signing observer
 3. Enable and verify guarded boot recovery on both known VMs only after code review. Test repeated reboots, delayed overlay allocation, Docker restart and restored network attachments, relay startup ordering, idempotence and no validator auto-sign.
 4. Confirm actual native EL/CL peers both sides, current matching finalized checkpoints, valid chainID/genesis and honest state transitions after safe manual validator recovery.
 5. Add CI tests for all failure modes, integration tests on isolated ephemeral test networks, rollback actions, structured logs/alerts; only then promote GitHub PR.
+
+## R102 verified namespace-port discrepancy, 2026-11-21
+- A real packet capture shows VM4707 native EL IPv6 UDP 30404 reaches owner overlay and is forwarded by R92 as AF_INET 172.18.0.1:55842 -> 172.18.0.2:30404, with no captured response.
+- The owner Besu network namespace actually binds IPv4 UDP 0.0.0.0:30303 and a separate wildcard IPv6 UDP 30404; both TCP 30303 and 30404 are listening. The original relay mistakenly used internal IPv4 destination port 30404 for native host IPv6 port 30404. R102 changes BOTH TCP and UDP EL upstream to 172.18.0.2:30303, retaining public native IPv6 30404; this is a proposed targeted fix requiring VM4706 and VM4707 peer verification.
+- Lighthouse listens on IPv6 [::]:9000 UDP/TCP and [::]:9001 UDP; current relay uses IPv4 upstream to 172.18.0.3:9000/9001. IPv4-mapped transport support is UNPROVEN, so CL remains a separate open acceptance test. Do not infer it is fixed by changing Besu ports.
+- Besu's repeated EngineQosTimer warning and Lighthouse no-peer logs are still unresolved. Do not start validator or assert finality before Engine relation + EL/CL peering are positively demonstrated.
