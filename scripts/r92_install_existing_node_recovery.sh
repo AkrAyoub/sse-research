@@ -22,7 +22,18 @@ if [[ "$MODE" == "--plan" ]]; then
 fi
 sudo -n install -D -m 0755 "$TOOL" /usr/local/libexec/sse_pos_r92_guarded_existing_node_recovery.py
 sudo -n install -m 0644 "$UNIT" /etc/systemd/system/sse31340-existing-node-recover@.service
+if [[ "$ROLE" == observer ]]; then
+  sudo -n install -m 0644 "$ROOT/systemd/sse31340-observer-network-recovery.timer" \
+    /etc/systemd/system/sse31340-observer-network-recovery.timer
+fi
 sudo -n systemctl daemon-reload
-sudo -n systemctl enable "sse31340-existing-node-recover@$ROLE.service"
-echo "R92_EXISTING_NODE_RECOVERY_ENABLED_NEXT_BOOT=true role=$ROLE"
-echo "NOTE: unit is only enabled, NOT started in this installation."
+if [[ "$ROLE" == observer ]]; then
+  sudo -n systemctl enable --now sse31340-observer-network-recovery.timer
+  # After the timer has been enabled, retire the original boot-only trigger.
+  sudo -n systemctl disable "sse31340-existing-node-recover@$ROLE.service"
+  echo "R113_OBSERVER_PERIODIC_RECOVERY_TIMER_ENABLED=true"
+else
+  sudo -n systemctl enable "sse31340-existing-node-recover@$ROLE.service"
+  echo "R92_EXISTING_NODE_RECOVERY_ENABLED_NEXT_BOOT=true role=$ROLE"
+fi
+echo "NOTE: installation itself does not restart Ethereum containers."
