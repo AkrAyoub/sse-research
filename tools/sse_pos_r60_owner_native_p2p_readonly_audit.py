@@ -34,7 +34,7 @@ COMMIT = re.compile(r"[a-f0-9]{40}\Z")
 HEXNUM = re.compile(r"0x[0-9a-fA-F]{1,20}\Z")
 ROOT_HASH = re.compile(r"0x[a-fA-F0-9]{64}\Z")
 SAFE_FLAGS = (
-    "p2p-enabled", "p2p-interface", "p2p-interface-ipv6", "p2p-host-ipv6",
+    "p2p-enabled", "p2p-interface", "p2p-host", "p2p-interface-ipv6", "p2p-host-ipv6",
     "p2p-port", "p2p-port-ipv6", "discovery-enabled", "discovery-mode",
     "listen-address", "port", "port6", "discovery-port", "discovery-port6",
     "quic-port", "quic-port6", "enable-private-discovery",
