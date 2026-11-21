@@ -77,7 +77,7 @@ At immutable Git SHA `ada6cf9bc84a1fd6944e6c7a40b1feff2901ef7c`, VM4706 operator
  cd "$HOME/sse-research"
  export GIT_SSH_COMMAND="ssh -i $HOME/.ssh/sse_vm4706_readonly -o IdentitiesOnly=yes -o StrictHostKeyChecking=yes -o BatchMode=yes"
  git fetch --no-tags origin feature/r19-fresh-external-node-preflight
- SHA="a65253b4300282e81356a17ac4a41605ee111785"
+ SHA="7b4d7c9afe5fb389abfa9fb333e645c6f15c6e7c"
  git switch --detach "$SHA"
  test "$(git rev-parse HEAD)" = "$SHA"
  python3 -B -m unittest discover -s tests -p 'test_sse_pos_r65_original_chain_native_public_p2p_migration.py' -v
@@ -89,6 +89,12 @@ At immutable Git SHA `ada6cf9bc84a1fd6944e6c7a40b1feff2901ef7c`, VM4706 operator
 ```
 
 `--plan` does NOT create the new Docker network, stop or rename containers, modify existing data, change client flags, or enable P2P. Original owner/source checks may REFUSE an unexpected existing security config, additional mount, image/env mismatch, or ZeroTier state rather than guessing. Diagnose first, do not weaken the guard without actual VM evidence.
+
+### Urgent experimental migration option — no independent backup (requires local owner double consent)
+
+This is an intentional *higher-risk non-mainnet* path chosen by the project owner. The last observed testnet state has 47 private files (0.211GiB) and 91.029GiB owner-VM free disk; R66 local-snapshot space guard passed. Offline/independent backup is **absent**. The consented R65 `--apply --accept-single-vm-recovery-risk` does NOT claim one exists, but still requires all 41 focused source tests, actual read-only plan, double typed owner permission, local consistent R66 stopped-state snapshot verification, original EL/BN+signer preservation and auto-rollback on failure. **Losing VM4706 or its disk could permanently lose the single original chain and validator state.** No backup materials go to VM4707 or public GitHub.
+
+**First run new 41 focused R65 regression tests and actual read-only plan at exact immutable Git source. Then, if BOTH succeed and owner still accepts risk, a separate interactive `--apply` is available at that same SHA.** The local TTY will require `I-ACCEPT-PERMANENT-CHAIN-LOSS-RISK` and `MIGRATE-EXISTING-CHAIN31340-NATIVE-P2P`, and will display the snapshot warning before any stop. Do not use `--backup-attested` unless an external recoverable backup genuinely exists. Do not rerun an interrupted apply; inspect saved state and stage output. This is only native owner P2P startup; independent peer/distributed finality verification remains pending.
 
 ### Separately approved controlled maintenance (NOT YET TO RUN)
 
