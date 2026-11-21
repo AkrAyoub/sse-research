@@ -113,19 +113,23 @@ def load_public_record(path):
     except (UnicodeError,ValueError) as exc:
         raise Refused("untrusted public node record JSON") from exc
 
-def write_new(path,content):
+def write_rotating(path,content):
+    """Safe atomic replacement for expiring native P2P hint directories."""
     target=Path(path)
-    if target.exists() or target.is_symlink():
-        raise Refused("never overwrite already published public directory")
+    if target.is_symlink() or (target.exists() and not target.is_file()):
+        raise Refused("public directory target is not a regular file")
     target.parent.mkdir(parents=True,exist_ok=True)
-    wire=(json.dumps(content,sort_keys=True,indent=2)+"\n").encode()
+    wire=(json.dumps(content,sort_keys=True,indent=2)+"\\n").encode()
     if len(wire)>r142.MAX_BYTES:
         raise Refused("public peer directory exceeds bounded size")
-    fd=os.open(target,os.O_CREAT|os.O_EXCL|os.O_WRONLY|os.O_NOFOLLOW,0o644)
-    with os.fdopen(fd,"wb") as out:
+    with tempfile.NamedTemporaryFile(
+            dir=target.parent,mode="wb",prefix=".r157-",delete=False) as out:
+        staged=Path(out.name)
+        os.fchmod(out.fileno(),0o644)
         out.write(wire)
         out.flush()
         os.fsync(out.fileno())
+    os.replace(staged,target)
     return target
 
 def main(argv=None):
@@ -136,7 +140,7 @@ def main(argv=None):
     try:
         now=int(datetime.now(timezone.utc).timestamp())
         report=build([load_public_record(x) for x in args.record],now=now)
-        write_new(args.out,report)
+        write_rotating(args.out,report)
         print(json.dumps({
             "schema":"SSE_R157_PUBLIC_DIRECTORY_CANDIDATE_V1",
             "candidateNodeCount":len(report["peers"]),
