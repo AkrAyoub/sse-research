@@ -39,6 +39,12 @@ class R60OwnerP2pAuditTests(unittest.TestCase):
         with self.assertRaises(r.R60Refused):
             r.safe_flags([None])
 
+    def test_p2p_host_is_allowed_and_validated_without_exposing_private_data(self):
+        self.assertEqual(r.safe_flags(["--p2p-host=127.0.0.1"]),
+                         {"p2p-host": ["127.0.0.1"]})
+        with self.assertRaises(r.R60Refused):
+            r.safe_flags(["--p2p-host=secret&token"])
+
     def test_sanitize_cmd_preserves_no_nonallowlisted_args(self):
         opts = r.safe_flags(["--password=abc", "--engine-host-allowlist=secret",
                              "--execution-jwt=/run/secret", "--port6=9000"])
