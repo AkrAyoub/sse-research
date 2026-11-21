@@ -34,10 +34,6 @@ class R66ConsistentOwnerSnapshotTests(unittest.TestCase):
         class FakeProc:
             returncode=0
             stdout="false\n"
-        with patch.object(m,"subprocess",create=True) as p:
-            # This test uses actual imported subprocess via patching run instead,
-            # so mock the call from the function's global lookup directly.
-            pass
         import subprocess
         with patch.object(subprocess,"run",return_value=FakeProc()) as run:
             m.require_stopped_docker(ORIGINAL)
