@@ -31,7 +31,10 @@ class _NoRedirect(urllib.request.HTTPRedirectHandler):
         return None
 
 def send_https(url, payload):
-    r142.check_source(url)
+    try:
+        r142.check_source(url)
+    except r142.Refused as exc:
+        raise Refused("unapproved public HTTPS mirror URL") from exc
     if not url.endswith("/peers.json"):
         raise Refused("reviewed directory submission endpoint must be /peers.json")
     wire=json.dumps(payload,sort_keys=True,separators=(",",":")).encode()
