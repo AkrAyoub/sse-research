@@ -99,6 +99,8 @@ def unit_contents(release, node_id):
         "ReadWritePaths=/var/lib/sse/evidence\n"
         f"ExecStart=/usr/bin/python3 -B {script} --node-id {node_id} "
         "--out /var/lib/sse/evidence/latest.json\n"
+        f"ExecStartPost=-/usr/bin/python3 -B {release / 'tools/sse_pos_r156_local_native_peer_identity.py'} "
+        f"--node-id {node_id} --out /var/lib/sse/evidence/public-peer.json\n"
     )
     timer=(
         "[Unit]\nDescription=Periodic chain31340 local client evidence\n\n"
