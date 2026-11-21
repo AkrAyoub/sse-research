@@ -76,7 +76,8 @@ class PublicArtifactTests(unittest.TestCase):
         obj["originalGenesisArchiveSources"]=["https://mirror.example.org/genesis.tar.gz"]
         obj["currentPublicReleaseStatus"]="PUBLIC_GENESIS_MIRRORED_NATIVE_DISCOVERY_PENDING"
         with tempfile.TemporaryDirectory() as tmp, \
-             patch.object(m,"ARCHIVE_SHA",hashlib.sha256(data).hexdigest()):
+             patch.object(m,"ARCHIVE_SHA",hashlib.sha256(data).hexdigest()), \
+             patch.object(m.original_release,"verify",return_value={"sha256":hashlib.sha256(data).hexdigest()}):
             # Release manifest is intentionally pinned to the real hash; update
             # only the pure fixture here to simulate a verified byte stream.
             obj["originalGenesisArchiveSha256"]=m.ARCHIVE_SHA
