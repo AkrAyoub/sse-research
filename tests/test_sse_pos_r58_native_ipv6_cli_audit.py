@@ -110,10 +110,10 @@ class R58NativeIpv6AuditTests(unittest.TestCase):
                          {"engine-rpc-port", "engine-host-allowlist", "engine-jwt-secret"})
 
     def test_engine_header_allowlist_does_not_count_as_bind_isolation(self):
-        with patch.object(m, "signer_guard"), patch.object(m, "archive_guard", return_value=16218), \\
-             patch.object(m, "membership", return_value=("ztrb6cq527", "fca0:2328:77b8:6578:a55::1")), \\
-             patch.object(m, "run", side_effect=["29.1.3", ""]), \\
-             patch.object(m, "verify_image"), \\
+        with patch.object(m, "signer_guard"), patch.object(m, "archive_guard", return_value=16218), \
+             patch.object(m, "membership", return_value=("ztrb6cq527", "fca0:2328:77b8:6578:a55::1")), \
+             patch.object(m, "run", side_effect=["29.1.3", ""]), \
+             patch.object(m, "verify_image"), \
              patch.object(m, "offline_help", side_effect=[
                  " ".join("--"+n for n in (*m.REQUIRED_BESU_IPV6, *m.REQUIRED_BESU_ENGINE)),
                  " ".join("--"+n for n in m.REQUIRED_LIGHTHOUSE),
