@@ -16,7 +16,7 @@ The GitHub R58 Python is standard library only. It requires Linux x86_64, origin
   cd "$HOME/sse-research"
   export GIT_SSH_COMMAND="ssh -i $HOME/.ssh/sse_vm4706_readonly -o IdentitiesOnly=yes -o StrictHostKeyChecking=yes -o BatchMode=yes"
   git fetch --no-tags origin feature/r19-fresh-external-node-preflight
-  SHA="389486ad754e8a1f77d1136422cd5eb5f092407"
+  SHA="79cf0837772845ec56573a5aa0863448acd03093"
   git switch --detach "$SHA"
   test "$(git rev-parse HEAD)" = "$SHA"
   python3 -B -m unittest discover -s tests -p 'test_sse_pos_r58_native_ipv6_cli_audit.py' -v
