@@ -28,7 +28,7 @@ from sse_monitor_public_snapshot import (
 import monitor_discovery
 
 spec=importlib.util.spec_from_file_location(
-    "role_agent_snapshot_ui",ROOT/"services"/"role-agent"/"agent.py")
+    "role_agent_snapshot_ui",ROOT/"services"/"node-console"/"agent.py")
 agent=importlib.util.module_from_spec(spec)
 sys.modules[spec.name]=agent
 spec.loader.exec_module(agent)
