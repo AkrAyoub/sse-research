@@ -1,5 +1,6 @@
 #!/usr/bin/env bash
-# R145: guarded create-once source bootstrap for a FRESH SSE operator VM.
+# R145 HISTORICAL LAB PROTOTYPE; interactive apply is disabled by R146.
+# NOT the zero-interaction onboarding installer; see docs/R146_ZERO_INTERACTION_CORRECTIVE_ARCHITECTURE_AUDIT.md.
 # No Ethereum node, validator, Docker, ZeroTier, wallet, or role is started.
 set -Eeuo pipefail
 
@@ -12,7 +13,7 @@ Usage:
 The repository is private. Provision a per-host READ-ONLY GitHub deploy key
 and independently authenticated github.com SSH host key first.
 --plan never installs packages, writes files, or talks to GitHub.
---apply obtains explicit local approval, installs only basic source tooling,
+--apply is RETIRED (fails closed). Historical code below remains for audit.
 clones this single repository at a reviewed immutable SHA and runs the
 unified NONMUTATING role-selection plan. No other components are installed.
 HELP
@@ -86,6 +87,9 @@ if [[ "$MODE" == '--plan' ]]; then
   exit 0
 fi
 
+# R146: never execute the legacy manual SSH-key + typed-prompt installer.
+# Retain read-only plan support only for regression/provenance history.
+refuse 'R145 manual apply retired: use reviewed zero-interaction infrastructure bootstrap (R146)' 
 [[ "$EUID" != 0 ]] || refuse 'run apply as ordinary local owner, not root'
 [[ -t 0 && -t 2 ]] || refuse 'create-once apply requires an interactive local terminal'
 printf '%s\n' 'R145 installs ONLY basic git/Python/SSH source tools and clones pinned SSE source.' \
