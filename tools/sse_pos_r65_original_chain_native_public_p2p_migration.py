@@ -22,6 +22,7 @@ import time
 import sse_pos_r64_owner_native_public_p2p_migration_audit as r64
 import sse_pos_r62_original_container_namespace_health as r62
 import sse_pos_r59_native_ipv6_observer as r59
+import sse_pos_r66_consistent_owner_recovery_snapshot as r66
 
 OWNER=r64.r63.r60
 EL=OWNER.EL
@@ -438,6 +439,9 @@ def read_only_plan(commit:str)->tuple[dict,dict,dict]:
         "oldELAndBNContainersPreservedStoppedForRollback":list(PRESERVED.values()),
         "nativeOutsideProviderP2pPeerAndContinuedFinalityStillUnverified":True,
         "ownerBackupAndMaintenanceConsentRequiredBeforeApply":True,
+        "additionalConsistentLocalOwnerStateSnapshotPlannedAfterStop":True,
+        "additionalSnapshotMustVerifyBeforeOriginalDatabaseReopen":True,
+        "additionalSnapshotMustBeProtectedAndCopiedOfflineByOwner":True,
         "originalELWorkdirPreservedWithoutPrintingHostPaths":True,
         "originalBNWorkdirPreservedWithoutPrintingHostPaths":True,
         "originalELWorkdirDiffersFromImageDefault":el["originalWorkdirDiffersFromImageDefault"],
@@ -523,6 +527,16 @@ def apply(commit:str, backup_attested:bool)->dict:
         destructive_started=True
         for name in (VC,BN,EL):
             docker(["stop","--time","90",name],timeout=110)
+        # Consistent local snapshot MUST finish before either original
+        # database is opened by a replacement client. No new signer is cloned
+        # or started. Archive stays owner-only on this same VM.
+        print("R65_STAGE=CREATE_AND_VERIFY_STOPPED_OWNER_RECOVERY_SNAPSHOT",flush=True)
+        snapshot=r66.snapshot_consistent_original_state(
+            OWNER.OWNER,(EL,BN,VC)
+        )
+        if snapshot.get("consistentStoppedOwnerSnapshotVerified") is not True:
+            raise R65Refused("original consistent recovery snapshot was not verified")
+        print("R65_ORIGINAL_STOPPED_STATE_RECOVERY_SNAPSHOT_VERIFIED=true",flush=True)
         for name in (EL,BN):
             docker(["rename",name,PRESERVED[name]],timeout=30)
             renamed.add(name)
@@ -543,12 +557,12 @@ def apply(commit:str, backup_attested:bool)->dict:
             raise R65Refused("original VC failed to restart")
         # Original validator is resumed only after authentic EL/BN chain API.
         print("R65_ORIGINAL_SINGLE_VALIDATOR_RESTARTED=true",flush=True)
-        return {**plan,**ports,"mode":"owner_approved_original_state_native_p2p_migrated",
+        return {**plan,**ports,**snapshot,"mode":"owner_approved_original_state_native_p2p_migrated",
                 "nothingModifiedByPlan":False,
                 "originalSingleSignerRunningAfterMaintenance":True,
                 "originalOldELAndBeaconContainersStoppedPreserved":True,
                 "externalNativeEthereumP2pSyncAndFinalizedRootMatchObserved":False}
-    except (R65Refused,KeyboardInterrupt,ValueError,OSError,TypeError,KeyError):
+    except (R65Refused,r66.R66Refused,KeyboardInterrupt,ValueError,OSError,TypeError,KeyError):
         if destructive_started:
             rollback(renamed,created)
         raise R65Refused("owner migration failed; recovery attempted, inspect state before any retry")
