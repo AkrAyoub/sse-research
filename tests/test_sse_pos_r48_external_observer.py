@@ -72,6 +72,12 @@ class R48NonsigningIndependentObserverTests(unittest.TestCase):
         self.assertIn('"sourceOnlyEnrSyntaxNotCryptographicVerification": True', src)
         self.assertIn('"noServicesCreatedOrChanged": False', src)
 
+    def test_fresh_non_signing_lighthouse_genesis_sync_is_explicitly_disclaimed(self):
+        src = (ROOT/"tools/sse_pos_r48_external_observer.py").read_text("utf-8")
+        self.assertIn('"--allow-insecure-genesis-sync"', src)
+        self.assertIn("weak-subjectivity", src)
+        self.assertIn('"realExternalFinalityVerified": False', src)
+
     def test_apply_is_one_time_and_explicitly_approved(self):
         source = (ROOT/"tools/sse_pos_r48_external_observer.py").read_text("utf-8")
         self.assertIn("START-EXTERNAL-31340-OBSERVER", source)
