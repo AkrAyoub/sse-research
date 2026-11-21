@@ -156,6 +156,21 @@ def verify_unmodified_image_launch_config(
     return override
 
 
+def safe_original_restart_policy(value:object)->str:
+    """Never let an old stopped signer or client auto-restart on daemon restart.
+
+    Docker 'always' can restart a previously stopped preserved original
+    container after daemon restart, risking concurrent database access.
+    'no' and 'unless-stopped' remain stopped after operator docker stop.
+    """
+    if not isinstance(value,dict):
+        raise R65Refused("original Docker restart-policy metadata invalid")
+    policy=value.get("Name")
+    if policy not in ("no","unless-stopped"):
+        raise R65Refused("original container has unsafe automatic restart policy")
+    return policy
+
+
 def original_definition(name:str)->dict:
     if name not in (EL,BN):
         raise R65Refused("only original execution and beacon processes may be re-created")
@@ -185,6 +200,7 @@ def original_definition(name:str)->dict:
     image_workdir=original_container_workdir(image.get("WorkingDir"))
     if host.get("Privileged") or host.get("ReadonlyRootfs") is not True:
         raise R65Refused("original root filesystem security not preserved")
+    safe_original_restart_policy(host.get("RestartPolicy"))
     if not host.get("Init") or "ALL" not in (host.get("CapDrop") or []):
         raise R65Refused("original capability/init restrictions not preserved")
     if not any(item in ("no-new-privileges", "no-new-privileges:true", "no-new-privileges=true") for item in (host.get("SecurityOpt") or [])):
@@ -377,6 +393,8 @@ def verify_old_absent_and_new_reachability(ipv6:str)->dict:
 def read_only_plan(commit:str)->tuple[dict,dict,dict]:
     print("R65_PLAN_STAGE=VERIFY_CURRENT_ORIGINAL_CHAIN_AND_OPEN_OVERLAY",file=sys.stderr,flush=True)
     owner=r64.current_owner_audit(commit)  # current genuine chain, both clients, VC
+    vc_policy=get_json(["inspect","--format","{{json .HostConfig.RestartPolicy}}",VC])
+    safe_original_restart_policy(vc_policy)
     if not owner["originalELP2pExplicitlyDisabled"]:
         raise R65Refused("owner Besu already migrated; never rerun")
     print("R65_PLAN_STAGE=VERIFY_NO_PREEXISTING_MIGRATION_RESOURCES",file=sys.stderr,flush=True)
@@ -428,6 +446,7 @@ def read_only_plan(commit:str)->tuple[dict,dict,dict]:
         "realOriginalExecutionBlockHex":owner["originalExecutionBlockHex"],
         "realOriginalBeaconFinalizedEpoch":owner["originalBeaconFinalizedEpoch"],
         "originalValidatorRunning":True,
+        "allOriginalDockerRestartPoliciesSafeForPreservedStoppedClients":True,
         "originalThreeClientsMustBeStoppedForControlledMaintenance":True,
         "originalELAndBeaconDataAndJWTReusedWithoutCopy":True,
         "originalValidatorSigningDataNeverProvisionedToAnotherActiveSigner":True,
