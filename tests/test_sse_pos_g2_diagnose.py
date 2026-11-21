@@ -35,6 +35,42 @@ class R37SafeExistingG2DiagnosticTests(unittest.TestCase):
         self.assertEqual(c["unclassifiedPossibleErrorLines"], 1)
         self.assertNotIn("VioletDragonEngineException", str(c))
 
+
+    def test_besu_java_exception_names_are_static_and_no_message_is_ever_output(self):
+        from sse_pos_g2_diagnose import safe_besu_exception_signatures
+        secret = "DO_NOT_EMIT_RANDOM_SENTENCE_2026_987612"
+        raw = (
+            "ERROR Exception in thread main java.lang.NullPointerException: " + secret + "\n"
+            "Caused by: java.lang.UnsupportedOperationException: " + secret + "\n"
+            "ERROR Unrecognized field `foo` in genesis.json: " + secret + "\n"
+        )
+        report = safe_besu_exception_signatures(raw)
+        classes = [x["class"] for x in report["knownJavaExceptionNames"]]
+        self.assertIn("NullPointerException", classes)
+        self.assertIn("UnsupportedOperationException", classes)
+        signatures = [x["signature"] for x in report["fixedBesuStartupSignatureCounts"]]
+        self.assertIn("GENESIS_FIELD_NOT_RECOGNIZED", signatures)
+        self.assertNotIn(secret, str(report))
+        self.assertFalse(report["rawErrorMessagesEmitted"])
+        self.assertFalse(report["unrecognizedExceptionNamesEmitted"])
+
+    def test_unknown_exception_class_never_echoed(self):
+        from sse_pos_g2_diagnose import safe_besu_exception_signatures
+        secret = "SecretNameThatLooksLikeAnException"
+        data = safe_besu_exception_signatures("ERROR java.lang." + secret + ": reason")
+        self.assertNotIn(secret, str(data))
+        self.assertEqual(data["knownJavaExceptionNames"], [])
+
+    def test_besu_static_signature_classes_do_not_require_error_keyword(self):
+        from sse_pos_g2_diagnose import safe_besu_exception_signatures
+        r = safe_besu_exception_signatures(
+            "Caused by: java.lang.IllegalStateException: this is private\n"
+            "at org.hyperledger.besu.crypto.UnsupportedOperationException"
+        )
+        names = [x["class"] for x in r["knownJavaExceptionNames"]]
+        self.assertIn("IllegalStateException", names)
+        self.assertIn("UnsupportedOperationException", names)
+
     def test_diagnostics_read_bounded_logs_only(self):
         script = (ROOT / "tools/sse_pos_g2_diagnose.py").read_text("utf-8")
         self.assertIn('"--tail", "160"', script)
