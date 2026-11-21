@@ -59,10 +59,14 @@ def docker_state(name:str)->dict:
     }
 
 def get_local_json(url:str, method:str="GET", json_body:dict|None=None)->dict:
-    if (method=="GET" and url not in {BN+x for x in API_PATHS}) and (
-        method!="POST" or url!=EL
-    ):
-        raise R69Refused("unreviewed remote API endpoint")
+    if method=="GET":
+        if url not in {BN+x for x in API_PATHS}:
+            raise R69Refused("unreviewed remote API endpoint")
+    elif method=="POST":
+        if url!=EL:
+            raise R69Refused("unreviewed remote API endpoint")
+    else:
+        raise R69Refused("unreviewed HTTP method")
     if method=="POST":
         if not isinstance(json_body,dict) or json_body.get("method") not in (
             "eth_chainId","eth_blockNumber","net_peerCount","eth_syncing"
@@ -135,22 +139,25 @@ def observed()->dict:
         "noDockerOrBlockchainMutations":True,
         "noValidatorKeysOrEngineJwtRead":True,
     }
-    for kind,fn in (
-        ("execution",lambda:{
+    def execution()->dict:
+        return {
             "chainId":uint(rpc("eth_chainId"),hex_result=True),
             "latestBlock":uint(rpc("eth_blockNumber"),hex_result=True),
             "nativePeerCount":uint(rpc("net_peerCount"),hex_result=True),
             "ethSyncing":rpc("eth_syncing"),
-        }),
-        ("beacon",lambda:{
+        }
+    def consensus()->dict:
+        finality=beacon("/eth/v1/beacon/states/head/finality_checkpoints")
+        finalized=finality["finalized"]
+        return {
             "genesisTime":beacon("/eth/v1/beacon/genesis").get("genesis_time"),
             "connectedPeers":uint(beacon("/eth/v1/node/peer_count")["connected"]),
             "isSyncing":beacon("/eth/v1/node/syncing").get("is_syncing"),
             "headSlot":uint(beacon("/eth/v1/beacon/headers/head")["header"]["message"]["slot"]),
-            "finalizedEpoch":uint(beacon("/eth/v1/beacon/states/head/finality_checkpoints")["finalized"]["epoch"]),
-            "finalizedRoot":beacon("/eth/v1/beacon/states/head/finality_checkpoints")["finalized"]["root"],
-        }),
-    ):
+            "finalizedEpoch":uint(finalized["epoch"]),
+            "finalizedRoot":finalized["root"],
+        }
+    for kind,fn in (("execution",execution),("beacon",consensus)):
         try:
             data=fn()
             out[kind]={"apiStatus":"reachable",**data}
