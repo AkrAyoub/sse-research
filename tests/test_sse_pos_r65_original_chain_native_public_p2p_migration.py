@@ -268,6 +268,16 @@ class R65NativePublicOwnerMigrationTests(unittest.TestCase):
         self.assertIn('candidate[candidate.index("--entrypoint")+1]!="lighthouse"',plan)
         self.assertNotIn('docker(["create"',plan)
 
+    def test_original_stopped_signer_cannot_auto_restart_on_docker_daemon_restart(self):
+        self.assertEqual(m.safe_original_restart_policy({"Name":"no"}),"no")
+        self.assertEqual(m.safe_original_restart_policy({"Name":"unless-stopped"}),"unless-stopped")
+        for unsafe in ({"Name":"always"},{"Name":"on-failure"},{"Name":"on-failure:3"},None,{},[]):
+            with self.subTest(policy=unsafe),self.assertRaises(m.R65Refused):
+                m.safe_original_restart_policy(unsafe)
+        source=(ROOT/"tools/sse_pos_r65_original_chain_native_public_p2p_migration.py").read_text()
+        self.assertIn('safe_original_restart_policy(host.get("RestartPolicy"))',source)
+        self.assertIn('safe_original_restart_policy(vc_policy)',source)
+
     def test_maintenance_prompt_warns_owner_backup_is_sensitive_and_unencrypted(self):
         source=(ROOT/"tools/sse_pos_r65_original_chain_native_public_p2p_migration.py").read_text()
         apply=source[source.index("def apply("):source.index("def main(")]
