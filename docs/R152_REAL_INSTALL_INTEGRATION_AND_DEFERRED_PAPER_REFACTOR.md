@@ -67,6 +67,21 @@ software are still checked. The output distinguishes
 submitted real nonsigning clients from actual observed
 peer handshakes and finality.
 
+**R153 — unattended objective chain evidence:** after R151 has actually
+submitted new Besu and Lighthouse containers, it attempts to install a
+local systemd timer invoking `tools/sse_pos_r153_local_node_evidence.py`
+at regular intervals. That read-only tool reuses R141's real loopback
+EL/CL API checks and produces an atomically replaced private
+`/var/lib/sse/evidence/latest.json`. If clients are absent, syncing,
+optimistic, offline, disconnected or have not finalized, the
+record explicitly says `WAITING_FOR_ACTUAL_EL_CL_FINALITY` and
+contains **no forged checkpoint**. A successful local R141
+capture is still not proof of an outside operator, public ISP
+reachability, active validator deposits or remote resource delivery.
+The timer runs only on newly created hosts from a reviewed pinned
+release; never touch the original VM4706 signer. Timer installation
+failure is recorded without rolling back running clients.
+
 ## High priority missing REAL infrastructure
 
 1. The R59 original public archive is still *on an operator VM*
