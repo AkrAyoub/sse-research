@@ -22,7 +22,7 @@ class Refused(ValueError):
 
 def names(node_id: str):
     # IDs are first validated by R136, and Docker names stay < 128 bytes.
-    suffix = node_id[:40]
+    suffix = node_id  # R136 validates <=63 characters; do not truncate identities.
     return {"network": "sse31340-r137-" + suffix,
             "el": "sse31340-r137-" + suffix + "-el",
             "bn": "sse31340-r137-" + suffix + "-bn"}
