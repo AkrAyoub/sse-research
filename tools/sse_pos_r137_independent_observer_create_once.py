@@ -16,6 +16,7 @@ import sys
 
 import sse_pos_r59_native_ipv6_observer as r59
 import sse_pos_r136_independent_observer_preflight as r136
+import sse_pos_r142_public_peer_discovery as r142
 
 class Refused(ValueError):
     pass
@@ -40,10 +41,16 @@ def require_absent(root, resources):
             raise Refused("pre-existing Docker resource; do not overwrite")
 
 def validate_seeds(el_enode, bn_enr):
-    # Require actual peer-record *syntax* and an explicitly supplied bootstrap.
-    # Signatures, remote identity and reachability are NOT checked here.
-    if not r59.bootnodes(el_enode, bn_enr):
-        raise Refused("execution enode AND beacon ENR are mandatory")
+    # Accept actual MULTIPLE independent native P2P hints; no node admission list.
+    # Syntax is not cryptographic peer identity/reachability assurance.
+    if type(el_enode) is not str or type(bn_enr) is not str:
+        raise Refused("execution enode AND beacon ENR hints required")
+    els, bns = el_enode.split(","), bn_enr.split(",")
+    if not 1 <= len(els) == len(bns) <= 64 or len(set(els)) != len(els):
+        raise Refused("invalid/duplicate or mismatched native bootstrap records")
+    for el, bn in zip(els, bns):
+        if not r59.bootnodes(el, bn):
+            raise Refused("empty native seed")
     return True
 
 def preflight(manifest, archive, el_enode, bn_enr):
@@ -158,12 +165,22 @@ def main(argv=None):
     mode.add_argument("--apply", action="store_true")
     p.add_argument("--manifest", type=Path, required=True)
     p.add_argument("--archive", type=Path, required=True)
-    p.add_argument("--execution-seed-enode-v6", required=True)
-    p.add_argument("--beacon-seed-enr", required=True)
+    p.add_argument("--execution-seed-enode-v6")
+    p.add_argument("--beacon-seed-enr")
+    p.add_argument("--discovery-source", action="append",
+                   help="public replaceable HTTPS peer hint directory (repeat for 2+ URLs)")
     args = p.parse_args(argv)
     try:
-        item = preflight(args.manifest, args.archive,
-                         args.execution_seed_enode_v6, args.beacon_seed_enr)
+        if args.discovery_source:
+            if args.execution_seed_enode_v6 or args.beacon_seed_enr:
+                raise Refused("choose dynamic directory OR explicit peer records")
+            found = r142.discover(args.discovery_source)
+            el_seeds = ",".join(found["executionBootnodes"])
+            bn_seeds = ",".join(found["beaconBootnodes"])
+        else:
+            el_seeds = args.execution_seed_enode_v6
+            bn_seeds = args.beacon_seed_enr
+        item = preflight(args.manifest, args.archive, el_seeds, bn_seeds)
         report = {
             "schema": "SSE_R137_INDEPENDENT_OBSERVER_INSTALL_V1",
             "nodeId": item["manifest"]["nodeId"], "hostOverlayIpv6": item["ip"],
@@ -173,14 +190,16 @@ def main(argv=None):
             "hostPublishedEngine8551": False, "validatorCreated": False,
             "actualNativePeersVerified": False,
             "actualFinalityAgreementVerified": False,
+            "bootstrapSourceMode": "DYNAMIC_MULTISOURCE_HINTS" if args.discovery_source else "EXPLICIT_HINTS",
+            "bootstrapHintCount": len(el_seeds.split(",")),
+            "realBootstrapPeerReachabilityVerified": False,
             "mode": "PLAN_NO_MUTATION" if args.plan else "AUTHORIZED_CREATE"
         }
         if args.apply:
-            report.update(apply(item, args.execution_seed_enode_v6,
-                                args.beacon_seed_enr))
+            report.update(apply(item, el_seeds, bn_seeds))
         print(json.dumps(report, indent=2, sort_keys=True))
         return 0
-    except (Refused, r59.R59Refused, r136.Refused,
+    except (Refused, r59.R59Refused, r136.Refused, r142.Refused,
             OSError, ValueError, KeyError, TypeError) as exc:
         print("R137_INDEPENDENT_OBSERVER_REFUSED: " + type(exc).__name__ + ": " + str(exc),
               file=sys.stderr)
