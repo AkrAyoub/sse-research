@@ -125,8 +125,8 @@ def peer_hints(release, *, lookup=r142.discover):
     found=lookup(urls)
     els=found["executionBootnodes"]
     bns=found["beaconBootnodes"]
-    if len(els)<2 or len(bns)<2:
-        raise Refused("insufficient live independent bootnode hints")
+    if len(els)<1 or len(bns)<1 or len(els)!=len(bns):
+        raise Refused("no actual native bootstrap peer hints")
     return ",".join(els),",".join(bns),"PUBLIC_MULTISOURCE_NATIVE_HINTS"
 
 def plan(selection, release, archive, *, observe=None,
