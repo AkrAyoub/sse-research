@@ -100,15 +100,27 @@ def normalized_env(value:object)->dict[str,str]:
     return result
 
 
-def verify_unmodified_image_launch_config(container:dict,image:dict)->None:
-    """Never loosen runtime defaults or repeat unreviewed environment secrets."""
+def verify_unmodified_image_launch_config(
+    container:dict,image:dict,name:str|None=None
+)->str|None:
+    """Preserve only the observed, strictly known Lighthouse entrypoint override.
+
+    The immutable Lighthouse image has no ENTRYPOINT and defaults to /bin/bash;
+    the running original Beacon container explicitly launches `lighthouse`.
+    A replacement must pass `--entrypoint lighthouse` rather than inherit bash.
+    Besu must retain its exact original image entrypoint. No arbitrary override.
+    """
     a=normalized_entrypoint(container.get("Entrypoint"))
     b=normalized_entrypoint(image.get("Entrypoint"))
+    override=None
     if a!=b:
-        raise R65Refused(
-            "original entrypoint differs from immutable image: "
-            f"container_argv_count={len(a)} image_argv_count={len(b)}"
-        )
+        if name==BN and a==("lighthouse",) and b==():
+            override="lighthouse"
+        else:
+            raise R65Refused(
+                "original entrypoint differs from immutable image: "
+                f"container_argv_count={len(a)} image_argv_count={len(b)}"
+            )
     aenv=normalized_env(container.get("Env"))
     benv=normalized_env(image.get("Env"))
     added=set(aenv)-set(benv)
@@ -120,6 +132,7 @@ def verify_unmodified_image_launch_config(container:dict,image:dict)->None:
             f"added_key_count={len(added)} missing_key_count={len(missing)} "
             f"changed_value_count={len(changed)}; no contents shown"
         )
+    return override
 
 
 def original_definition(name:str)->dict:
@@ -144,7 +157,7 @@ def original_definition(name:str)->dict:
     image=get_json(["image","inspect","--format","{{json .Config}}",ref])
     if not isinstance(image,dict):
         raise R65Refused("pinned image config unreadable")
-    verify_unmodified_image_launch_config(config,image)
+    entrypoint_override=verify_unmodified_image_launch_config(config,image,name)
     if config.get("WorkingDir")!=image.get("WorkingDir"):
         raise R65Refused("custom working directory requires separate review")
     if host.get("Privileged") or host.get("ReadonlyRootfs") is not True:
@@ -192,7 +205,8 @@ def original_definition(name:str)->dict:
         raise R65Refused("original host port bindings unreadable")
     # Preserve exact trusted chain process data; no validator keys touched.
     return {"name":name,"image":ref,"cmd":cmd,"mounts":mounts,"config":config,
-            "host":host,"network":networks[TRUSTED]}
+            "host":host,"network":networks[TRUSTED],
+            "entrypoint_override":entrypoint_override}
 
 def validated_host_ports(ip:str)->dict[str,list[str]]:
     try:
@@ -255,7 +269,15 @@ def clone_args(definition:dict,ipv6:str)->list[str]:
             raise R65Refused("only reviewed original tmpfs supported")
         args.extend(["--tmpfs",dest+":"+opts])
     if name==EL:
+        if definition.get("entrypoint_override") is not None:
+            raise R65Refused("Besu entrypoint must remain its pinned image default")
         args.extend(["--network-alias","sse31340-g2-el"])
+    elif name==BN:
+        if definition.get("entrypoint_override")!="lighthouse":
+            raise R65Refused("original Lighthouse explicit executable not validated")
+        args.extend(["--entrypoint","lighthouse"])
+    else:
+        raise R65Refused("original validator must never be recreated")
     for m in definition["mounts"]:
         source=m["Source"]
         target=m["Destination"]
