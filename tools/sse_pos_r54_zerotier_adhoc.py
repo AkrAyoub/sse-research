@@ -8,8 +8,9 @@ infrastructure dependency. No public-IP or static-IPv4 requirement on peers.
 Full publicly permissionless ETH native P2P remains UNPROVEN by overlay join.
 
 OFFICIAL ID format ffSSSSEEEE000000, where S/E are destination port range.
-Choose S=9000 (0x2328), E=30303 (0x765f), so only destination ports in
-[9000,30303] are permitted by ZeroTier. This includes P2P 9000,9001,30303,
+The EXISTING live network uses S=9000 (0x2328), E=30559 (0x775f), so
+only destination ports in [9000,30559] are permitted by ZeroTier.
+This includes the real EL/CL P2P ports 9000, 9001, 30303 and 30404,
 EXCLUDES SSH/22 and Engine API/8551. NEVER bind JSON-RPC/signer on overlay.
 Network ID is globally public and not a unique isolated chain namespace.
 
@@ -34,8 +35,8 @@ import time
 
 NETWORK_ID = "ff2328775f000000"
 MIN_PORT = 9000
-MAX_PORT = 30303
-ALLOWED_P2P = (9000, 9001, 30303)
+MAX_PORT = 30559
+ALLOWED_P2P = (9000, 9001, 30303, 30404)
 ORIGINAL_SIGNER_PATH = Path.home() / ".local/share/sse-r35-chain31340-g2-private"
 ORIGINAL_BLS_PATH = Path.home() / ".local/share/sse-r27-bls-operator-private"
 EXIT_TIMEOUT = 12
@@ -154,7 +155,7 @@ def join() -> dict:
     answer = input(
         "On NEW NON-SIGNING VM4707 only, join PUBLIC controllerless IPv6 "
         "ZeroTier network, with NO admin authorization and port range "
-        "9000..30303. No blockchain process started. "
+        "9000..30559. No blockchain process started. "
         "Type JOIN-SSE31340-ZT-ADHOC: "
     )
     if answer != "JOIN-SSE31340-ZT-ADHOC":
