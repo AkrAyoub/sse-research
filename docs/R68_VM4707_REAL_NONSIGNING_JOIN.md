@@ -21,7 +21,7 @@ To avoid password prompts and accidental private source transfers, first use the
   fi
   cd "$HOME/sse-research"
   git fetch --no-tags origin feature/r19-fresh-external-node-preflight
-  SHA="REPLACE_WITH_CURRENT_PINNED_R68_SOURCE_SHA"
+  SHA="b02c215e5a249dccb4ba2cee8770f6a405ac9d4e"
   git switch --detach "$SHA"
   test "$(git rev-parse HEAD)" = "$SHA"
   echo "== R59 updated observer safety tests =="
