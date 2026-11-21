@@ -27,7 +27,7 @@ class PublicP2pNoPrivateLanContract(unittest.TestCase):
         self.assertEqual(observer.NETWORK,"ff2328775f000000")
         ipv6="fca0:2328:77b8:6578:a55::1"
         self.assertEqual(observer.port_bindings(ipv6,True),[
-            f"[{ipv6}]:30303:30303/tcp",f"[{ipv6}]:30303:30303/udp",
+            f"[{ipv6}]:30404:30404/tcp",f"[{ipv6}]:30404:30404/udp",
             "127.0.0.1:28545:8545/tcp"])
         self.assertEqual(observer.port_bindings(ipv6,False),[
             f"[{ipv6}]:9000:9000/tcp",f"[{ipv6}]:9000:9000/udp",
