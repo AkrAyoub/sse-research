@@ -26,6 +26,14 @@ class R92RelayTests(unittest.TestCase):
             {(proto, port) for proto, host, port, _, _ in m.FORWARDS if host == "127.0.0.1"},
             {("tcp", 18545), ("tcp", 15052)}
         )
+    def test_owner_ipv6_p2p_maps_to_actual_besu_ipv4_socket(self):
+        # VM4706 namespace observation: AF_INET UDP 30303; AF_INET6 UDP 30404.
+        # R92 upstream uses AF_INET for its 172.18.0.2 endpoint.
+        for proto in ("tcp", "udp"):
+            matches = [v for v in m.FORWARDS if v[0] == proto and v[1] == m.OWNER and v[2] == 30404]
+            self.assertEqual(matches, [(proto, m.OWNER, 30404, m.EL, 30303)])
+        self.assertFalse(any(v[3] == m.EL and v[4] == 30404 for v in m.FORWARDS))
+
     def test_check_mode_does_not_forward(self):
         fake = unittest.mock.MagicMock()
         with patch.object(m, "bind_socket", return_value=fake) as bind, patch.object(
