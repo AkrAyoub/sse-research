@@ -28,6 +28,14 @@ Run inside a subshell, so failure does not exit the operator's interactive shell
 
 Expected source tests: 12 methods. Whether they pass is not yet observed. The live audit output is a point-in-time observation; no current EL block height, Beacon head or finalized root should be presumed until the user executes it. Its report never establishes remote peer sync.
 
+## Actual VM4706 R60 result — 2026-11-21 (Entry 094)
+
+At immutable source SHA `6b2a6e24322567114c383ed7a5056ed7749939e1`, the operator actually ran **13/13 R60 regression tests and 6/6 R61 policy tests PASS**. The real owner-only read-only audit succeeded (structured output) and observed that all three original EL/BN/VC containers were running, all on the IPv4-only **internal** Docker bridge. Original EL P2P was explicitly disabled; no native P2P host ports were published; original EL+Beacon genesis hashes and Engine JWT *metadata only* were verified. ZeroTier CLI is **absent on VM4706**. This is not yet a public P2P source or external seed.
+
+**New safety hold:** the probe obtained **NO valid local execution RPC readings** (`realExecutionRpcChainId31340=false`, `realExecutionBlockNumber=null`, `realExecutionPeerCount=null`) and **NO usable Beacon REST readings** (`genesisTimeMatchesOriginal=false`, head/root/finalized epoch `null`). The probe hides HTTP errors and failed connections, so these readings do **not** prove the blockchain is halted; they mean CURRENT chain health/finality is **UNVERIFIED**, irrespective of Docker `running`. Before any new overlay join or native P2P maintenance, inspect safe Docker host port bindings and classify each actual loopback API response. No signer/network modifications authorized.
+
+The original R60 audit script's expected localhost ports are Execution `127.0.0.1:18545` and Beacon REST `127.0.0.1:15052`. The next check should compare these with `docker inspect` actual host-published mappings. For 127.0.0.1 only, request the nonsecret JSON-RPC `eth_chainId`, `eth_blockNumber`, `net_peerCount` and Beacon REST genesis, headers/head and finality checkpoints. Log only HTTP status, method/result whitelisted values, error category, and actual public checkpoint hash/epoch. Do not inspect or display Docker .Config.Env, unrestricted .Config.Cmd, volume source paths, JWT, validator keys, or unfiltered logs. If endpoints are unavailable, diagnose port/network/API status before any restart.
+
 ## State-preserving native P2P migration (separate reviewed stage, NOT applied)
 
 - A live --p2p-enabled=false Besu cannot become a valid bootnode merely because Docker publishes a port. Original internal bridge cannot route to external/IPv6 peers. Docker cannot retroactively add --publish to existing containers; connecting a running container to a bridge without changing the EL startup flags also does not enable Besu P2P.
