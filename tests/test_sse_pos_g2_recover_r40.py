@@ -61,6 +61,23 @@ class R40ExistingRealChainRecoveryTests(unittest.TestCase):
         self.assertIn('RECOVER-CHAIN31340-G2', code)
         self.assertIn("sys.stdin.isatty()", code)
 
+
+    def test_future_launch_has_exec_tmpfs_only_for_java_besu(self):
+        launcher = (ROOT / "scripts/r35_launch_native_chain31340_g2.sh").read_text("utf-8")
+        besu = launcher.split("== SUBMIT PINNED BESU EXECUTION ==")[1].split(
+            "== SUBMIT PINNED LIGHTHOUSE BEACON =="
+        )[0]
+        self.assertIn("/tmp:rw,nosuid,exec,size=256m", besu)
+        self.assertNotIn("/tmp:rw,nosuid,noexec", besu)
+        self.assertIn("--p2p-enabled=false", besu)
+
+    def test_safe_diagnostic_can_identify_new_besu_without_raw_logs(self):
+        from sse_pos_g2_diagnose import RECOVERY_CONTAINERS
+        self.assertEqual(RECOVERY_CONTAINERS, (r40.REPLACEMENT_EL,))
+        script = (ROOT / "tools/sse_pos_g2_diagnose.py").read_text("utf-8")
+        self.assertIn('"recoveryContainers": [inspect_one(name)', script)
+        self.assertIn('"rawDockerLogsEmitted": False', script)
+
     def test_readonly_plan_invokes_no_docker_start(self):
         with patch.object(r40, "review", return_value={"safe": True}):
             with patch.object(r40, "recover", side_effect=AssertionError("no start")):
