@@ -43,6 +43,14 @@ class R142Tests(unittest.TestCase):
         self.assertFalse(result["actualNativePeersAuthenticated"])
         self.assertFalse(result["fullZeroTouchHostInstallationImplemented"])
 
+    def test_first_online_single_peer_can_bootstrap_second_node(self):
+        one = directory([peer(1)])
+        result=d.discover(SOURCES[:2],lambda _:body(one),NOW)
+        self.assertEqual(result["candidateNodeCount"],1)
+        self.assertEqual(result["validSourceCount"],2)
+        self.assertEqual(result["executionBootnodes"],[peer(1)["executionEnode"]])
+        self.assertFalse(result["actualNativePeersAuthenticated"])
+
     def test_wrong_genesis_or_beacon_root_refused(self):
         for field in ("executionGenesisHash", "beaconGenesisValidatorsRoot",
                       "networkId", "chainId"):
