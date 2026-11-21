@@ -56,13 +56,28 @@ class HostDependencies(unittest.TestCase):
     def test_exact_signer_verifies_and_returns_only_signed_plaintext(self):
         def runner(argv,**kwargs):
             if "--fingerprint" in argv:
-                return "fpr:::::::::"+m.VENDOR_FINGERPRINT+":\n"
+                return "pub::::::::::\\nfpr:::::::::"+m.VENDOR_FINGERPRINT+":\\n"
             if "--decrypt" in argv:
                 path=Path(argv[argv.index("--output")+1])
-                path.write_bytes(b"#!/bin/sh\necho vendor-signed\n")
+                path.write_bytes(b"#!/bin/sh\\necho vendor-signed\\n")
             return ""
         script=m.verify_official_install_script(b"key",b"signed",runner=runner)
-        self.assertEqual(script,b"#!/bin/sh\necho vendor-signed\n")
+        self.assertEqual(script,b"#!/bin/sh\\necho vendor-signed\\n")
+
+    def test_legitimate_primary_key_with_subkey_is_accepted(self):
+        gpg=("pub::::::::::\\n"
+             "fpr:::::::::"+m.VENDOR_FINGERPRINT+":\\n"
+             "sub::::::::::\\n"
+             "fpr:::::::::1234567890123456789012345678901234567890:\\n")
+        self.assertTrue(m.verify_primary_vendor_key_fingerprint(gpg))
+
+    def test_two_different_primary_certificates_are_not_accepted(self):
+        gpg=("pub::::::::::\\n"
+             "fpr:::::::::"+m.VENDOR_FINGERPRINT+":\\n"
+             "pub::::::::::\\n"
+             "fpr:::::::::1234567890123456789012345678901234567890:\\n")
+        with self.assertRaises(m.Refused):
+            m.verify_primary_vendor_key_fingerprint(gpg)
 
     def test_install_command_bounded_and_actual_client_pins(self):
         calls=[]
