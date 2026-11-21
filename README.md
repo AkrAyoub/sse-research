@@ -28,6 +28,15 @@ discoverable real native EL/CL peers, verified client images and
 economic-role infrastructure are genuinely published and available.
 No GitHub SSH deploy key or preselected VM IP is needed.
 
+The original-chain identity and empty-yet-honest public source lists live
+in [the chain31340 release manifest](release/chain31340-public-release.json).
+[The R149 verifier](tools/sse_public_genesis.py) fetches the original
+archive only from HTTPS sources declared in the immutable release and
+requires its R59-pinned SHA256 before storing it. **At present those
+public sources are empty**, so public source acquisition is possible
+but a real external full-node install remains gated. No installer
+should invent new genesis bytes or use old 31339 assets.
+
 **First online peer:** zero bootstrap peers is allowed, with correct
 original genesis and no fabricated consensus/finality. First host of
 a **new chain** needs a real genesis ceremony and active signing
