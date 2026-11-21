@@ -22,7 +22,7 @@ class R153Tests(unittest.TestCase):
         self.assertFalse(outcome["permissionlessExternalP2pReachabilityVerified"])
 
     def test_invalid_node_identity_refused(self):
-        for name in ("", "VM 7", "sudo", "../node", "node/owner"):
+        for name in ("", "VM 7", "a", "../node", "node/owner"):
             with self.subTest(name=name),self.assertRaises(m.Refused):
                 m.observe(name,collector=lambda *args:None)
 
