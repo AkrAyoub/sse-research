@@ -28,6 +28,22 @@ class R106NativeRecoveryTests(unittest.TestCase):
     def test_relay_retired_only_after_success(self):
         s=SCRIPT.read_text()
         self.assertLess(s.index('network connect "$PUBLIC"'),s.index('systemctl disable "$RELAY"'))
-        self.assertIn('DO NOT RETRY BLINDLY',s)
+        self.assertIn('validator running; no automatic client restart',s)
+        self.assertIn('check state before retry',s)
+        self.assertIn('if [[ "$(attachment "$C")" == no ]]',s)
+        self.assertIn('if ! effective "$C"; then',s)
+    def test_boot_service_and_timer_are_recurrent(self):
+        root=ROOT/"systemd"
+        service=(root/"sse31340-owner-native-network-recovery.service").read_text()
+        timer=(root/"sse31340-owner-native-network-recovery.timer").read_text()
+        install=(ROOT/"scripts"/"r109_install_owner_native_network_recovery.sh").read_text()
+        self.assertIn("R106_BOOT_SERVICE=true",service)
+        self.assertIn("Restart=on-failure",service)
+        self.assertNotIn("RemainAfterExit=yes",service)
+        self.assertIn("OnBootSec=45s",timer)
+        self.assertIn("OnUnitInactiveSec=2min",timer)
+        self.assertIn("enable --now sse31340-owner-native-network-recovery.timer",install)
+        self.assertNotIn("sse31340-g2-vc start",service)
+
 if __name__=="__main__":
     unittest.main()
