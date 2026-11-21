@@ -1,0 +1,34 @@
+name: SSE public role-onboarding regressions
+on:
+  push:
+    branches:
+      - feature/r136-independent-observer-preflight
+  pull_request:
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  public-install-and-first-peer:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 15
+    steps:
+      - name: Fetch tracked source
+        uses: actions/checkout@v4
+        with:
+          persist-credentials: false
+      - name: Validate Python installer syntax
+        run: |
+          python3 -m py_compile scripts/sse_install.py tools/sse_join_phase.py
+      - name: Validate shell syntax of retired R145
+        run: bash -n scripts/sse_fresh_vm_source_bootstrap.sh
+      - name: R147 public installer security tests
+        run: python3 -B -m unittest discover -s tests -p 'test_sse_pos_r147_public_install.py' -v
+      - name: R148 no-hardcoded-peer first-node semantics
+        run: python3 -B -m unittest discover -s tests -p 'test_sse_join_phase.py' -v
+      - name: All relevant unified/VM onboarding guard tests
+        run: |
+          python3 -B -m unittest discover -s tests -p 'test_sse_join.py' -v
+          python3 -B -m unittest discover -s tests -p 'test_sse_pos_r143_new_vm_readiness.py' -v
+          python3 -B -m unittest discover -s tests -p 'test_sse_pos_r145_fresh_vm_source_bootstrap.py' -v
