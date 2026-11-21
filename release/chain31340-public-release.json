@@ -1,0 +1,13 @@
+{
+  "schema": "SSE_CHAIN31340_PUBLIC_RELEASE_V1",
+  "chainId": 31340,
+  "executionGenesisHash": "0x5f7cbcd4f1ddfbbedbdd2b180b83d9eff49d4b7263643858d7be2e9c243936bf",
+  "beaconGenesisValidatorsRoot": "0xda5c089a2f9261d547bdeb8f129bdb5d174cb925c486670b129b17d1e2fcbedd",
+  "originalGenesisArchiveSha256": "1d21e6bfb7609d1797edd9d36561b1dc47a520153d1c6f698f807c29266c2ce7",
+  "originalGenesisArchiveSources": [],
+  "replaceablePeerDirectorySources": [],
+  "currentPublicReleaseStatus": "BLOCKED_UNPUBLISHED_ORIGINAL_GENESIS_AND_DISCOVERY",
+  "noFixedBootstrapPeerOrIp": true,
+  "noMemberAllowlist": true,
+  "noAutomaticGenesisRecreation": true
+}
