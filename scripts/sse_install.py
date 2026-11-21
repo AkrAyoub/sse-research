@@ -126,6 +126,21 @@ def install_source(commit, plan, root=TARGET_ROOT, state=STATE):
         command(["git","-C",str(checkout),"switch","--detach",commit])
         if command(["git","-C",str(checkout),"rev-parse","HEAD"]) != commit:
             raise Refused("source SHA mismatch")
+        # Release descriptor carries exact public genesis identity and
+        # replaceable artifact sources; never a hardcoded bootstrap host/IP.
+        sys.path.insert(0,str(checkout/"tools"))
+        import sse_public_genesis as public_genesis
+        release_data=public_genesis.read_manifest(
+            checkout/"release/chain31340-public-release.json")
+        if release_data["originalGenesisArchiveSources"]:
+            result_archive=public_genesis.acquire(
+                release_data,Path(tmp)/"original-chain31340.tar.gz")
+            if not result_archive["sha256Verified"]:
+                raise Refused("unverified original genesis archive")
+            # Do not pretend archived data are a live synchronized node.
+            plan["originalGenesisArchiveAcquired"]=True
+        else:
+            plan["originalGenesisArchiveAcquired"]=False
         # The existing local role engine is reused; it is only a plan, never
         # silently advertised as on-chain authority.
         node_id=plan["nodeId"]
@@ -141,6 +156,11 @@ def install_source(commit, plan, root=TARGET_ROOT, state=STATE):
             raise Refused("unified role configuration disagrees")
         plan["selectedRoles"] = expected
         shutil.move(str(checkout),str(release))
+        # Public archive source, when real and verified, is kept with exact
+        # pinned release, never injected into an existing signer data dir.
+        verified_archive=Path(tmp)/"original-chain31340.tar.gz"
+        if verified_archive.exists():
+            shutil.move(str(verified_archive),str(release/"original-chain31340.tar.gz"))
     state.parent.mkdir(mode=0o700,parents=True,exist_ok=True)
     data={**plan,"publicSourceDownloaded":True,"roleSelectionRecorded":True}
     fd=os.open(str(state),os.O_CREAT|os.O_EXCL|os.O_WRONLY,0o600)
