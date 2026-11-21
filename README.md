@@ -15,6 +15,23 @@ network using valueless TEST ETH**.
 > chain31339 on VM4705 has known exposed genesis validator keys and is
 > **not safe to expose publicly**.
 
+## R146 correction — manual bootstrap is not the required installer
+
+**Operator requirement: NO per-VM interaction.** Earlier R145 SSH deploy-key
+and typed-prompt instructions have been **withdrawn**; its `--apply`
+is now intentionally disabled. Do **not** ask the operator to run
+R145, generate a deploy key, configure Docker/ZeroTier or manually select
+roles on the six already-provisioned VMs.
+
+The [R146 corrective source/VM-log audit](docs/R146_ZERO_INTERACTION_CORRECTIVE_ARCHITECTURE_AUDIT.md)
+identifies the actual historical network, Docker, genesis, client-image,
+port, validator custody, peer-discovery and public release dependencies.
+True zero-interaction first boot requires a preauthorized provider
+cloud-init/remote-execution channel and publishable audited release.
+Existing fresh VMs will not start installing merely because GitHub
+source changed. The private repository has not been cleared for
+public exposure, including possible historical secret-bearing records.
+
 ## Unified fresh-node onboarding and role selection (R144)
 
 **ONE repository and entry point:** after obtaining this verified source
@@ -42,7 +59,7 @@ network join.
 Detailed role/scale reference:
 [complete architecture and all roles](docs/SSE_COMPLETE_ROLES_PERMISSIONLESS_SCALING_AND_VM_EXPERIMENTS.md).
 [Unified installer specification and honest gates](docs/R144_UNIFIED_ROLE_SELECTING_INSTALLER.md).
-For a **completely fresh Ubuntu VM**, see [R145 fresh-source bootstrap](docs/R145_FRESH_VM_SOURCE_BOOTSTRAP.md). It provides a guarded source-only create-once procedure using an independently configured read-only deploy key, followed by the same unified role-selection plan. **The repository is currently private; this is not yet publicly distributable permissionless zero-touch onboarding.**
+The [R145 historical manual bootstrap](docs/R145_FRESH_VM_SOURCE_BOOTSTRAP.md) is superseded and its apply mode is disabled; see R146 for the unattended architecture and actual blocker inventory.
 
 [Fresh-VM sizing](docs/R143_NEW_VM_INVENTORY_AND_FIRST_BOOT_GATE.md).
 
