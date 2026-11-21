@@ -31,8 +31,8 @@ class R153Tests(unittest.TestCase):
         report={
             "schema":r141.SCHEMA,"nodeId":"node-third-operator","chainId":31340,
             "capturedAtUtc":"2026-11-21T23:00:00+00:00",
-            "executionGenesisHash":"0x"+"aa"*32,
-            "beaconGenesisValidatorsRoot":"0x"+"bb"*32,
+            "executionGenesisHash":m.original_chain.EL_GENESIS,
+            "beaconGenesisValidatorsRoot":m.original_chain.CL_GENESIS,
             "executionBlockNumber":50,"beaconHeadSlot":1024,
             "executionNativePeers":2,"beaconNativePeers":2,
             "finalizedEpoch":30,"finalizedRoot":"0x"+"cc"*32,
@@ -48,6 +48,51 @@ class R153Tests(unittest.TestCase):
         self.assertEqual(outcome["state"],"ACTUAL_LOCAL_CHAIN_FINALITY_VERIFIED")
         self.assertFalse(outcome["externalOperatorIndependenceVerified"])
         self.assertFalse(outcome["validatorKeyOrMarketLeaseVerified"])
+
+    def test_wrong_original_genesis_rejected_even_with_chainid(self):
+        # Validator check is made *after* schema validation. A structurally
+        # valid unrelated chain with chainId 31340 cannot pass.
+        from datetime import datetime, timezone
+        report={
+            "schema":r141.SCHEMA,"nodeId":"node-third-operator","chainId":31340,
+            "capturedAtUtc":datetime.now(timezone.utc).isoformat(),
+            "executionGenesisHash":"0x"+"aa"*32,
+            "beaconGenesisValidatorsRoot":m.original_chain.CL_GENESIS,
+            "executionBlockNumber":12,"beaconHeadSlot":96,
+            "executionNativePeers":1,"beaconNativePeers":1,
+            "finalizedEpoch":2,"finalizedRoot":"0x"+"cc"*32,
+            "executionSyncing":False,"beaconSyncing":False,
+            "executionOffline":False,"optimistic":False,
+            "localClientApisRead":True,"validatorKeyRead":False,
+            "transactionSubmitted":False,"dockerChanged":False,
+            "independentOperatorVerified":False,
+            "publicInternetNativeP2pVerified":False,
+            "remotePhysicalResourceVerified":False,
+        }
+        outcome=m.observe("node-third-operator",collector=lambda *a:report)
+        self.assertEqual(outcome["state"],"WAITING_FOR_ACTUAL_EL_CL_FINALITY")
+
+    def test_no_native_el_or_cl_peers_does_not_count_as_joined(self):
+        from datetime import datetime, timezone
+        report={
+            "schema":r141.SCHEMA,"nodeId":"node-third-operator","chainId":31340,
+            "capturedAtUtc":datetime.now(timezone.utc).isoformat(),
+            "executionGenesisHash":m.original_chain.EL_GENESIS,
+            "beaconGenesisValidatorsRoot":m.original_chain.CL_GENESIS,
+            "executionBlockNumber":12,"beaconHeadSlot":96,
+            "executionNativePeers":0,"beaconNativePeers":1,
+            "finalizedEpoch":2,"finalizedRoot":"0x"+"cc"*32,
+            "executionSyncing":False,"beaconSyncing":False,
+            "executionOffline":False,"optimistic":False,
+            "localClientApisRead":True,"validatorKeyRead":False,
+            "transactionSubmitted":False,"dockerChanged":False,
+            "independentOperatorVerified":False,
+            "publicInternetNativeP2pVerified":False,
+            "remotePhysicalResourceVerified":False,
+        }
+        self.assertEqual(
+            m.observe("node-third-operator",collector=lambda *a:report)["state"],
+            "WAITING_FOR_ACTUAL_EL_CL_FINALITY")
 
     def test_bad_r141_report_does_not_fool_observer(self):
         outcome=m.observe("node-third-operator",collector=lambda *args:{
