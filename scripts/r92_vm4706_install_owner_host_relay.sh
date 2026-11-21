@@ -22,6 +22,9 @@ test "$(sudo -n docker inspect sse31340-g2-el-r40 --format '{{with index .Networ
 test "$(sudo -n docker inspect sse31340-g2-bn --format '{{with index .NetworkSettings.Networks "sse31340-g2-internal"}}{{.IPAddress}}{{end}}')" = 172.18.0.3
 # No privileged Engine 8551 is included in fixed relay configuration.
 python3 -B -m unittest discover -s "$ROOT/tests" -p 'test_sse_pos_r92_owner_internal_bridge_host_relay.py' -q
+python3 -B "$SOURCE" --check
+# Verify the host can access the original bridge endpoints before publishing them.
+curl --noproxy '*' -fsS --max-time 5 http://172.18.0.3:5052/eth/v1/node/syncing >/dev/null
 if [[ "$MODE" == "--plan" ]]; then
   echo "R92_OWNER_RELAY_PLAN_OK=true"
   echo "R92_NEXT=run --apply after reviewing explicit TCP UDP endpoints"
