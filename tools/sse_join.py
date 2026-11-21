@@ -65,7 +65,7 @@ def normalize_roles(roles):
     # full_node install dependency; this does not grant staking eligibility.
     selected = list(roles)
     dependencies = []
-    if "validator" in selected and not FULL.intersection(selected - {"validator"}):
+    if "validator" in selected and not FULL.intersection(set(selected) - {"validator"}):
         selected.insert(0, "full_node")
         dependencies.append("validator_requires_local_full_node_consensus_clients")
     return selected, dependencies
