@@ -46,7 +46,7 @@ class PublicP2pNoPrivateLanContract(unittest.TestCase):
 
     def test_no_bootstrap_admission_whitelist_or_single_owner_required(self):
         src=(ROOT/"tools/sse_pos_r59_native_ipv6_observer.py").read_text("utf-8")
-        self.assertIn('el_enr: str | None',src)
+        self.assertIn('el_enode: str | None',src)
         self.assertIn('bn_enr: str | None',src)
         self.assertNotIn("allowlist-operators",src)
         self.assertNotIn("genesis-owner-ip",src)
