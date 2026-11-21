@@ -40,7 +40,9 @@ def require_absent(root, resources):
         if r59.resource_exists(kind, name):
             raise Refused("pre-existing Docker resource; do not overwrite")
 
-def validate_seeds(el_enode, bn_enr):
+def validate_seeds(el_enode, bn_enr, *, allow_no_peers=False):
+    if allow_no_peers and el_enode is None and bn_enr is None:
+        return True
     # Accept actual MULTIPLE independent native P2P hints; no node admission list.
     # Syntax is not cryptographic peer identity/reachability assurance.
     if type(el_enode) is not str or type(bn_enr) is not str:
@@ -53,7 +55,7 @@ def validate_seeds(el_enode, bn_enr):
             raise Refused("empty native seed")
     return True
 
-def preflight(manifest, archive, el_enode, bn_enr):
+def preflight(manifest, archive, el_enode, bn_enr, *, allow_no_peers=False):
     obj = r136.load_manifest(manifest)
     if archive.expanduser().resolve() != r59.ARCHIVE.resolve():
         raise Refused("use existing operator-local public chain archive path")
@@ -63,7 +65,7 @@ def preflight(manifest, archive, el_enode, bn_enr):
     iface, ip = r59.overlay_ip()  # Detect dynamic host IPv6; no VM4707 pinned address.
     r59.docker(["info", "--format", "{{.ServerVersion}}"])
     r59.images()
-    validate_seeds(el_enode, bn_enr)
+    validate_seeds(el_enode, bn_enr, allow_no_peers=allow_no_peers)
     res = names(obj["nodeId"])
     root = data_root(obj["nodeId"])
     require_absent(root, res)
@@ -89,15 +91,42 @@ def docker_run(image, name, network, root, bindings, args, *, beacon=False):
     command += [image, *args]
     r59.docker(command, timeout=60)
 
-def apply(plan, el_enode, bn_enr):
-    if not (sys.stdin.isatty() and sys.stderr.isatty()):
-        raise Refused("local interactive authorization required")
-    print("Create exactly ONE new real non-signing Besu+Lighthouse observer; "
-          "DO NOT use on either existing VM. No validator or new genesis. "
-          "Partial failures must be reviewed manually, never blindly rerun.",
-          file=sys.stderr)
-    if input("Type CREATE-INDEPENDENT-NONSIGNING-OBSERVER: ") != "CREATE-INDEPENDENT-NONSIGNING-OBSERVER":
-        raise Refused("explicit authorization absent")
+def apply(plan, el_enode, bn_enr, *, unattended=False):
+    if unattended:
+        # R151 uses only a locally selected, exact pinned, nonsecret public
+        # installer state. No API or network operator can authorize this.
+        approval = Path("/var/lib/sse/selection.json")
+        if approval.is_symlink() or not approval.is_file():
+            raise Refused("no locally selected SSE installation roles")
+        if os.geteuid() != 0 or approval.stat().st_mode & 0o077:
+            raise Refused("unattended installation requires root-owned private selection")
+        state = json.loads(approval.read_text("utf-8"))
+        roles = state.get("selectedRoles")
+        if (state.get("schema") != "SSE_R147_PUBLIC_INSTALL_V1"
+                or state.get("nodeId") != plan["manifest"]["nodeId"]
+                or type(roles) is not list
+                or not set(roles).intersection({"full_node", "observer", "validator"})
+                or state.get("chainGenesisRecreated") is not False
+                or state.get("sourceCommit") is None):
+            raise Refused("unattended node install not authorized by local role selection")
+        # Root's HOME alone is not enough: the original operator may run a
+        # command under sudo and thereby bypass an old user-local guard.
+        for home in Path("/home").glob("*"):
+            for name in ("sse-r35-chain31340-g2-private",
+                         "sse-r27-bls-operator-private",
+                         "sse-r59-chain31340-observer"):
+                location = home / ".local/share" / name
+                if location.exists() or location.is_symlink():
+                    raise Refused("original signing or observer host protected")
+    else:
+        if not (sys.stdin.isatty() and sys.stderr.isatty()):
+            raise Refused("local interactive authorization required")
+        print("Create exactly ONE new real non-signing Besu+Lighthouse observer; "
+              "DO NOT use on either existing VM. No validator or new genesis. "
+              "Partial failures must be reviewed manually, never blindly rerun.",
+              file=sys.stderr)
+        if input("Type CREATE-INDEPENDENT-NONSIGNING-OBSERVER: ") != "CREATE-INDEPENDENT-NONSIGNING-OBSERVER":
+            raise Refused("explicit authorization absent")
     # Recheck identity/absence immediately before the first mutation.
     r59.guard_owner()
     require_absent(plan["root"], plan["resources"])
@@ -129,7 +158,9 @@ def apply(plan, el_enode, bn_enr):
         "--rpc-http-port=8545", "--rpc-http-api=ETH,NET,WEB3",
         "--host-allowlist=localhost,127.0.0.1", "--engine-rpc-enabled",
         "--engine-rpc-port=8551", "--engine-host-allowlist=" + res["el"],
-        "--engine-jwt-secret=/jwt/engine.jwt", "--bootnodes=" + el_enode]
+        "--engine-jwt-secret=/jwt/engine.jwt"]
+    if el_enode:
+        el_args.append("--bootnodes=" + el_enode)
     # Published ports are precisely actual per-host 6plane P2P and loopback RPC.
     el_bindings = [f"[{ip}]:30404:30404/tcp", f"[{ip}]:30404:30404/udp",
                    "127.0.0.1:28545:8545/tcp"]
@@ -148,7 +179,9 @@ def apply(plan, el_enode, bn_enr):
         "--enr-address=" + ip, "--enr-tcp6-port=9000", "--enr-udp6-port=9000",
         "--enr-quic6-port=9001", "--enable-private-discovery",
         "--disable-upnp", "--disable-enr-auto-update",
-        "--allow-insecure-genesis-sync", "--boot-nodes=" + bn_enr]
+        "--allow-insecure-genesis-sync"]
+    if bn_enr:
+        bn_args.append("--boot-nodes=" + bn_enr)
     docker_run(r59.LIGHTHOUSE_REF, res["bn"], res["network"], root,
                bn_bindings, bn_args, beacon=True)
     r59.inspect_published(res["bn"], bn_bindings, r59.LIGHTHOUSE_ID)
