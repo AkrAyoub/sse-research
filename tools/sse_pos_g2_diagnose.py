@@ -19,6 +19,7 @@ import time
 
 ROOT = Path(__file__).resolve().parents[1]
 CONTAINERS = ("sse31340-g2-el", "sse31340-g2-bn", "sse31340-g2-vc")
+RECOVERY_CONTAINERS = ("sse31340-g2-el-r40",)
 MAX_LOG_BYTES = 300_000
 SHA_RE = re.compile(r"[0-9a-f]{40}\Z")
 
@@ -274,6 +275,7 @@ def main() -> int:
             "privateJWTOrValidatorSecretsRead": False,
             "rawDockerLogsEmitted": False,
             "containers": [inspect_one(name) for name in CONTAINERS],
+            "recoveryContainers": [inspect_one(name) for name in RECOVERY_CONTAINERS],
         }
         print(json.dumps(output, sort_keys=True, indent=2))
         return 0
