@@ -4,7 +4,7 @@
 
 R60 is a self-contained **owner-only read-only** source audit, not a migration or network service. On VM4706, tools/sse_pos_r60_owner_native_p2p_readonly_audit.py checks actual owner G2 EL genesis+Beacon genesis hash and local JWT metadata (never reads JWT), inspects only allowlisted Docker native P2P flags/network/port publications, and reads local loopback EL JSON-RPC chainId/blockNumber/peerCount and Beacon genesis/head/finalized checkpoint. It prints only redacted/sanitized summary fields; no signer secrets, keystores, private JWT data, raw full Docker command arrays or shell variables are printed.
 
-Tests: tests/test_sse_pos_r60_owner_native_p2p_readonly_audit.py (12 source/mock tests). No tests or R60 audit have been run on a VM yet; these are GitHub files. Nothing is started, stopped, restarted, reconfigured, backed up or exported.
+**Observed first source run:** 11 passed, 1 failed before the live audit: R60 `safe_flags` lacked the allowlisted `p2p-host` option, so the malformed flag negative test failed. New GitHub-only fix now includes `p2p-host` and an explicit positive/negative regression (13 total tests). The corrected tests and R60 live audit have NOT yet been executed. Do not claim measured health until rerun. Nothing is started, stopped, restarted, reconfigured, backed up or exported.
 
 ## VM4706-only operator source and audit gate
 
@@ -16,7 +16,7 @@ Run inside a subshell, so failure does not exit the operator's interactive shell
   cd "$HOME/sse-research"
   export GIT_SSH_COMMAND="ssh -i $HOME/.ssh/sse_vm4706_readonly -o IdentitiesOnly=yes -o StrictHostKeyChecking=yes -o BatchMode=yes"
   git fetch --no-tags origin feature/r19-fresh-external-node-preflight
-  SHA="721ac9421f45dcec79391cb46a02e58fac181b64"
+  SHA="TO_BE_PINNED_AFTER_R60_ARCHITECTURE_COMMITS"
   git switch --detach "$SHA"
   test "$(git rev-parse HEAD)" = "$SHA"
   python3 -B -m unittest discover -s tests -p 'test_sse_pos_r60_owner_native_p2p_readonly_audit.py' -v
@@ -33,7 +33,7 @@ Expected source tests: 12 methods. Whether they pass is not yet observed. The li
 - A live --p2p-enabled=false Besu cannot become a valid bootnode merely because Docker publishes a port. Original internal bridge cannot route to external/IPv6 peers. Docker cannot retroactively add --publish to existing containers; connecting a running container to a bridge without changing the EL startup flags also does not enable Besu P2P.
 - Before modifying owner containers, establish current original head and finalized root, review exact existing EL/BN/VC mount points, determine host/overlay routes and recoverable consistent backups. Never copy BLS signing keys, JWT or slashing data to another host, generate a new genesis or run duplicate EL/VC against owner databases.
 - Plan controlled migration of only the existing owner EL/BN runtime networking while retaining the original EL+Beacon+VC persistent state. A brief signing outage may require the owner's explicit maintenance approval, slashing safety and rollback. Engine API port 8551 must remain inaccessible from outside its local trusted Docker network.
-- A useful G3 first-stage topology may use VM4706↔VM4707's real private 10.50.56.0/24 LAN for native bootstrap and let the independent non-signing VM4707 advertise *public open-join ZeroTier IPv6* to the outside laptop. This avoids forcing the original signing host onto a third-party overlay. Real dual-stack signed ENRs, execution AND consensus peers and matching finalized roots are required; don't infer this from an R55 echo.
+- **WITHDRAWN: no VM4706↔VM4707 native blockchain bootstrap over the cloud provider's private 10.50.56.0/24 LAN.** Both full nodes (including the original signer) must support the SAME open-join Internet-accessible network mechanism available to external operators, initially the verified controllerless ZeroTier public ad-hoc IPv6 overlay `ff2328775f000000`. VM4706's current Docker internal-only network prevents native outbound P2P; bringing it onto the common overlay must use an explicitly reviewed owner-state-preserving installation and P2P migration. ZeroTier overlay addresses alone do not prove that the underlying path avoids the same-provider private LAN: observe actual paths and require at least one genuinely external laptop-native EL+CL peer before declaring public WAN acceptance. Require real authenticated EL+CL peer handshakes and matching original-chain finalized roots; no private-LAN peer counts for G3.
 - Docker published P2P port and host address behavior must be actually checked after any run. Enabling Docker IPv6 or configuring host firewalls is a privileged maintenance change, not a harmless read-only probe.
 
 ## Public onboarding requirement
