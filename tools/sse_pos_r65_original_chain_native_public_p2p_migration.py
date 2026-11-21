@@ -182,7 +182,7 @@ def clone_args(definition:dict,ipv6:str)->list[str]:
     host=definition["host"]
     config=definition["config"]
     args=["create","--pull","never","--platform","linux/amd64",
-          "--name",name,"--hostname",name,"--init",
+          "--name",name,"--hostname",name,"--init","--stop-timeout","90",
           "--network",TRUSTED,
           "--read-only","--cap-drop","ALL",
           "--security-opt","no-new-privileges",
@@ -314,6 +314,13 @@ def read_only_plan(commit:str)->tuple[dict,dict,dict]:
         "nothingModifiedByPlan":True,
     },el,bn)
 
+def start_if_stopped(name:str)->None:
+    state=get_json(["inspect","--format","{{json .State}}",name])
+    if not isinstance(state,dict):
+        raise R65Refused("original rollback container state unavailable")
+    if state.get("Running") is not True:
+        docker(["start",name],timeout=35)
+
 def rollback(renamed:set[str],created:set[str])->None:
     print("R65_MAINTENANCE_ROLLBACK_ATTEMPTED=true",file=sys.stderr,flush=True)
     # Only remove NEW containers created by this migration. NEVER remove
@@ -343,13 +350,13 @@ def rollback(renamed:set[str],created:set[str])->None:
         print("R65_ROLLBACK_PARTIAL_ORIGINAL_VALIDATOR_LEFT_STOPPED=true",file=sys.stderr,flush=True)
         return
     try:
-        docker(["start",EL],timeout=30)
+        start_if_stopped(EL)
         if not wait_client(EL,"execution",8):
             raise R65Refused("original EL health not recovered")
-        docker(["start",BN],timeout=30)
+        start_if_stopped(BN)
         if not wait_client(BN,"beacon",8):
             raise R65Refused("original BN health not recovered")
-        docker(["start",VC],timeout=30)
+        start_if_stopped(VC)
         print("R65_ROLLBACK_EXISTING_ORIGINAL_EL_BN_VC_RESTARTED=true",file=sys.stderr,flush=True)
     except R65Refused:
         print("R65_ROLLBACK_HEALTH_UNVERIFIED_ORIGINAL_SIGNER_LEFT_STOPPED=true",file=sys.stderr,flush=True)
