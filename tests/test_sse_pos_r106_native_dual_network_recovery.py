@@ -32,6 +32,17 @@ class R106NativeRecoveryTests(unittest.TestCase):
         self.assertIn('check state before retry',s)
         self.assertIn('if [[ "$(attachment "$C")" == no ]]',s)
         self.assertIn('if ! effective "$C"; then',s)
+    def test_private_network_restored_before_public_on_boot(self):
+        orchestrator=(ROOT/"scripts"/"r110_owner_boot_reconcile_networks.sh").read_text()
+        service=(ROOT/"systemd"/"sse31340-owner-native-network-recovery.service").read_text()
+        installer=(ROOT/"scripts"/"r109_install_owner_native_network_recovery.sh").read_text()
+        self.assertLess(orchestrator.index("sse_pos_r92_guarded_existing_node_recovery.py"),
+                        orchestrator.index("sse31340-owner-native-network-recovery.sh"))
+        self.assertIn("--role owner --apply",orchestrator)
+        self.assertIn("sse31340-owner-native-network-orchestrator.sh",service)
+        self.assertIn('install -m 0755 "$PRIVATE_RECOVERY"',installer)
+        subprocess.run(["bash","-n",str(ROOT/"scripts"/"r110_owner_boot_reconcile_networks.sh")],check=True)
+
     def test_boot_service_and_timer_are_recurrent(self):
         root=ROOT/"systemd"
         service=(root/"sse31340-owner-native-network-recovery.service").read_text()
