@@ -213,6 +213,49 @@ class R65NativePublicOwnerMigrationTests(unittest.TestCase):
         with self.assertRaises(m.R65Refused):
             m.clone_args(defn,IP)
 
+    def test_original_workdir_absent_defaults_to_root(self):
+        self.assertEqual(m.original_container_workdir(None),"/")
+        self.assertEqual(m.original_container_workdir(""),"/")
+        self.assertEqual(m.original_container_workdir("/"),"/")
+
+    def test_original_workdir_preserves_existing_nondefault_absolute_path(self):
+        for wd in ("/home/lighthouse", "/opt/besu", "/app/chain31340", "/tmp"):
+            self.assertEqual(m.original_container_workdir(wd),wd)
+        d={
+            "name":m.BN,"image":m.LIGHTHOUSE_REF,
+            "entrypoint_override":"lighthouse",
+            "original_workdir":"/home/lighthouse",
+            "config":{"User":"1000:1000"},
+            "host":{"Memory":4294967296,"PidsLimit":384,"NanoCpus":2000000000,
+                    "Tmpfs":{"/tmp":"rw,nosuid,exec,size=256m"}},
+            "mounts":[],"cmd":["bn"]
+        }
+        argv=m.clone_args(d,IP)
+        self.assertIn("--workdir",argv)
+        self.assertEqual(argv[argv.index("--workdir")+1],"/home/lighthouse")
+        self.assertLess(argv.index("--workdir"),argv.index(m.LIGHTHOUSE_REF))
+        self.assertEqual(argv[argv.index("--entrypoint")+1],"lighthouse")
+
+    def test_original_workdir_rejects_relative_path_and_traversal(self):
+        for wd in ("relative","./path","../path","/foo/../bar",
+                   "//host/secret","/a//b","/a/./b",
+                   "/path;rm","/path\nother","/path\tother","/unicode/🔥",34,[],{}):
+            with self.subTest(value=wd),self.assertRaises(m.R65Refused):
+                m.original_container_workdir(wd)
+
+    def test_cloned_besu_preserves_explicit_original_workdir_without_override_entrypoint(self):
+        d={
+            "name":m.EL,"image":m.BESU_REF,
+            "entrypoint_override":None,"original_workdir":"/opt/besu",
+            "config":{"User":"1000:1000"},
+            "host":{"Memory":4294967296,"PidsLimit":384,"NanoCpus":2000000000,
+                    "Tmpfs":{"/tmp":"rw,nosuid,exec,size=256m"}},
+            "mounts":[],"cmd":["--network-id=31340","--p2p-enabled=false"]
+        }
+        argv=m.clone_args(d,IP)
+        self.assertEqual(argv[argv.index("--workdir")+1],"/opt/besu")
+        self.assertNotIn("--entrypoint",argv)
+
     def test_refuse_original_client_already_migrated(self):
         owner={"originalELP2pExplicitlyDisabled":False}
         with patch.object(m.r64,"current_owner_audit",return_value=owner):
