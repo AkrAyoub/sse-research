@@ -27,6 +27,7 @@ BESU_FLAGS = (
     "p2p-interface-ipv6", "p2p-port-ipv6", "p2p-ipv6-outbound-enabled",
     "discovery-mode", "discovery-enabled", "p2p-discovery-port",
     "nat-method", "engine-rpc-enabled", "engine-rpc-host",
+    "engine-rpc-port", "engine-host-allowlist",
     "engine-jwt-secret", "rpc-http-host", "rpc-http-enabled",
     "host-allowlist", "network-id", "genesis-file",
     "Xv5-discovery-enabled",
@@ -41,9 +42,12 @@ LIGHTHOUSE_FLAGS = (
     "execution-jwt", "testnet-dir", "datadir",
     "boot-nodes", "allow-insecure-genesis-sync",
 )
-REQUIRED_BESU = (
+REQUIRED_BESU_IPV6 = (
     "p2p-host-ipv6", "p2p-interface-ipv6", "p2p-port-ipv6",
-    "discovery-mode", "engine-rpc-host", "rpc-http-host",
+    "p2p-ipv6-outbound-enabled", "discovery-mode", "rpc-http-host",
+)
+REQUIRED_BESU_ENGINE = (
+    "engine-rpc-port", "engine-host-allowlist", "engine-jwt-secret",
 )
 REQUIRED_LIGHTHOUSE = (
     "listen-address", "enr-address", "port6", "enr-tcp6-port",
@@ -193,7 +197,11 @@ def audit() -> dict:
         "besuExtendedHelpAvailable": xhelp_available,
         "besuP2pCliFlagsPresent": besu,
         "lighthouseBeaconCliFlagsPresent": lighthouse,
-        "requiredBesuIpv6OptionsPresent": all(besu[n] for n in REQUIRED_BESU),
+        "requiredBesuIpv6OptionsPresent": all(besu[n] for n in REQUIRED_BESU_IPV6),
+        "besuEngineJwtAndHeaderAllowlistOptionsPresent": all(besu[n] for n in REQUIRED_BESU_ENGINE),
+        "besuEngineExplicitBindHostOptionObserved": besu["engine-rpc-host"],
+        "engineHostAllowlistIsNotNetworkAccessControl": True,
+        "engineApiIPv6HostNetworkIsolationVerified": False,
         "requiredLighthouseIpv6OptionsPresent": all(lighthouse[n] for n in REQUIRED_LIGHTHOUSE),
         "dockerHelpRunsUsedNetworkNone": True,
         "newGenesisOrSignerCreated": False,
