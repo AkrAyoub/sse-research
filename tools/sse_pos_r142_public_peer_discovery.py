@@ -138,6 +138,7 @@ def discover(urls, getter=fetch, now=None, *, min_sources=2):
         raise Refused("at least two independent source URLs are required")
     successful = 0
     candidates = {}
+    conflicting_node_ids = set()
     for url in urls:
         try:
             raw = getter(url)
@@ -153,7 +154,13 @@ def discover(urls, getter=fetch, now=None, *, min_sources=2):
             if old is None:
                 candidates[node] = (el, bn)
             elif old != (el, bn):
+                conflicting_node_ids.add(node)
                 candidates[node] = False
+    # An equivocal identity can be an Eclipse/poisoning attempt. Do not
+    # silently accept the remaining one peer merely because R157 correctly
+    # permits networks with only ONE genuine bootstrap identity.
+    if conflicting_node_ids:
+        raise Refused("conflicting native peer identity across public directories")
     accepted = sorted((node, *data) for node, data in candidates.items() if data)
     # A network with exactly ONE reachable first-online peer must admit
     # its second node. Two independent source URLs avoid a single *directory*
