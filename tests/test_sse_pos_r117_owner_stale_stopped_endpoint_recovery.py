@@ -59,6 +59,15 @@ class R117Tests(unittest.TestCase):
                 m,"network",side_effect=lambda n:networks[n]),patch.object(
                 m,"inspect",side_effect=lambda n:cs[n]),self.assertRaises(m.Refused):
             m.validate()
+    def test_installer_and_boot_path_use_exact_stale_gate(self):
+        orchestrator=(ROOT/"scripts"/"r110_owner_boot_reconcile_networks.sh").read_text()
+        installer=(ROOT/"scripts"/"r109_install_owner_native_network_recovery.sh").read_text()
+        self.assertIn('"$STALE" --plan',orchestrator)
+        self.assertIn('"$STALE" --apply',orchestrator)
+        self.assertLess(orchestrator.index('"$STALE" --apply'),
+                        orchestrator.index('sse31340-owner-native-network-recovery.sh --apply'))
+        self.assertIn('install -m 0755 "$STALE_RECOVERY"',installer)
+        self.assertIn('R109_PREFLIGHT_EXACT_STALE_REBOOT_STATE=true',installer)
     def test_never_uses_container_create_or_validator_start(self):
         s=(ROOT/"tools"/"sse_pos_r117_owner_stale_stopped_endpoint_recovery.py").read_text()
         self.assertIn('docker("network","disconnect","--force",PRIVATE,name)',s)
