@@ -372,7 +372,7 @@ def apply(el_enode: str | None, bn_enr: str | None) -> dict:
         "--quic-port6=9001", "--enr-address=" + ip,
         "--enr-tcp6-port=9000", "--enr-udp6-port=9000",
         "--enr-quic6-port=9001", "--enable-private-discovery",
-        "--disable-upnp", "--allow-insecure-genesis-sync",
+        "--disable-upnp", "--disable-enr-auto-update", "--allow-insecure-genesis-sync",
     ]
     if bn_enr:
         bn_args.extend(["--boot-nodes=" + bn_enr])
@@ -404,7 +404,7 @@ def main() -> int:
     args = p.parse_args()
     try:
         report = preflight(args.execution_seed_enode_v6, args.beacon_seed_enr) if args.plan else apply(
-            args.execution_seed_enr, args.beacon_seed_enr)
+            args.execution_seed_enode_v6, args.beacon_seed_enr)
         if args.plan:
             report["mode"] = "read_only"
         print(json.dumps(report, sort_keys=True, indent=2))
