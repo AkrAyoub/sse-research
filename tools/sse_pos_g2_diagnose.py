@@ -98,6 +98,87 @@ ERROR_WORDS = re.compile(
     r"fatal|critical|crit|panic|failed|error|unable|could not|"
     r"invalid|unsupported|refused|unrecognized|unknown", re.I)
 
+
+# R39: narrow symbolic introspection. ALL emitted values must be authored in
+# source, never interpolated from raw JVM log lines. A huge secret-bearing
+# error line cannot leak through a dynamic class-name or message printout.
+JAVA_EXCEPTION_SIGNATURES = (
+    "RuntimeException", "UnsupportedOperationException", "NullPointerException",
+    "ClassCastException", "ExceptionInInitializerError", "SecurityException",
+    "FileNotFoundException", "IOException", "UncheckedIOException",
+    "FileSystemException", "AccessDeniedException", "NoSuchFileException",
+    "ReadOnlyFileSystemException", "OutOfMemoryError",
+    "IllegalStateException", "IllegalArgumentException",
+    "UnmatchedArgumentException", "ParameterException", "ExecutionException",
+    "JsonProcessingException", "JsonParseException", "JsonMappingException",
+    "MismatchedInputException", "InvalidFormatException",
+    "InvalidDefinitionException", "UnrecognizedPropertyException",
+    "GenesisConfigFileException", "GenesisConfigurationException",
+    "InvalidGenesisFileException", "InvalidConfigurationException",
+    "StorageException", "RocksDBException",
+    "NoClassDefFoundError", "ClassNotFoundException", "LinkageError",
+    "UnknownHostException", "BindException", "ConnectException",
+    "ConnectTimeoutException", "SocketException", "SSLException",
+    "DecodeException", "ParseException", "ValidationException",
+    "RejectedExecutionException", "TimeoutException",
+    "UncheckedExecutionException", "Error", "Exception",
+)
+BESU_DIAGNOSTIC_SIGNATURES = (
+    ("GENESIS_FIELD_NOT_RECOGNIZED", r"unrecognized field|unknown (?:property|field)|unknown key"),
+    ("GENESIS_PARSE_OR_VALIDATION", r"parse genesis|read genesis|invalid genesis|genesis.{0,60}(?:parse|invalid|error|failure)|can't parse genesis"),
+    ("GENESIS_FIELD_MISSING", r"missing (?:required )?(?:field|attribute|key)|required field"),
+    ("GENESIS_FIELD_NUMBER_ERROR", r"numberformatexception|number format|numeric value|out of range|value is too large"),
+    ("POST_MERGE_CONSENSUS_ERROR", r"consensus mechanism|no consensus|ethash|proof.of.stake|terminal.total.difficulty"),
+    ("CONFIG_DUPLICATE_OR_INCOMPATIBLE_FORK", r"fork.{0,45}(?:unsupported|error|invalid)|unsupported.{0,40}fork|prague|electra|osaka|fulu"),
+    ("GENESIS_ALLOC_ACCOUNT_ERROR", r"genesis account|alloc|invalid account|storage.{0,40}(?:invalid|error)|balance.{0,40}error"),
+    ("JAVA_CLI_UNMATCHED_ARGUMENT", r"unmatched arguments?|unrecognized arguments?|unknown option|invalid option|unknown argument|unknown parameter"),
+    ("JAVA_CLI_MISSING_ARGUMENT", r"missing required option|missing required parameter|not enough arguments"),
+    ("JAVA_STARTUP_FAILED", r"failed to start besu|error starting besu|cannot start besu"),
+    ("JAVA_MODULE_CLASSLOADER", r"classloader|class not found|noclassdeffounderror|unsupportedclassversionerror"),
+    ("JAVA_LOGGING_INITIALIZATION", r"logging|log4j|appender|logback|slf4j"),
+    ("JAVA_TMP_FILE_ACCESS", r"temporary directory|tempdir|java\.io\.tmpdir|/tmp/|accessdeniedexception"),
+    ("JAVA_FILESYSTEM_READ_ONLY", r"read.only file.system|erofs|filesystemexception|not writable"),
+    ("JAVA_JVM_CRASH_OR_SIGNAL", r"fatal error has been detected|sigsegv|hs_err_pid|segmentation fault|core dump"),
+    ("JAVA_NATIVE_LIBRARY_ERROR", r"failed to load native|native library|shared library|unsatisfiedlinkerror"),
+    ("JAVA_HOST_RESOLUTION_FAILURE", r"unknownhostexception|unable to resolve|could not resolve hostname"),
+    ("JAVA_DATABASE_ERROR", r"rocksdb|database.{0,60}(?:error|failed)|storageexception"),
+    ("AUTH_JWT_FAILURE", r"jwt|authentication token|secret file|secret key"),
+    ("RPC_HOST_ALLOWLIST_FAILURE", r"host allowlist|host is not allowed|invalid host allowlist"),
+    ("DOCKER_INTERNAL_RESOLUTION", r"sse31340-g2-(?:bn|el)|engine rpc|http://sse31340"),
+    ("OUT_OF_MEMORY", r"outofmemoryerror|oom|cannot allocate memory"),
+    ("EXCEPTION_STACKTRACE_PRESENT", r"(?:caused by:|exception in thread|at [a-z0-9_$.]+\(.*\.java:)"),
+)
+SIGNATURES = tuple((name, re.compile(expr, re.I)) for name, expr in BESU_DIAGNOSTIC_SIGNATURES)
+
+def safe_besu_exception_signatures(log_output: str) -> dict:
+    lines = log_output.splitlines()
+    labels = []
+    exception_counts = collections.Counter()
+    for line in lines:
+        for token in JAVA_EXCEPTION_SIGNATURES:
+            if token in ("Error", "Exception"):
+                continue
+            if re.search(r"(?<![A-Za-z0-9_$])" + re.escape(token) + r"(?![A-Za-z0-9_$])", line):
+                exception_counts[token] += 1
+    categorized = collections.Counter()
+    for line in lines:
+        for name, expr in SIGNATURES:
+            if expr.search(line):
+                categorized[name] += 1
+    return {
+        "knownJavaExceptionNames": [
+            {"class": token, "matchedLines": exception_counts[token]}
+            for token in JAVA_EXCEPTION_SIGNATURES
+            if exception_counts[token]
+        ],
+        "fixedBesuStartupSignatureCounts": [
+            {"signature": name, "matchedLines": categorized[name]}
+            for name, _ in SIGNATURES if categorized[name]
+        ],
+        "unrecognizedExceptionNamesEmitted": False,
+        "rawErrorMessagesEmitted": False,
+    }
+
 def categorize(log_output: str) -> dict:
     """Public-safe summary only; input can contain arbitrary private text."""
     counts = collections.Counter()
@@ -172,6 +253,8 @@ def inspect_one(name: str) -> dict:
     if rc == 0:
         result["readOnlyClassification"] = categorize(logs)
         result["staticRootCauseHints"] = safe_root_hints(logs)
+        if name == "sse31340-g2-el":
+            result["staticBesuJavaExceptionSignatures"] = safe_besu_exception_signatures(logs)
     else:
         result["containerLogsAccessible"] = False
     return result
