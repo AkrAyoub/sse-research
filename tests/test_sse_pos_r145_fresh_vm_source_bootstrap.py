@@ -80,6 +80,13 @@ class BootstrapTests(unittest.TestCase):
         self.assertFalse((self.home/"sse-research").exists())
         self.assertNotIn("R145_SOURCE_BOOTSTRAP_COMPLETED=true",r.stdout)
 
+    def test_legacy_apply_is_retired_even_with_pty_marker_absent(self):
+        # Historical R145 does not satisfy zero-interaction onboarding.
+        r=self.cmd(*self.opts(mode="--apply"))
+        self.assertEqual(r.returncode,2)
+        self.assertIn("manual apply retired",r.stderr)
+        self.assertFalse((self.home/"sse-research").exists())
+
     def test_shell_syntax(self):
         r=subprocess.run(["bash","-n",str(SCRIPT)],capture_output=True,
                          text=True,timeout=5,check=False)
