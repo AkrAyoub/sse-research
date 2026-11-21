@@ -101,6 +101,31 @@ class R58NativeIpv6AuditTests(unittest.TestCase):
         self.assertFalse(report["actualEthereumPeerHandshakeObserved"])
         self.assertFalse(report["readyToExecuteNativeNodeWithoutDesignReview"])
 
+    def test_ipv6_flags_independent_of_nonexistent_engine_bind_host_option(self):
+        names = m.REQUIRED_BESU_IPV6
+        self.assertIn("p2p-interface-ipv6", names)
+        self.assertIn("p2p-host-ipv6", names)
+        self.assertNotIn("engine-rpc-host", names)
+        self.assertEqual(set(m.REQUIRED_BESU_ENGINE),
+                         {"engine-rpc-port", "engine-host-allowlist", "engine-jwt-secret"})
+
+    def test_engine_header_allowlist_does_not_count_as_bind_isolation(self):
+        with patch.object(m, "signer_guard"), patch.object(m, "archive_guard", return_value=16218), \\
+             patch.object(m, "membership", return_value=("ztrb6cq527", "fca0:2328:77b8:6578:a55::1")), \\
+             patch.object(m, "run", side_effect=["29.1.3", ""]), \\
+             patch.object(m, "verify_image"), \\
+             patch.object(m, "offline_help", side_effect=[
+                 " ".join("--"+n for n in (*m.REQUIRED_BESU_IPV6, *m.REQUIRED_BESU_ENGINE)),
+                 " ".join("--"+n for n in m.REQUIRED_LIGHTHOUSE),
+                 m.R58Refused("Xhelp unavailable")]):
+            report = m.audit()
+        self.assertTrue(report["requiredBesuIpv6OptionsPresent"])
+        self.assertTrue(report["besuEngineJwtAndHeaderAllowlistOptionsPresent"])
+        self.assertFalse(report["besuEngineExplicitBindHostOptionObserved"])
+        self.assertTrue(report["engineHostAllowlistIsNotNetworkAccessControl"])
+        self.assertFalse(report["engineApiIPv6HostNetworkIsolationVerified"])
+        self.assertFalse(report["readyToExecuteNativeNodeWithoutDesignReview"])
+
     def test_refuse_unverified_image_id(self):
         with patch.object(m, "run", side_effect=["sha256:"+"a"*64, "linux/amd64"]):
             with self.assertRaises(m.R58Refused):
