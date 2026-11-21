@@ -8,6 +8,7 @@ claims source installation is a joined chain or activated role.
 """
 from __future__ import annotations
 import argparse
+import hashlib
 import json
 import os
 from pathlib import Path
@@ -74,6 +75,7 @@ def guard_existing(root=Path("/")):
                 "sse-r35-chain31340-g2-private",
                 "sse-r27-bls-operator-private",
                 "sse-r59-chain31340-observer"))
+            paths.extend(state.glob("sse-r137-*"))
     if any(p.exists() or p.is_symlink() for p in paths):
         raise Refused("existing SSE state; refuse overwrite and duplicate signer")
 
@@ -131,11 +133,13 @@ def install_source(commit, plan, root=TARGET_ROOT, state=STATE):
                         "--node-id",node_id,
                         "--roles",",".join(plan["selectedRoles"]),"--plan"])
         report=json.loads(result)
-        if (report.get("nodeId") != node_id or
-                report.get("selectedRoles") != plan["selectedRoles"] and
-                not (plan["selectedRoles"] == ["validator"] and
-                     report["selectedRoles"] == ["full_node","validator"])):
+        expected = list(plan["selectedRoles"])
+        if ("validator" in expected and
+                not set(expected).intersection({"full_node", "observer"})):
+            expected.insert(0, "full_node")
+        if report.get("nodeId") != node_id or report.get("selectedRoles") != expected:
             raise Refused("unified role configuration disagrees")
+        plan["selectedRoles"] = expected
         shutil.move(str(checkout),str(release))
     state.parent.mkdir(mode=0o700,parents=True,exist_ok=True)
     data={**plan,"publicSourceDownloaded":True,"roleSelectionRecorded":True}
@@ -160,7 +164,7 @@ def main(argv=None):
         mid=machine.read_text().strip()
         if not re.fullmatch(r"[0-9a-f]{32}",mid):
             raise Refused("invalid independent host machine-id")
-        node_id="node-"+mid[:20]
+        node_id="node-"+hashlib.sha256(mid.encode("ascii")).hexdigest()[:20]
         plan=build_plan(commit,selected,node_id)
         if args.plan:
             print(json.dumps(plan,sort_keys=True,indent=2))
