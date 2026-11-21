@@ -268,6 +268,14 @@ class R65NativePublicOwnerMigrationTests(unittest.TestCase):
         self.assertIn('candidate[candidate.index("--entrypoint")+1]!="lighthouse"',plan)
         self.assertNotIn('docker(["create"',plan)
 
+    def test_maintenance_prompt_warns_owner_backup_is_sensitive_and_unencrypted(self):
+        source=(ROOT/"tools/sse_pos_r65_original_chain_native_public_p2p_migration.py").read_text()
+        apply=source[source.index("def apply("):source.index("def main(")]
+        self.assertIn("UNENCRYPTED",apply)
+        self.assertIn("signing/slashing",apply)
+        self.assertIn("Protect and encrypt it offline",apply)
+        self.assertIn("MIGRATE-EXISTING-CHAIN31340-NATIVE-P2P",apply)
+
     def test_apply_aborts_and_rolls_back_before_rename_if_consistent_snapshot_fails(self):
         plan={"actualOpenOverlayIPv6":IP}
         from unittest.mock import patch as mp
