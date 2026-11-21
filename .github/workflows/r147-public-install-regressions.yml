@@ -27,6 +27,8 @@ jobs:
         run: python3 -B -m unittest discover -s tests -p 'test_sse_pos_r147_public_install.py' -v
       - name: R148 no-hardcoded-peer first-node semantics
         run: python3 -B -m unittest discover -s tests -p 'test_sse_join_phase.py' -v
+      - name: R149 original public-genesis release verification
+        run: python3 -B -m unittest discover -s tests -p 'test_sse_public_genesis.py' -v
       - name: All relevant unified/VM onboarding guard tests
         run: |
           python3 -B -m unittest discover -s tests -p 'test_sse_join.py' -v
