@@ -57,6 +57,34 @@ def fetch_https(url):
         raise Refused("oversized or empty vendor artifact")
     return data
 
+def verify_primary_vendor_key_fingerprint(colon_report):
+    """Require exactly one release certificate, allow its actual subkeys.
+
+    GPG --with-colons prints an fpr for the primary pub and may print
+    additional fpr lines for legitimate sub keys. The old len(fprs)==1
+    incorrectly rejected valid certificates with subkeys.
+    """
+    if type(colon_report) is not str:
+        raise Refused("missing GPG public key inventory")
+    primaries=[]
+    expecting=False
+    for line in colon_report.splitlines():
+        columns=line.split(":")
+        kind=columns[0]
+        if kind=="pub":
+            primaries.append(None)
+            expecting=True
+        elif kind=="sub":
+            expecting=False
+        elif kind=="fpr" and expecting and primaries:
+            if len(columns)<=9 or primaries[-1] is not None:
+                raise Refused("ambiguous vendor primary key fingerprint")
+            primaries[-1]=columns[9].upper()
+            expecting=False
+    if primaries!=[VENDOR_FINGERPRINT]:
+        raise Refused("ZeroTier release primary key fingerprint differs")
+    return True
+
 def verify_official_install_script(key, signed, *, runner=call):
     if (type(key) is not bytes or type(signed) is not bytes
             or not 0<len(key)<=200000 or not 0<len(signed)<=200000):
@@ -72,10 +100,7 @@ def verify_official_install_script(key, signed, *, runner=call):
         runner(["gpg","--batch","--homedir",tmp,"--import",str(keyfile)])
         inventory=runner(["gpg","--batch","--homedir",tmp,
                           "--with-colons","--fingerprint"])
-        fprs=[line.split(":")[9] for line in inventory.splitlines()
-              if line.startswith("fpr:")]
-        if len(fprs)!=1 or fprs[0].upper()!=VENDOR_FINGERPRINT:
-            raise Refused("ZeroTier release key fingerprint differs")
+        verify_primary_vendor_key_fingerprint(inventory)
         # GPG verifies the official clearsigned script and emits ONLY
         # independently authenticated script bytes. No pipe-to-shell.
         # With checked single primary key, a good signature cannot be from
