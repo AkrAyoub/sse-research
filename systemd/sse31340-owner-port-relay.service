@@ -1,0 +1,28 @@
+[Unit]
+Description=SSE 31340 owner host port relay (no Engine API; original EL/BN remain internal)
+Wants=network-online.target docker.service zerotier-one.service
+After=network-online.target docker.service zerotier-one.service
+StartLimitIntervalSec=0
+
+[Service]
+Type=simple
+DynamicUser=yes
+ExecStart=/usr/bin/python3 -B /usr/local/libexec/sse_pos_r92_owner_internal_bridge_host_relay.py --serve
+Restart=always
+RestartSec=15s
+NoNewPrivileges=true
+ProtectSystem=strict
+ProtectHome=true
+PrivateTmp=true
+PrivateDevices=true
+ProtectKernelTunables=true
+ProtectKernelModules=true
+ProtectControlGroups=true
+RestrictAddressFamilies=AF_INET AF_INET6 AF_UNIX
+UMask=077
+TimeoutStopSec=15s
+StandardOutput=journal
+StandardError=journal
+
+[Install]
+WantedBy=multi-user.target
