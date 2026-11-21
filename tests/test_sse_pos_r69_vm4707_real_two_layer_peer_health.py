@@ -26,6 +26,12 @@ class R69ReadOnlyObserverTests(unittest.TestCase):
         with self.assertRaises(m.R69Refused):
             m.rpc("admin_addPeer")
 
+    def test_execution_peer_count_uses_hex_rpc_quantity(self):
+        self.assertEqual(m.uint("0x1",hex_result=True),1)
+        self.assertEqual(m.uint("0xa",hex_result=True),10)
+        with self.assertRaises(m.R69Refused):
+            m.uint("0x1")
+
     def test_no_unreviewed_docker_container_ever_inspected(self):
         with self.assertRaises(m.R69Refused):
             m.docker_state("sse31340-g2-vc")
@@ -73,7 +79,7 @@ class R69ReadOnlyObserverTests(unittest.TestCase):
                      '"admin_addPeer"','"validator","create"','"wallet"','"engine.jwt"'):
             self.assertNotIn(term,source)
         self.assertIn('"noDockerOrBlockchainMutations":True',source)
-        self.assertIn('"realIndependentSameEpochFinalizedRootAgreementStillNeedsOwnerComparison":True',source)
+        self.assertIn('out["realIndependentSameEpochFinalizedRootAgreementStillNeedsOwnerComparison"]=True',source)
 
 if __name__=="__main__":
     unittest.main()
