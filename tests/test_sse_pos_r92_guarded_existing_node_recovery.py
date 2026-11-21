@@ -43,6 +43,19 @@ class R92RecoveryTests(unittest.TestCase):
                                              "172.18.0.2", None))
         self.assertFalse(m.published({"NetworkSettings":{"Ports":{}}},
                                      cfg["bindings"]["sse31340-r59-nonsigning-el"]))
+    def test_observer_periodic_recovery_installed_and_not_latched(self):
+        service = (ROOT / "systemd" / "sse31340-existing-node-recover@.service").read_text()
+        timer = (ROOT / "systemd" / "sse31340-observer-network-recovery.timer").read_text()
+        installer = (ROOT / "scripts" / "r92_install_existing_node_recovery.sh").read_text()
+        self.assertIn("Type=oneshot", service)
+        self.assertNotIn("RemainAfterExit=yes", service)
+        self.assertIn("Restart=on-failure", service)
+        self.assertIn("OnBootSec=45s", timer)
+        self.assertIn("OnUnitInactiveSec=2min", timer)
+        self.assertIn("Unit=sse31340-existing-node-recover@observer.service", timer)
+        self.assertIn("enable --now sse31340-observer-network-recovery.timer", installer)
+        self.assertLess(installer.index("enable --now sse31340-observer-network-recovery.timer"),
+                        installer.index('systemctl disable "sse31340-existing-node-recover@$ROLE.service"'))
     def test_plan_does_not_modify_docker(self):
         cfg = m.ROLES["observer"]
         with patch.object(m, "verify_environment", return_value=cfg), patch.object(
