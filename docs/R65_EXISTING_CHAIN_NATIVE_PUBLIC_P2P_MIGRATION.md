@@ -18,13 +18,25 @@
 
 Original chain/validator unaffected. Real Docker runtime readiness still subject to all remaining plan gates (original immutable images/hardening, preserved private mounts, original genesis, authenticated same-overlay networking, actual original API/finality and rollback). **DO NOT run `--apply` until the corrected plan returns successfully and backups/maintenance risks are reviewed**. This fix is not proof of external native peers.
 
+## R65 owner WORKDIR refusal and next read-only correction — 2026-11-21
+
+**Actually observed:** VM4706 fetched and detached `aa34d5a3a8164753775d8bc098ef676b389b2215`, ran **27/27 R65 tests PASS**, then `--plan` verified real chain and owner public overlay and stopped with **`custom working directory requires separate review`** during original Docker metadata inspection. No `--apply` or original-client restart occurred. The exact Docker `WorkingDir` values were not printed; no assumptions about their contents are warranted.
+
+**GitHub-only fix (NOT YET VM EXECUTED):** Normalize effective absent/empty Docker working directory to `/`, accept only a bounded normalized absolute in-container path (never traversal, untrusted relative paths or control characters), and **explicitly pass `--workdir` with the original live container's effective directory** to any proposed new Besu or Beacon container. This preserves runtime semantics instead of silently adopting a pinned image default, including for genuine nondefault original paths. The original running process and private host mount paths are untouched.
+
+R65 `--plan` now constructs each complete proposed EL/BN `docker create` argument vector *in memory*, checks original Lighthouse explicit `--entrypoint lighthouse`, workdir match and size, but never runs `docker create`. This catches more launch inconsistencies before the only signing validator is interrupted. Strict original Env key/value equality, pinned image digest, mounts, Engine JWT and network hardening checks still apply. The R65 test suite now defines **33 tests** (previously 27), and corrected R59 source defines **19 tests** (previously 17), neither new suite run on VM yet.
+
+**Peer-discovery safety improvement:** Lighthouse owner and observer CLI now pass `--disable-enr-auto-update` so an ENR configured for the public 6plane address is not overwritten by underlay peer observations; a stale `args.execution_seed_enr` R59 observer `--apply` reference was fixed to the actual `args.execution_seed_enode_v6` parameter. The latter would otherwise have raised `AttributeError` when eventually creating a second nonsigning observer. None of these source changes demonstrate native P2P peer handshakes or finalized-root equality across outside-provider nodes.
+
+**Do not run R65 `--apply`** until corrected live `--plan` passes AND original EL/BN/VC recoverable backups and rollback can be independently verified. The owner VM must not use provider-private LAN for native P2P/bootstrap.
+
 ## What the original VM actually proved
 
 At immutable Git SHA `ada6cf9bc84a1fd6944e6c7a40b1feff2901ef7c`, VM4706 operator ran R64 **10/10 source tests PASS** and real original R64 network/state audit. Output verified owner actual ZeroTier `ff2328775f000000` `OK PUBLIC`, assigned `fca0:2328:776e:4750:395b::1`; original single EL/BN/VC running; same isolated internal Docker trust network `sse31340-g2-internal`; exact pinned image IDs and immutable original genesis/JWT metadata; EL P2P explicitly false, actual native peers `0x0`. EL/BN each bind-mount **exactly three owner-private paths** at `/data` (writable), `/testnet` and `/jwt/engine.jwt` (readonly), no extra original attached Docker networks; VC has four existing private mounts and **must never be recreated**. Real in-namespace EL execution chainId31340 block `0xc62` = **3170**; Lighthouse head **slot 3388**, finalized **epoch 101**, finalized root `0xf30b621acbfda2ee5ebaef9e0dd26c516481f27c545a49fb78f81f94484ddf85`. These advance from R62 EL3029, BN head3247, epoch97. They do not prove ongoing multi-peer finality or native P2P beyond the single owner host.
 
 ## Implemented migration source (NOT YET OPERATOR-RUN)
 
-`tools/sse_pos_r65_original_chain_native_public_p2p_migration.py`, `tests/test_sse_pos_r65_original_chain_native_public_p2p_migration.py` (**27 mocked/source tests**, not executed on VM), and this document. Source is GitHub-only in feature branch. The implementation has two mutually exclusive modes:
+`tools/sse_pos_r65_original_chain_native_public_p2p_migration.py`, `tests/test_sse_pos_r65_original_chain_native_public_p2p_migration.py` (**33 mocked/source tests**, not executed on VM), and this document. Source is GitHub-only in feature branch. The implementation has two mutually exclusive modes:
 
 **`--plan --expected-commit SHA`** reads the exact original G2 + owner overlay state through R60/R62/R63/R64, checks that exactly one original execution+Beacon pair is running, normal image digest and private mount layout, preserved Engine JWT metadata, hardening and trusted Docker network, current canonical execution/Beacon health. It checks no old `-r65-preserved` containers or R65 P2P bridge exist. It builds a minimal proposed public IPv6 P2P publication list:
 - Besu existing client: primary *internal IPv4* `30303` (NOT host-published, NOT private provider-LAN advertised), **secondary IPv6 30404 TCP+UDP** published ONLY to owner `[fca0:2328:776e:4750:395b::1]` (computed dynamically from current ZeroTier host membership). Besu v26.11 IPv6 options `--p2p-enabled=true`, `--p2p-host=127.0.0.1`, `--p2p-host-ipv6=<actual6plane>`, `--p2p-interface-ipv6=::`, `--p2p-port-ipv6=30404`, `--p2p-discovery-port-ipv6=30404`, IPv6 outbound preference and discovery BOTH. Host EL JSON-RPC only `127.0.0.1:18545:8545/tcp`; **NO Engine8551 host publication**.
@@ -43,7 +55,7 @@ At immutable Git SHA `ada6cf9bc84a1fd6944e6c7a40b1feff2901ef7c`, VM4706 operator
  cd "$HOME/sse-research"
  export GIT_SSH_COMMAND="ssh -i $HOME/.ssh/sse_vm4706_readonly -o IdentitiesOnly=yes -o StrictHostKeyChecking=yes -o BatchMode=yes"
  git fetch --no-tags origin feature/r19-fresh-external-node-preflight
- SHA="aa34d5a3a8164753775d8bc098ef676b389b2215"
+ SHA="ae5e780055f044d635d20cc33a5d426ca6e42e63"
  git switch --detach "$SHA"
  test "$(git rev-parse HEAD)" = "$SHA"
  python3 -B -m unittest discover -s tests -p 'test_sse_pos_r59_native_ipv6_observer.py' -v
