@@ -130,6 +130,8 @@ class R153Tests(unittest.TestCase):
         self.assertIn("OnUnitActiveSec=2min",timer)
         self.assertIn("sse_pos_r156_local_native_peer_identity.py",unit)
         self.assertIn("public-peer.json",unit)
+        self.assertIn("sse_pos_r159_native_peer_announce.py",unit)
+        self.assertIn("chain31340-public-release.json",unit)
         self.assertNotIn("validator",unit)
         self.assertNotIn("docker run",unit)
         self.assertNotIn("Engine",unit)
