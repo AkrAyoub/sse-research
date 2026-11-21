@@ -15,6 +15,8 @@ import base64
 from datetime import datetime, timezone
 import ipaddress
 import json
+import os
+import tempfile
 from pathlib import Path
 import re
 import sys
@@ -211,9 +213,11 @@ def capture(node_id, fetch=read_json, overlay_reader=r59.overlay_ip):
         node_id,ip,fetch(LOOPBACK_EL,method="POST",rpc_method="net_enode"),
         enr_identity.get("enr"),chain,
         beacon_genesis.get("genesis_validators_root",""))
+    now=datetime.now(timezone.utc)
     return {
         "schema":"SSE_R156_LOCAL_NODE_NATIVE_IDENTITY_V1",
-        "capturedAtUtc":datetime.now(timezone.utc).isoformat(),
+        "capturedAtUtc":now.isoformat(),
+        "expiresAt":int(now.timestamp())+600,
         "chainId":31340,
         "executionGenesisHash":genesis.EL_GENESIS,
         "beaconGenesisValidatorsRoot":genesis.CL_GENESIS,
@@ -226,12 +230,37 @@ def capture(node_id, fetch=read_json, overlay_reader=r59.overlay_ip):
         "independentOperatorProven":False,
     }
 
+def write_atomic(path, record):
+    path=Path(path)
+    if path.is_symlink() or (path.exists() and not path.is_file()):
+        raise Refused("refuse nonregular peer-record output")
+    path.parent.mkdir(mode=0o700,parents=True,exist_ok=True)
+    with tempfile.NamedTemporaryFile(mode="w",dir=path.parent,
+                                     prefix=".r156-",delete=False,
+                                     encoding="utf-8") as out:
+        temporary=Path(out.name)
+        os.fchmod(out.fileno(),0o600)
+        json.dump(record,out,sort_keys=True,indent=2)
+        out.write("\\n")
+        out.flush()
+        os.fsync(out.fileno())
+    os.replace(temporary,path)
+    return record
+
 def main(argv=None):
     p=argparse.ArgumentParser(description=__doc__)
     p.add_argument("--node-id",required=True)
+    p.add_argument("--out",type=Path,help="private rotating local output; never uploads")
     args=p.parse_args(argv)
     try:
-        print(json.dumps(capture(args.node_id),sort_keys=True,indent=2))
+        result=capture(args.node_id)
+        if args.out:
+            write_atomic(args.out,result)
+        print(json.dumps({"nodeId":result["publicPeerRecord"]["nodeId"],
+                          "expiresAt":result["expiresAt"],
+                          "realPeerIdentityCaptured":True,
+                          "publishedToAnyExternalDiscoveryService":False},
+                         sort_keys=True))
         return 0
     except (Refused,r59.R59Refused,OSError,ValueError,TypeError,KeyError) as exc:
         print("R156_LOCAL_NATIVE_IDENTITY_REFUSED: "+str(exc),file=sys.stderr)
