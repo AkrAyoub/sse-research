@@ -139,8 +139,11 @@ def original_definition(name:str)->dict:
     return {"name":name,"image":ref,"cmd":cmd,"mounts":mounts,"config":config,
             "host":host,"network":networks[TRUSTED]}
 
-def validated_host_ports(ip:str)->dict[str,list[dict]]:
-    address=ipaddress.IPv6Address(ip)
+def validated_host_ports(ip:str)->dict[str,list[str]]:
+    try:
+        address=ipaddress.IPv6Address(ip)
+    except ValueError as exc:
+        raise R65Refused("public P2P host endpoint is not real IPv6") from exc
     if address not in ipaddress.IPv6Network("fca0::/16"):
         raise R65Refused("public native ports require actual 6plane IPv6 host")
     return {
