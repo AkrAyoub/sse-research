@@ -169,7 +169,10 @@ def enode_bootstrap_from_rpc(identity:object,ip:str)->str:
     )
     if not m:
         raise R67Refused("Besu net_enode did not expose a valid actual public node ID")
-    ipv6=ipaddress.IPv6Address(ip)
+    try:
+        ipv6=ipaddress.IPv6Address(ip)
+    except ValueError as exc:
+        raise R67Refused("Besu bootstrap IP is not IPv6") from exc
     if ipv6 not in ipaddress.IPv6Network("fca0::/16"):
         raise R67Refused("Besu bootstrap IP is not owner open-overlay 6plane")
     candidate=f"enode://{m.group(1).lower()}@[{ipv6.compressed}]:30404"
