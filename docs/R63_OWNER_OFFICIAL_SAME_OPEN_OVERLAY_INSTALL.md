@@ -4,6 +4,14 @@
 
 Original VM4706 does **not** currently have ZeroTier. This is a **one-time OS networking installation**, separate from Ethereum P2P; it must never recreate original genesis, new validators, change existing Docker networks, restart Besu/Lighthouse or transfer signing secrets. User insists NO provider-private LAN as blockchain peer/bootstrapping; this transport must match VM4707 and independent laptop open-join network. The existing measured external WSL laptop↔VM4707 ZeroTier IPv6 payload transport is a prerequisite but not real native EL/CL proof. A ZeroTier virtual 6plane address by itself does not prove packets avoid provider-private underlay; future acceptance must include outside-provider native peer and real underlay inspection.
 
+## Actual VM4706 run and verified installer defect (2026-11-21)
+
+**Real result:** operator fetched/detached SHA `bfd604f6f379d18980de4154cea4bf5f0e38fd57` and ran all **14/14 R63 source tests PASS**; the actual read-only `--plan` returned original EL/BN/VC running, genesis/JWT metadata valid, host IPv4 default route present, `zeroTierClientAlreadyInstalled=false`, `alreadyOnExactPublicControllerlessNetwork=false`. The owner then ran `--install-and-join`, typed exact authorization `INSTALL-OWNER-OPEN-P2P-TRANSPORT`, and got **`R63_SAME_OPEN_TRANSPORT_REFUSED: R63Refused`**. The original version deliberately omitted untrusted subprocess stderr, making the failed operation unspecified. **No installation success or actual overlay membership has been observed.** Existing Ethereum EL/BN/VC were not told to stop, restart or change configuration.
+
+**Root-cause source defect verified against live upstream repository:** prior `KEY_URL` used `https://raw.githubusercontent.com/zerotier/ZeroTierOne/master/doc/contact%40zerotier.com.gpg`, but the official upstream ZeroTierOne GitHub repository has `main` and `dev`, **not** `master` (GitHub commit-ref lookup for `master` returned 404). The actual official signing key is found on `main` (3,175-byte ASCII armored public key), consistent with https://www.zerotier.com/download/ . Thus the old installer would fail while retrieving its first nonlocal prerequisite, **before adding the apt source or installing packages if it reached that step**. Exact stage of the real failure must still be verified from operator read-only local repository/package state rather than assumed.
+
+**GitHub R63 correction SOURCE ONLY (not VM rerun):** fixed official GPG key URL to the real `main` branch; new controlled, nonsecret stage markers for public-key fetch/fingerprint, signed apt source configuration, APT update and pinned package install, join and post-install original-chain verification. Added two source regression tests for the live upstream key branch and stage-level diagnostics; suite now **16 focused tests defined, not yet VM-executed**. Do not blindly rerun on partial host state: report whether `/usr/share/keyrings/zerotier-debian-package-key.gpg`, `/etc/apt/sources.list.d/zerotier-sse.list`, `/etc/apt/sources.list.d/zerotier.list`, `zerotier-one` or the CLI/service already exist. The updated installer itself refuses an existing repo file/key or installed client, preventing unattended overwrites.
+
 ## R63 implementation (not executed yet)
 
 `tools/sse_pos_r63_owner_open_overlay_install.py` is a single standard-library script that imports the existing reviewed R60 owner audit guard. Two modes:
@@ -16,7 +24,7 @@ Original VM4706 does **not** currently have ZeroTier. This is a **one-time OS ne
 
 ## Operator gate — VM4706 ONLY (after exact commit SHA is given)
 
-Use owner-local GitHub read-only fetch, pinned detached checkout, run **14 R63 regression methods** (SOURCE mocks only), and run `--plan`. If any preflight result fails, stop and do not run `--install-and-join`. The owner must explicitly agree before real host networking is modified.
+Use owner-local GitHub read-only fetch, pinned detached checkout, run **16 R63 regression methods** (SOURCE mocks only), and run `--plan`. If any preflight result fails, stop and do not run `--install-and-join`. The owner must explicitly agree before real host networking is modified.
 
 ```bash
 (
