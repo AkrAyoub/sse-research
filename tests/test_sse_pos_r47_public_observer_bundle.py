@@ -72,6 +72,32 @@ class R47PortableRealObserverArtifacts(unittest.TestCase):
             with self.assertRaisesRegex(module.ArtifactRefused, "symlinked"):
                 module.verify_bundle(link)
 
+    def test_complete_tar_from_synthetic_fixture_verifies_without_extracting(self):
+        import io
+        samples = {
+            "genesis.json": b'{"config":{"chainId":31340}}',
+            "config.yaml": b"DEPOSIT_CHAIN_ID: 31340\n",
+            "genesis.ssz": b"\x12" * 64,
+            "deposit_contract_block.txt": b"0\n",
+        }
+        hashes = {name: module.digest(data) for name, data in samples.items()}
+        sizes = {name: (len(data), len(data)) for name, data in samples.items()}
+        with patch.dict(module.EXPECTED, hashes, clear=True):
+            with patch.dict(module.SIZES, sizes, clear=True):
+                with tempfile.TemporaryDirectory() as temp:
+                    path = Path(temp) / "synthetic-test-fixture.tar.gz"
+                    with path.open("wb") as dest:
+                        module.archive_stream(dest, samples)
+                    report = module.verify_bundle(path, expected=hashes)
+                    self.assertTrue(report["originalChain31340ManifestAuthenticated"])
+                    self.assertEqual(report["publicGenesisFilesExact"], 4)
+                    self.assertFalse(report["archiveExtractedByVerification"])
+                    with tarfile.open(path, mode="r:gz") as archive:
+                        self.assertEqual(
+                            set(archive.getnames()),
+                            {module.PREFIX + key for key in (*samples, "manifest.json")}
+                        )
+
     def test_no_docker_restart_or_any_private_keyfile_read(self):
         source = (ROOT / "tools/sse_pos_r47_public_observer_bundle.py").read_text("utf-8")
         for token in ('"start"', '"restart"', '"stop"', '"kill"', '"rm"',
