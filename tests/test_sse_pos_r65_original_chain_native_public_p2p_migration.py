@@ -278,6 +278,48 @@ class R65NativePublicOwnerMigrationTests(unittest.TestCase):
         self.assertIn('safe_original_restart_policy(host.get("RestartPolicy"))',source)
         self.assertIn('safe_original_restart_policy(vc_policy)',source)
 
+    def test_single_vm_risk_is_explicit_alternative_not_false_backup_attestation(self):
+        source=(ROOT/"tools/sse_pos_r65_original_chain_native_public_p2p_migration.py").read_text()
+        self.assertIn('authorization.add_argument("--accept-single-vm-recovery-risk"',source)
+        self.assertIn("I-ACCEPT-PERMANENT-CHAIN-LOSS-RISK",source)
+        self.assertIn("The local R66 archive is NOT independently protected",source)
+        self.assertIn('singleVmRecoveryRiskAcceptedByOperator',source)
+        self.assertIn('"externalBackupIndependentlyVerified":False',source)
+        self.assertIn('snapshot_consistent_original_state(',source)
+
+    def test_single_vm_risk_and_external_backup_claim_cannot_both_be_selected(self):
+        with patch.object(m,"read_only_plan",return_value=({}, {}, {})):
+            with self.assertRaises(m.R65Refused):
+                m.apply("a"*40,True,True)
+
+    def test_single_vm_risk_operator_rejection_changes_nothing(self):
+        with patch.object(m,"read_only_plan",return_value=({}, {}, {})),patch.object(
+            m.sys,"stdin") as stdin,patch.object(
+            m.sys,"stderr") as stderr,patch(
+            "builtins.input",return_value="NO"),patch.object(m,"docker") as docker:
+            stdin.isatty.return_value=True
+            stderr.isatty.return_value=True
+            with self.assertRaises(m.R65Refused):
+                m.apply("a"*40,False,True)
+        docker.assert_not_called()
+
+    def test_single_vm_risk_requires_two_distinct_approvals_before_mutation(self):
+        with patch.object(m,"read_only_plan",return_value=(
+                {"actualOpenOverlayIPv6":IP},{},{})),patch.object(
+                m.sys,"stdin") as stdin,patch.object(
+                m.sys,"stderr") as stderr,patch(
+                "builtins.input",side_effect=[
+                    "I-ACCEPT-PERMANENT-CHAIN-LOSS-RISK",
+                    "MIGRATE-EXISTING-CHAIN31340-NATIVE-P2P"]),patch.object(
+                m,"docker",side_effect=m.R65Refused("mock Docker bridge failure")
+                ) as docker:
+            stdin.isatty.return_value=True
+            stderr.isatty.return_value=True
+            with self.assertRaises(m.R65Refused):
+                m.apply("a"*40,False,True)
+        docker.assert_called_once()
+        self.assertEqual(docker.call_args.args[0][:2],["network","create"])
+
     def test_maintenance_prompt_warns_owner_backup_is_sensitive_and_unencrypted(self):
         source=(ROOT/"tools/sse_pos_r65_original_chain_native_public_p2p_migration.py").read_text()
         apply=source[source.index("def apply("):source.index("def main(")]
