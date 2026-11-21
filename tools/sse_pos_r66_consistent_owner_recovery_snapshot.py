@@ -64,8 +64,8 @@ def digest_file(p:Path)->str:
 def require_stopped_docker(names:tuple[str,str,str])->None:
     """Source helper may never snapshot live signing or database files."""
     import subprocess
-    if len(names)!=3 or len(set(names))!=3:
-        raise R66Refused("exactly original EL, BN and VC required")
+    if names!=("sse31340-g2-el-r40","sse31340-g2-bn","sse31340-g2-vc"):
+        raise R66Refused("exactly verified original EL, BN and VC required")
     for name in names:
         try:
             result=subprocess.run(
