@@ -24,8 +24,8 @@ def record(name="node-existing-a",key="a",ip="fca0:2328:7777:8888::1",
         "actualOverlayIpv6":ip,
         "publicPeerRecord":{
             "nodeId":name,
-            "executionEnode":"enode://"+key*128+"@["+ip+"]:30404",
-            "beaconEnr":"enr:"+key.upper()*100,
+            "executionEnode":"enode://"+(key if len(key)==128 else key*128)+"@["+ip+"]:30404",
+            "beaconEnr":"enr:"+"A"*100,
         },
         "publishedToAnyExternalDiscoveryService":False,
         "nativeRemoteHandshakeProven":False,
@@ -79,7 +79,7 @@ class DirectoryServiceTests(unittest.TestCase):
     def test_bounded_capacity_not_network_membership_cap(self):
         for i in range(64):
             self.store.announce(record(name="node-%03d"%i,
-                                       key=format(i+1,"x")[-1],
+                                       key=f"{i+1:0128x}",
                                        ip="fca0:2328:7777:8888::"+format(i+1,"x")))
         self.assertEqual(len(self.store.snapshot()["peers"]),64)
         with self.assertRaises(m.Refused):
