@@ -17,6 +17,7 @@ from pathlib import Path
 import re
 import subprocess
 import tempfile
+import time
 import urllib.request
 
 import sse_pos_r59_native_ipv6_observer as r59
@@ -117,7 +118,19 @@ def setup(*, execute=False, runner=call, fetcher=fetch_https):
         runner(["docker","pull",image],timeout=300)
     # Confirm exact local image digests and architecture, NOT merely tag.
     r59.images()
-    iface,ip=r59.overlay_ip()
+    # Joining a public ad-hoc overlay is asynchronous. Actual 6plane IPv6
+    # must be observed, not inferred from successful "join" submission.
+    last_failure=None
+    for attempt in range(12):
+        try:
+            iface,ip=r59.overlay_ip()
+            break
+        except r59.R59Refused as exc:
+            last_failure=exc
+            if attempt < 11:
+                time.sleep(5)
+    else:
+        raise Refused("ZeroTier joined but usable actual overlay IPv6 not observed") from last_failure
     return {
         "schema":"SSE_R152_HOST_PREREQUISITES_V1",
         "installed":True,"imagesPulled":True,
