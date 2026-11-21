@@ -22,7 +22,7 @@ import urllib.request
 
 import sse_pos_r59_native_ipv6_observer as r59
 
-VENDOR_KEY = "https://raw.githubusercontent.com/zerotier/ZeroTierOne/main/doc/contact%40zerotier.com.gpg"
+VENDOR_KEY = "https://raw.githubusercontent.com/zerotier/ZeroTierOne/master/doc/contact%40zerotier.com.gpg"
 VENDOR_SCRIPT = "https://install.zerotier.com/"
 VENDOR_FINGERPRINT = "74A5E9C458E1A431F1DA57A71657198823E52A61"
 NETWORK = r59.NETWORK
