@@ -79,11 +79,17 @@ class R151Tests(unittest.TestCase):
         self.assertEqual(y,",".join(bn))
         self.assertEqual(status,"PUBLIC_MULTISOURCE_NATIVE_HINTS")
 
-    def test_fewer_than_two_discovered_hints_fail_closed(self):
+    def test_zero_discovered_hints_fail_closed_but_one_peer_is_valid(self):
         urls=["https://a.example.org/peers","https://b.example.org/peers"]
         with self.assertRaises(m.Refused):
             m.peer_hints(release(urls),lookup=lambda _: {
-                "executionBootnodes":["one"],"beaconBootnodes":["two"]})
+                "executionBootnodes":[],"beaconBootnodes":[]})
+        el,bn,mode=m.peer_hints(release(urls),lookup=lambda _: {
+            "executionBootnodes":["real-enode-hint"],
+            "beaconBootnodes":["real-enr-hint"]})
+        self.assertEqual((el,bn,mode),
+                         ("real-enode-hint","real-enr-hint",
+                          "PUBLIC_MULTISOURCE_NATIVE_HINTS"))
 
     def test_bad_local_role_selection_or_fake_source_refused(self):
         for change in ({"publicSourceDownloaded":False},
