@@ -1,0 +1,23 @@
+[Unit]
+Description=SSE31340 original owner native dual-network recovery (existing EL/BN only)
+Wants=docker.service zerotier-one.service
+After=docker.service zerotier-one.service
+StartLimitIntervalSec=0
+
+[Service]
+Type=oneshot
+Environment=R106_BOOT_SERVICE=true
+ExecStart=/usr/bin/bash /usr/local/libexec/sse31340-owner-native-network-recovery.sh --apply
+Restart=on-failure
+RestartSec=30s
+TimeoutStartSec=180s
+UMask=077
+NoNewPrivileges=true
+ProtectHome=true
+ProtectSystem=strict
+PrivateTmp=true
+ProtectKernelTunables=true
+ProtectKernelModules=true
+ProtectControlGroups=true
+StandardOutput=journal
+StandardError=journal
