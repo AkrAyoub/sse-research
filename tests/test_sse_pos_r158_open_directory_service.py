@@ -1,6 +1,11 @@
 """R158 open peer hint directory: bounded, expiring, no membership authority."""
 from datetime import datetime,timezone
 from pathlib import Path
+import json
+from http.server import ThreadingHTTPServer
+from threading import Thread
+import urllib.request
+import urllib.error
 import sys
 import unittest
 
@@ -84,6 +89,37 @@ class DirectoryServiceTests(unittest.TestCase):
         self.assertEqual(len(self.store.snapshot()["peers"]),64)
         with self.assertRaises(m.Refused):
             self.store.announce(record(name="node-overflow",ip="fca0:2328:7777:8888::70"))
+
+    def test_actual_loopback_http_post_then_get_serves_r142_wire_format(self):
+        # GENUINE in-process loopback socket, not an Internet/network join
+        # claim or a mocked HTTP service. No real keys or remote peers.
+        server=ThreadingHTTPServer(("127.0.0.1",0),
+                                   m.handler_factory(self.store))
+        server.daemon_threads=True
+        thread=Thread(target=server.serve_forever,daemon=True)
+        thread.start()
+        base="http://127.0.0.1:%d/peers.json"%server.server_address[1]
+        opener=urllib.request.build_opener(urllib.request.ProxyHandler({}))
+        try:
+            with self.assertRaises(urllib.error.HTTPError) as pending:
+                opener.open(base,timeout=3)
+            self.assertEqual(pending.exception.code,503)
+            wire=json.dumps(record()).encode()
+            req=urllib.request.Request(base,data=wire,method="POST",
+                                       headers={"Content-Type":"application/json"})
+            with opener.open(req,timeout=3) as response:
+                self.assertEqual(response.status,202)
+                ack=json.loads(response.read())
+            self.assertFalse(ack["membershipOrRoleGranted"])
+            with opener.open(base,timeout=3) as response:
+                self.assertEqual(response.status,200)
+                feed=json.loads(response.read())
+            self.assertEqual(len(feed["peers"]),1)
+            self.assertEqual(feed["chainId"],31340)
+        finally:
+            server.shutdown()
+            server.server_close()
+            thread.join(timeout=4)
 
     def test_no_remote_rpc_or_signer_action_exposed(self):
         self.assertEqual(m.PATH,"/peers.json")
