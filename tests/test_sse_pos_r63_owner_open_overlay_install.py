@@ -46,6 +46,21 @@ class R63OpenOverlayOwnerInstallerTests(unittest.TestCase):
         with patch.object(m.shutil,"which",return_value="/usr/sbin/zerotier-cli"),             patch.object(m,"priv",return_value=json.dumps(payload)):
             with self.assertRaises(m.R63Refused):
                 m.membership()
+    def test_postjoin_pending_status_is_not_falsely_confirmed(self):
+        pending=[{"nwid":m.NETWORK,"status":"REQUESTING_CONFIGURATION",
+                  "type":"PUBLIC","assignedAddresses":[]}]
+        with patch.object(m.shutil,"which",return_value="/usr/sbin/zerotier-cli"),patch.object(
+              m,"priv",return_value=json.dumps(pending)):
+            self.assertEqual(m.membership(),(False,None))
+
+    def test_plan_reports_signed_package_as_not_yet_installed(self):
+        with patch.object(m,"original_state_guard"),patch.object(m,"default_route",return_value="route"),patch.object(
+              m.shutil,"which",return_value=None),patch.object(m,"membership",return_value=(False,None)):
+            report=m.plan("a"*40)
+        self.assertTrue(report["officialGpgSignedAptRepositoryPlanned"])
+        self.assertFalse(report["officialGpgRepositoryActuallyConfiguredByPlan"])
+        self.assertFalse(report["signedZeroTierPackageActuallyInstalledByPlan"])
+
     def test_plan_no_privileged_network_or_package_modification(self):
         src=(ROOT/"tools/sse_pos_r63_owner_open_overlay_install.py").read_text("utf-8")
         before=src[src.index("def plan("):src.index("def fetch_official_key(")]
