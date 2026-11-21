@@ -7,7 +7,6 @@ StartLimitIntervalSec=0
 [Service]
 Type=oneshot
 ExecStart=/usr/bin/python3 -B /usr/local/libexec/sse_pos_r92_guarded_existing_node_recovery.py --role %i --apply
-RemainAfterExit=yes
 Restart=on-failure
 RestartSec=15s
 NoNewPrivileges=true
