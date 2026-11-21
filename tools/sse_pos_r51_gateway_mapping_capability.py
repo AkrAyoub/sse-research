@@ -131,8 +131,11 @@ def query_gateway(gateway: str) -> dict:
         parsed = ipaddress.IPv4Address(gateway)
     except (ValueError, ipaddress.AddressValueError) as exc:
         raise GatewayRefused("target not a private IPv4 gateway") from exc
-    if not (parsed.is_private or parsed in ipaddress.ip_network("100.64.0.0/10")):
-        raise GatewayRefused("never send probes to an arbitrary public IP")
+    if (parsed.is_loopback or parsed.is_unspecified
+            or parsed.is_multicast or parsed.is_link_local or parsed.is_reserved
+            or not (parsed.is_private
+                    or parsed in ipaddress.ip_network("100.64.0.0/10"))):
+        raise GatewayRefused("only a local private default gateway may receive metadata probes")
     def single_query(request_type: str) -> bytes:
         # Separate ephemeral UDP sockets: a delayed PCP response cannot be
         # accidentally interpreted as the NAT-PMP public address response.
