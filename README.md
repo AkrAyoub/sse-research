@@ -42,6 +42,8 @@ network join.
 Detailed role/scale reference:
 [complete architecture and all roles](docs/SSE_COMPLETE_ROLES_PERMISSIONLESS_SCALING_AND_VM_EXPERIMENTS.md).
 [Unified installer specification and honest gates](docs/R144_UNIFIED_ROLE_SELECTING_INSTALLER.md).
+For a **completely fresh Ubuntu VM**, see [R145 fresh-source bootstrap](docs/R145_FRESH_VM_SOURCE_BOOTSTRAP.md). It provides a guarded source-only create-once procedure using an independently configured read-only deploy key, followed by the same unified role-selection plan. **The repository is currently private; this is not yet publicly distributable permissionless zero-touch onboarding.**
+
 [Fresh-VM sizing](docs/R143_NEW_VM_INVENTORY_AND_FIRST_BOOT_GATE.md).
 
 ## Canonical architecture
