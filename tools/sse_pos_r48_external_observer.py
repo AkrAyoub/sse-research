@@ -213,6 +213,11 @@ def apply(archive: Path, commit: str, el_enr: str, bn_enr: str) -> dict:
         "--http", "--http-address=0.0.0.0", "--http-port=5052",
         "--listen-address=0.0.0.0", "--port=9000", "--quic-port=9001",
         "--boot-nodes=" + bn_enr,
+        # New NON-SIGNING observer syncing an original custom chain from
+        # genesis, with NO independently trusted checkpoint infrastructure.
+        # This weak-subjectivity exception is for research only; require
+        # independent finalized-root comparison before trust.
+        "--allow-insecure-genesis-sync",
     ], timeout=30)
     print("R48_REAL_INDEPENDENT_NONSIGNING_LIGHTHOUSE_SUBMITTED=true", flush=True)
     result.update({
