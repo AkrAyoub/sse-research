@@ -15,6 +15,35 @@ network using valueless TEST ETH**.
 > chain31339 on VM4705 has known exposed genesis validator keys and is
 > **not safe to expose publicly**.
 
+## R155–R159 — verified local native identity and optional open rendezvous
+
+The latest development increments close a first-to-second-node discovery
+deadlock: **one actual first online peer is sufficient to bootstrap a
+second node**, even though two distinct HTTPS sources are desirable to
+reduce mirror availability risk. A peer population threshold is NOT
+a blockchain membership rule.
+
+- [R155–R156](docs/R156_REAL_PEER_IDENTITY_AND_FALSE_FINALITY_GUARDS.md):
+  require exact original execution and Beacon genesis and actual native EL/CL
+  peers before declaring local finality. Collect real Besu `net_enode`,
+  Lighthouse Beacon ENR and observed dynamic IPv6 into an expiring,
+  nonsecret peer record (never copy a private signing key).
+- [R157](docs/R157_FIRST_PEER_DISCOVERY_AND_ROTATING_PUBLIC_HINTS.md):
+  atomically prepare refreshed, short-TTL R142 native peer discovery hints
+  from the current live node identities, without fixed VM IPs/bootnodes.
+- [R158–R159](docs/R159_OPEN_DIRECTORY_AND_UNATTENDED_ANNOUNCEMENT.md):
+  experimental, loopback-only open-registration discovery hint server and
+  no-credential periodic HTTPS announcement client; neither has
+  permission to enroll validators, control EVM consensus or decide
+  marketplace outcomes. Requires independent real HTTPS hosting and
+  abuse/security hardening before public deployment.
+
+ZeroTier controllerless ad-hoc networks are IPv6 **unicast-only**;
+multicast discovery is not a working fallback on the original VM
+configuration. The current genesis release source list and public
+directory URLs remain empty pending actual independently verified
+hosting. The new R155–R159 tests have not yet been operator-verified.
+
 ## R147 — Public repository source onboarding (one role prompt)
 
 GitHub now lists this repository as **public**. Fresh Ubuntu 24.04 VMs can
