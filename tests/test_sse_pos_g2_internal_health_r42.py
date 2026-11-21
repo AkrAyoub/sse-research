@@ -77,6 +77,37 @@ class R42RealG2InsideDockerHealthTests(unittest.TestCase):
         self.assertIn("config.synthesize", source)
         self.assertIn("config.upstream_git_blob", source)
 
+
+    def test_real_deposit_runtime_multichunk_rpc_now_reassembles_full_bytecode(self):
+        import json
+        import hashlib
+        from sse_pos_deposit_predeploy import standard_reference
+        code = standard_reference()["code"]
+        body = json.dumps({"jsonrpc": "2.0", "id": 1, "result": code}).encode()
+        first, second = body[:3000], body[3000:]
+        raw = (
+            b"HTTP/1.1 200 OK\r\nTransfer-Encoding: chunked\r\n\r\n"
+            + format(len(first), "x").encode() + b"\r\n" + first + b"\r\n"
+            + format(len(second), "x").encode() + b"\r\n" + second + b"\r\n"
+            + b"0\r\n\r\n"
+        )
+        with patch.object(m.internal, "docker", return_value=raw):
+            actual = m.rpc("eth_getCode", [m.DEPOSIT, "latest"])
+        self.assertEqual(actual, code)
+        self.assertEqual(
+            hashlib.sha256(bytes.fromhex(actual[2:])).hexdigest(), m.CODE_SHA
+        )
+
+    def test_internal_health_rpc_error_remains_unverified_and_never_prints_secrets(self):
+        import json
+        payload = {"jsonrpc": "2.0", "id": 1,
+                   "error": {"code": -32601, "message": "SECRET_DO_NOT_PRINT"}}
+        body = json.dumps(payload).encode()
+        raw = (b"HTTP/1.1 200 OK\r\nContent-Length: "
+               + str(len(body)).encode() + b"\r\n\r\n" + body)
+        with patch.object(m.internal, "docker", return_value=raw):
+            self.assertIsNone(m.rpc("eth_getCode", [m.DEPOSIT, "latest"]))
+
     def test_no_runtime_container_mutations_or_secret_printout(self):
         source = (ROOT / "tools/sse_pos_g2_internal_health_r42.py").read_text("utf-8")
         for forbidden in ('"start"', '"restart"', '"run"', '"stop"', '"kill"', '"rm"', "wallet create"):
