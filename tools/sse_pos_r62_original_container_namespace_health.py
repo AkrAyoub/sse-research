@@ -207,6 +207,10 @@ def audit(commit: str) -> dict:
         info[kind]["insideExistingContainerNetnsApiReadings"]=probes[kind]
     return {
         "schema":"SSE_R62_ORIGINAL_CHAIN31340_EXISTING_NAMESPACE_READONLY_HEALTH_V1",
+        "internalExecutionChainIdMatches31340":probes["execution"]["eth_chainId"].get("value")==hex(31340),
+        "internalBeaconGenesisTimeMatchesOriginal":probes["beacon"]["genesis"].get("genesisTime")==r60.GENESIS_TIME,
+        "internalExecutionLatestBlockObserved":probes["execution"]["eth_blockNumber"].get("status")=="ok",
+        "internalBeaconFinalizedCheckpointObserved":probes["beacon"]["finality"].get("status")=="ok",
         "sourceGitExactSha":commit,
         "originalGenesisAndJwtMetadataVerified":True,
         "originalValidatorContainerRunning":True,
