@@ -41,6 +41,10 @@ jobs:
         run: python3 -B -m unittest discover -s tests -p 'test_sse_pos_r156_local_native_peer_identity.py' -v
       - name: R157 real first-peer directory compilation and 1-peer rendezvous
         run: python3 -B -m unittest discover -s tests -p 'test_sse_pos_r157_public_peer_directory.py' -v
+      - name: R158 open permissionless discovery relay with bounded record TTL
+        run: python3 -B -m unittest discover -s tests -p 'test_sse_pos_r158_open_directory_service.py' -v
+      - name: R159 unattended announcements to interchangeable mirrors
+        run: python3 -B -m unittest discover -s tests -p 'test_sse_pos_r159_native_peer_announce.py' -v
       - name: All relevant unified/VM onboarding guard tests
         run: |
           python3 -B -m unittest discover -s tests -p 'test_sse_join.py' -v
