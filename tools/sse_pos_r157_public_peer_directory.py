@@ -119,7 +119,7 @@ def write_rotating(path,content):
     if target.is_symlink() or (target.exists() and not target.is_file()):
         raise Refused("public directory target is not a regular file")
     target.parent.mkdir(parents=True,exist_ok=True)
-    wire=(json.dumps(content,sort_keys=True,indent=2)+"\\n").encode()
+    wire=(json.dumps(content,sort_keys=True,indent=2)+"\n").encode()
     if len(wire)>r142.MAX_BYTES:
         raise Refused("public peer directory exceeds bounded size")
     with tempfile.NamedTemporaryFile(
