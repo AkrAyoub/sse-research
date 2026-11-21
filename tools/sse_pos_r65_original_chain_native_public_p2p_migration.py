@@ -96,7 +96,7 @@ def original_definition(name:str)->dict:
         raise R65Refused("original root filesystem security not preserved")
     if not host.get("Init") or "ALL" not in (host.get("CapDrop") or []):
         raise R65Refused("original capability/init restrictions not preserved")
-    if "no-new-privileges" not in (host.get("SecurityOpt") or []):
+    if not any(item in ("no-new-privileges", "no-new-privileges:true", "no-new-privileges=true") for item in (host.get("SecurityOpt") or [])):
         raise R65Refused("original no-new-privileges missing")
     user=config.get("User")
     if not isinstance(user,str) or not re.fullmatch(r"[0-9]{1,7}:[0-9]{1,7}",user):
@@ -314,35 +314,45 @@ def read_only_plan(commit:str)->tuple[dict,dict,dict]:
         "nothingModifiedByPlan":True,
     },el,bn)
 
-def rollback(reason:str)->None:
+def rollback(renamed:set[str],created:set[str])->None:
     print("R65_MAINTENANCE_ROLLBACK_ATTEMPTED=true",file=sys.stderr,flush=True)
-    # Keep signing stopped until exactly one original EL+BN pair is restarted.
-    for name in (VC,BN,EL):
-        try: docker(["stop","--time","35",name],timeout=50)
-        except R65Refused: pass
+    # Only remove NEW containers created by this migration. NEVER remove
+    # original containers if the failure happened before docker rename.
+    try:
+        docker(["stop","--time","35",VC],timeout=50)
+    except R65Refused:
+        pass
+    failed=False
     for name in (BN,EL):
-        try: docker(["rm",name],timeout=25)
-        except R65Refused: pass
-    restored=True
+        if name in created:
+            try:
+                docker(["stop","--time","35",name],timeout=50)
+            except R65Refused:
+                pass
+            try:
+                docker(["rm",name],timeout=25)
+            except R65Refused:
+                failed=True
     for name in (EL,BN):
-        try:
-            docker(["rename",PRESERVED[name],name])
-        except R65Refused:
-            restored=False
-    if restored:
-        try:
-            docker(["start",EL],timeout=30)
-            if not wait_client(EL,"execution",8):
-                raise R65Refused("original EL not healthy during rollback")
-            docker(["start",BN],timeout=30)
-            if not wait_client(BN,"beacon",8):
-                raise R65Refused("original BN not healthy during rollback")
-            docker(["start",VC],timeout=30)
-            print("R65_ROLLBACK_EXISTING_ORIGINAL_EL_BN_VC_RESTARTED=true",file=sys.stderr,flush=True)
-        except R65Refused:
-            print("R65_ROLLBACK_INCOMPLETE_ORIGINAL_SIGNER_LEFT_STOPPED=true",file=sys.stderr,flush=True)
-    else:
-        print("R65_ROLLBACK_RENAME_INCOMPLETE_ORIGINAL_SIGNER_LEFT_STOPPED=true",file=sys.stderr,flush=True)
+        if name in renamed:
+            try:
+                docker(["rename",PRESERVED[name],name])
+            except R65Refused:
+                failed=True
+    if failed:
+        print("R65_ROLLBACK_PARTIAL_ORIGINAL_VALIDATOR_LEFT_STOPPED=true",file=sys.stderr,flush=True)
+        return
+    try:
+        docker(["start",EL],timeout=30)
+        if not wait_client(EL,"execution",8):
+            raise R65Refused("original EL health not recovered")
+        docker(["start",BN],timeout=30)
+        if not wait_client(BN,"beacon",8):
+            raise R65Refused("original BN health not recovered")
+        docker(["start",VC],timeout=30)
+        print("R65_ROLLBACK_EXISTING_ORIGINAL_EL_BN_VC_RESTARTED=true",file=sys.stderr,flush=True)
+    except R65Refused:
+        print("R65_ROLLBACK_HEALTH_UNVERIFIED_ORIGINAL_SIGNER_LEFT_STOPPED=true",file=sys.stderr,flush=True)
 
 def apply(commit:str, backup_attested:bool)->dict:
     plan,el,bn=read_only_plan(commit)
@@ -368,6 +378,8 @@ def apply(commit:str, backup_attested:bool)->dict:
     print("R65_STAGE=CREATE_SEPARATE_PUBLIC_IPV6_DOCKER_BRIDGE",flush=True)
     docker(["network","create","--driver","bridge","--ipv6",PUBLIC_BRIDGE],timeout=45)
     destructive_started=False
+    renamed:set[str]=set()
+    created:set[str]=set()
     try:
         print("R65_STAGE=STOP_ORIGINAL_SIGNER_BEFORE_CLIENT_MAINTENANCE",flush=True)
         destructive_started=True
@@ -375,10 +387,12 @@ def apply(commit:str, backup_attested:bool)->dict:
             docker(["stop","--time","90",name],timeout=110)
         for name in (EL,BN):
             docker(["rename",name,PRESERVED[name]],timeout=30)
+            renamed.add(name)
         print("R65_ORIGINAL_EL_AND_BEACON_CONTAINERS_SAFELY_PRESERVED=true",flush=True)
         for name,definition,kind in ((EL,el,"execution"),(BN,bn,"beacon")):
             print("R65_STAGE=CREATE_EXISTING_DATA_NATIVE_"+kind.upper(),flush=True)
             docker(clone_args(definition,ipv6),timeout=50)
+            created.add(name)
             docker(["network","connect",PUBLIC_BRIDGE,name],timeout=35)
             docker(["start",name],timeout=35)
             if not wait_client(name,kind):
@@ -396,9 +410,9 @@ def apply(commit:str, backup_attested:bool)->dict:
                 "originalSingleSignerRunningAfterMaintenance":True,
                 "originalOldELAndBeaconContainersStoppedPreserved":True,
                 "externalNativeEthereumP2pSyncAndFinalizedRootMatchObserved":False}
-    except (R65Refused,KeyboardInterrupt,ValueError,OSError):
+    except (R65Refused,KeyboardInterrupt,ValueError,OSError,TypeError,KeyError):
         if destructive_started:
-            rollback("migration partial failure")
+            rollback(renamed,created)
         raise R65Refused("owner migration failed; recovery attempted, inspect state before any retry")
 
 def main()->int:
