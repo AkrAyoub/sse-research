@@ -199,6 +199,7 @@ def install_and_join(commit: str) -> dict:
     if answer!="INSTALL-OWNER-OPEN-P2P-TRANSPORT":
         raise R63Refused("local owner did not authorize transport installation")
     oldroute=default_route()
+    print("R63_STAGE=FETCH_AND_VALIDATE_VENDOR_PUBLIC_KEY",flush=True)
     with tempfile.TemporaryDirectory(prefix="sse-r63-zt-pub-") as tmp:
         td=Path(tmp)
         key=td/"publisher.asc"
@@ -206,19 +207,25 @@ def install_and_join(commit: str) -> dict:
         source=td/"zerotier-sse.list"
         fetch_official_key(key)
         verify_key(key)
+        print("R63_VENDOR_SIGNING_KEY_FINGERPRINT_VERIFIED=true",flush=True)
         call(["gpg","--batch","--dearmor","--output",str(keyring),str(key)])
         source.write_text(APT_REPO,"utf-8")
         priv(["install","-m","0644",str(keyring),ROOT_KEY])
         priv(["install","-m","0644",str(source),ROOT_SOURCE])
+    print("R63_SIGNED_APT_REPOSITORY_CONFIGURED=true",flush=True)
     # APT verifies a GPG-signed InRelease for THIS repository and its
     # package hash. Never execute curl|bash or accept unsigned packages.
+    print("R63_STAGE=OFFICIAL_APT_METADATA_UPDATE",flush=True)
     priv(["apt-get","update","-o","Acquire::Retries=1"],timeout=180)
+    print("R63_STAGE=SIGNED_PINNED_PACKAGE_INSTALL",flush=True)
     priv(["apt-get","install","-y","--no-install-recommends","zerotier-one="+VERSION],timeout=180)
+    print("R63_APT_PINNED_PACKAGE_INSTALL_COMPLETED=true",flush=True)
     version=priv(["zerotier-cli","-v"],timeout=15)
     if VERSION not in version:
         raise R63Refused("installed ZeroTier version not pinned 1.16.2")
     # Service will have created its own host-local transport identity; it is
     # NOT an Ethereum validator key and must not be uploaded or copied.
+    print("R63_STAGE=JOIN_OPEN_CONTROLLERLESS_NETWORK",flush=True)
     priv(["zerotier-cli","join",NETWORK],timeout=20)
     for setting in ("allowDefault=0","allowDNS=0","allowGlobal=0"):
         priv(["zerotier-cli","set",NETWORK,setting],timeout=12)
@@ -226,6 +233,7 @@ def install_and_join(commit: str) -> dict:
         raise R63Refused("host IPv4 management default route unexpectedly changed; do not rerun")
     # Membership can be temporarily REQUESTING_CONFIGURATION after join;
     # report no success until operator confirms OK PUBLIC + new 6plane IPv6.
+    print("R63_STAGE=VERIFY_POST_JOIN_ORIGINAL_OWNER_STATE",flush=True)
     active,addr=membership()
     original_state_guard(commit)
     outcome.update({
