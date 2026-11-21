@@ -1,0 +1,11 @@
+[Unit]
+Description=Periodically reconcile SSE31340 original owner existing native Docker network
+
+[Timer]
+OnBootSec=45s
+OnUnitInactiveSec=2min
+AccuracySec=10s
+Unit=sse31340-owner-native-network-recovery.service
+
+[Install]
+WantedBy=timers.target

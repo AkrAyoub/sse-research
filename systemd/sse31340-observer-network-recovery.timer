@@ -1,0 +1,11 @@
+[Unit]
+Description=Periodically reconcile existing SSE31340 observer Docker network
+
+[Timer]
+OnBootSec=45s
+OnUnitInactiveSec=2min
+AccuracySec=10s
+Unit=sse31340-existing-node-recover@observer.service
+
+[Install]
+WantedBy=timers.target
