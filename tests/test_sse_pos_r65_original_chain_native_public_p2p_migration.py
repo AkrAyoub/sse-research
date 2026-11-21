@@ -101,6 +101,51 @@ class R65NativePublicOwnerMigrationTests(unittest.TestCase):
         self.assertIn('str(owner_root)',source)
         self.assertIn('os.path.commonpath',source)
 
+    def test_docker_nil_and_empty_entrypoint_are_equivalent(self):
+        self.assertEqual(m.normalized_entrypoint(None),())
+        self.assertEqual(m.normalized_entrypoint([]),())
+        self.assertEqual(m.normalized_entrypoint(["/entrypoint"]),("/entrypoint",))
+        m.verify_unmodified_image_launch_config(
+            {"Entrypoint":[],"Env":None},{"Entrypoint":None,"Env":[]}
+        )
+
+    def test_docker_env_order_is_not_a_security_difference(self):
+        m.verify_unmodified_image_launch_config(
+            {"Entrypoint":["/entrypoint"],"Env":["PATH=/usr/bin","LANG=C.UTF-8"]},
+            {"Entrypoint":["/entrypoint"],"Env":["LANG=C.UTF-8","PATH=/usr/bin"]}
+        )
+
+    def test_original_env_additions_do_not_silently_drop_configuration(self):
+        original={"Entrypoint":[],"Env":["PATH=/usr/bin","SECRET_TOKEN=do_not_print"]}
+        image={"Entrypoint":None,"Env":["PATH=/usr/bin"]}
+        with self.assertRaises(m.R65Refused) as caught:
+            m.verify_unmodified_image_launch_config(original,image)
+        msg=str(caught.exception)
+        self.assertIn("added_key_count=1",msg)
+        self.assertNotIn("SECRET_TOKEN",msg)
+        self.assertNotIn("do_not_print",msg)
+
+    def test_original_env_value_changes_do_not_leak_secrets(self):
+        original={"Entrypoint":[],"Env":["PATH=private-value"]}
+        image={"Entrypoint":None,"Env":["PATH=public-value"]}
+        with self.assertRaises(m.R65Refused) as caught:
+            m.verify_unmodified_image_launch_config(original,image)
+        self.assertIn("changed_value_count=1",str(caught.exception))
+        self.assertNotIn("private-value",str(caught.exception))
+        self.assertNotIn("public-value",str(caught.exception))
+
+    def test_unexpected_docker_entrypoint_blocks_migration(self):
+        with self.assertRaises(m.R65Refused):
+            m.verify_unmodified_image_launch_config(
+                {"Entrypoint":["/unexpected"],"Env":[]},
+                {"Entrypoint":["/expected"],"Env":[]}
+            )
+
+    def test_duplicate_env_or_malformed_env_fails_closed(self):
+        for invalid in (["A=1","A=2"],["NO_EQUALS"],["BAD KEY=x"],"not-an-array"):
+            with self.subTest(invalid=invalid),self.assertRaises(m.R65Refused):
+                m.normalized_env(invalid)
+
     def test_refuse_original_client_already_migrated(self):
         owner={"originalELP2pExplicitlyDisabled":False}
         with patch.object(m.r64,"current_owner_audit",return_value=owner):
