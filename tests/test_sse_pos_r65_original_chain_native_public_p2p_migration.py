@@ -268,6 +268,30 @@ class R65NativePublicOwnerMigrationTests(unittest.TestCase):
         self.assertIn('candidate[candidate.index("--entrypoint")+1]!="lighthouse"',plan)
         self.assertNotIn('docker(["create"',plan)
 
+    def test_apply_aborts_and_rolls_back_before_rename_if_consistent_snapshot_fails(self):
+        plan={"actualOpenOverlayIPv6":IP}
+        from unittest.mock import patch as mp
+        with mp.object(m,"read_only_plan",return_value=(plan,{},{})),mp.object(
+             m.sys.stdin,"isatty",return_value=True),mp.object(
+             m.sys.stderr,"isatty",return_value=True),mp(
+             "builtins.input",return_value="MIGRATE-EXISTING-CHAIN31340-NATIVE-P2P"),mp.object(
+             m,"docker",return_value=""),mp.object(
+             m.r66,"snapshot_consistent_original_state",side_effect=m.r66.R66Refused("test failure")),mp.object(
+             m,"rollback") as rollback:
+            with self.assertRaises(m.R65Refused):
+                m.apply("a"*40,True)
+        rollback.assert_called_once_with(set(),set())
+
+    def test_apply_attempts_verified_consistent_snapshot_before_renaming_any_original(self):
+        source=(ROOT/"tools/sse_pos_r65_original_chain_native_public_p2p_migration.py").read_text()
+        apply=source[source.index("def apply("):source.index("def main(")]
+        self.assertLess(apply.index('for name in (VC,BN,EL):'),
+                        apply.index('r66.snapshot_consistent_original_state('))
+        self.assertLess(apply.index('r66.snapshot_consistent_original_state('),
+                        apply.index('docker(["rename",name,PRESERVED[name]]'))
+        self.assertIn('if snapshot.get("consistentStoppedOwnerSnapshotVerified") is not True:',apply)
+        self.assertIn('except (R65Refused,r66.R66Refused,KeyboardInterrupt',apply)
+
     def test_refuse_original_client_already_migrated(self):
         owner={"originalELP2pExplicitlyDisabled":False}
         with patch.object(m.r64,"current_owner_audit",return_value=owner):
