@@ -30,6 +30,23 @@ class R63OpenOverlayOwnerInstallerTests(unittest.TestCase):
         with patch.object(m,"call",return_value=correct.replace(m.KEY_FINGERPRINT,"0"*40)):
             with self.assertRaises(m.R63Refused):
                 m.verify_key(Path("/tmp/not-opened"))
+    def test_live_vendor_branch_main_not_deleted_master(self):
+        self.assertEqual(
+            m.KEY_URL,
+            "https://raw.githubusercontent.com/zerotier/ZeroTierOne/main/doc/contact%40zerotier.com.gpg"
+        )
+        self.assertNotIn("/master/",m.KEY_URL)
+
+    def test_failure_logs_nonsecret_stage_before_apt_mutations(self):
+        src=(ROOT/"tools/sse_pos_r63_owner_open_overlay_install.py").read_text("utf-8")
+        self.assertIn("R63_STAGE=FETCH_AND_VALIDATE_VENDOR_PUBLIC_KEY",src)
+        self.assertIn("R63_VENDOR_SIGNING_KEY_FINGERPRINT_VERIFIED=true",src)
+        self.assertIn("R63_SIGNED_APT_REPOSITORY_CONFIGURED=true",src)
+        self.assertIn("R63_STAGE=OFFICIAL_APT_METADATA_UPDATE",src)
+        self.assertIn("R63_STAGE=SIGNED_PINNED_PACKAGE_INSTALL",src)
+        self.assertIn("R63_STAGE=JOIN_OPEN_CONTROLLERLESS_NETWORK",src)
+        self.assertIn("R63_STAGE=VERIFY_POST_JOIN_ORIGINAL_OWNER_STATE",src)
+
     def test_private_original_owner_guard_before_any_network_work(self):
         with patch.object(m.r60,"owner_guard") as original,patch.object(m,"os_guard"),             patch.object(m,"priv",side_effect=["true",m.r60.NET]*3+["true"]):
             m.original_state_guard("a"*40)
