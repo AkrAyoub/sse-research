@@ -53,8 +53,27 @@ def require_existing(sha: str):
     old.safe_dir(old.RUN)
     for sub in ("el", "beacon", "vc", "testnet"):
         old.safe_dir(old.RUN / sub)
+    # R42: R34's ORIGINAL partial CL config is preserved as a PUBLIC
+    # immutable backup. Lighthouse requires a full serde Config; validate
+    # its exact byte-for-byte canonical rendering before starting ANY signer.
+    # No genesis SSZ, EL genesis, JWT or BLS validator data is modified.
+    import hashlib
+    from sse_pos_g2_lighthouse_config_r42 import (
+        BACKUP, BASELINE, BASELINE_GIT_BLOB, upstream_git_blob, synthesize,
+    )
+    if upstream_git_blob(BASELINE.read_bytes()) != BASELINE_GIT_BLOB:
+        raise Refuse("pinned official Lighthouse CL source changed")
+    old.safe_public(BACKUP, old.EXPECTED["testnet/config.yaml"])
+    complete, _ = synthesize(
+        BASELINE.read_text("utf-8"), BACKUP.read_text("utf-8")
+    )
+    old.safe_public(
+        old.RUN / "testnet/config.yaml",
+        hashlib.sha256(complete.encode("utf-8")).hexdigest(),
+    )
     for name, expected in old.EXPECTED.items():
-        old.safe_public(old.RUN / name, expected)
+        if name != "testnet/config.yaml":
+            old.safe_public(old.RUN / name, expected)
     jwt = old.RUN / "engine.jwt"
     if (jwt.is_symlink() or not jwt.is_file()
             or jwt.stat().st_uid != os.geteuid()
