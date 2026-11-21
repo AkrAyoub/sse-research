@@ -28,13 +28,16 @@ Run **only on VM4706**; a subshell refuses safely without terminating the operat
   test "$(sha256sum "$ARCHIVE" | awk '{print $1}')" = "$EXPECTED"
   python3 -B tools/sse_pos_r47_public_observer_bundle.py --verify "$ARCHIVE" --expected-commit "$SOURCE_SHA"
   echo "R56_ORIGINAL_PUBLIC_BUNDLE_VERIFIED=true"
-  scp -o StrictHostKeyChecking=yes "$ARCHIVE" \
-    ayoubakrvm4707@10.50.56.8:/home/ayoubakrvm4707/chain31340-public-native-observer-v1.tar.gz
-  echo "R56_PUBLIC_ONLY_ARCHIVE_SCP_COMPLETED=true"
+  # Never overwrite a different public archive on the receiving host.
+  # The remote shell's noclobber guard makes this a create-only transfer.
+  ssh -o StrictHostKeyChecking=yes ayoubakrvm4707@10.50.56.8 \
+    'umask 077; set -C; cat > "$HOME/chain31340-public-native-observer-v1.tar.gz"' \
+    < "$ARCHIVE"
+  echo "R56_PUBLIC_ONLY_ARCHIVE_TRANSFER_COMPLETED=true"
 )
 ```
 
-The source parser R47 verifies exact 4 public inputs/manifest: original `genesis.json` SHA-256 `22eb6c58288113b9c3671970967151012665137b345237b5c24060dc988b1ee8`, `config.yaml` SHA-256 `3e750d7d02e3ed83747f95cc09ff3299185f56f1777dfeb1f126b17881297b6e`, `genesis.ssz` SHA-256 `8a5307e81c2dd73be5f3405a722d631ad5761d53ef4771a57b81971e4fcd9e82`, `deposit_contract_block.txt` SHA-256 `9a271f2a916b0b6ee6cecb2426f0b3206ef074578be55d9bc94f6f3fe3ab86aa`; and no signing keys/JWT/mnemonics are included. The particular tarball hash is the actual owner-created archive hash, distinct from its file-members' hashes. SSH host key `SHA256:zO1v+7aN5N4mOid9NNwsZLhO65297wGWjrOM/E9oY8s` was independently verified from VM4707's console during R55. `scp` still requires operator SSH access. Do not overwrite any pre-existing differently hashed target without review.
+The source parser R47 verifies exact 4 public inputs/manifest: original `genesis.json` SHA-256 `22eb6c58288113b9c3671970967151012665137b345237b5c24060dc988b1ee8`, `config.yaml` SHA-256 `3e750d7d02e3ed83747f95cc09ff3299185f56f1777dfeb1f126b17881297b6e`, `genesis.ssz` SHA-256 `8a5307e81c2dd73be5f3405a722d631ad5761d53ef4771a57b81971e4fcd9e82`, `deposit_contract_block.txt` SHA-256 `9a271f2a916b0b6ee6cecb2426f0b3206ef074578be55d9bc94f6f3fe3ab86aa`; and no signing keys/JWT/mnemonics are included. The particular tarball hash is the actual owner-created archive hash, distinct from its file-members' hashes. SSH host key `SHA256:zO1v+7aN5N4mOid9NNwsZLhO65297wGWjrOM/E9oY8s` was independently verified from VM4707's console during R55. The create-only SSH stdin transfer requires operator account authentication; it cannot overwrite a destination that already exists, even if its hash matches. If one exists, check it first using Gate B and do not rerun transfer. A broken/partial target must be handled separately after human review.
 
 ## Gate B — verify received public archive and node host prerequisites (VM4707)
 
