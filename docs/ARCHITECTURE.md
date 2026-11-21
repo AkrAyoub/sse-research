@@ -6,6 +6,28 @@
 VM4705, single host, exposed bootstrap mnemonic; Anvil31337, permissioned
 QBFT31338 and Tailscale invite-gated networks are NOT this architecture.
 
+## Zero centralized authorization or control — architectural veto
+
+**There is no SSE authority that signs up, approves, permits, updates, controls, funds, or manages every participant.** Network membership depends only on independently verifiable genesis, compatible clients and native P2P; economic roles depend only on the relevant *on-chain/protocol rules*, not the original experiment operator, an admin's wallet, a central registry, privileged invitation, API account, hosted dashboard or Tailscale coordinator. A full node must be able to join after the original deployer, all original bootstrap peers, a single faucet, and a single HTTP/HTTPS mirror are offline, provided other peers and required publicly obtainable test funds remain.
+
+Initial genesis publication and optional signed release snapshots are reproducible **information distribution**, never ongoing approval or unilateral upgrade power. Any user may cache/redistribute genesis and run their own compatible client; release artifacts should have multiple independent mirrors, transparently verifiable code and optional nonexclusive signatures. No mandatory central RPC, seed, VRF/faucet/operator, block explorer, UI relay or global node management service may control consensus or joining.
+
+**Current contracts do not yet satisfy a proven no-central-dependency audit:** pre-binding `bootstrapper` configuration, VRF fee recipient/lifetime cap, a pinned randomness source/coordinator and potentially biasable sortition require real semantic review and engineering. They are **BLOCKERS**, not approval that the project is currently fully decentralized. Exact source findings, no-administrator threat model and independent host acceptance live in [DECENTRALIZATION_INVARIANTS.md](DECENTRALIZATION_INVARIANTS.md). Fresh host provenance, every command, every future fix and remaining automation gaps belong in [the VM4706 experiment journal](experiments/VM4706_2026-11-19.md).
+
+## Native P2P topology rule: NO provider-private LAN, same network for all peers
+
+**Decision affirmed 2026-11-21 (G3/R60):** private provider LAN routing (including the observed VM4706 `10.50.56.2` ↔ VM4707 `10.50.56.8`) is **FORBIDDEN as an Ethereum native execution/consensus bootstrap path, discoverable/advertised endpoint, or fallback.** The previous R60 proposal to use provider-private LAN for initial native EL/BN peering is **WITHDRAWN**. Historical SSH/SCP over that LAN only distributed developer files and is not evidence of acceptable blockchain networking or a permanent onboarding model. No future native G3 acceptance may count a private-LAN peer. At least one real source/candidate peer must be established via the same open Internet-accessible network mechanism as unrelated external participants.
+
+**One role-neutral native transport for all full nodes:** all full nodes MUST use the same open Internet-accessible network mechanism; the initial experimentally validated candidate is the **same publicly joinable ZeroTier controllerless ad-hoc overlay**, network ID `ff2328775f000000` (public no admission controller, IPv6 6plane `fca0::/16`). This transport must be independently available to the original owner VM4706, all full/observer/validator nodes including VM4707 and the user's laptop, and any later operator on a distinct ISP **without invitation or preapproved cloud tenancy**. Provider, consumer, and monitor network services must likewise be Internet reachable via appropriate authenticated endpoints; those economic role operations do not imply every role must run a local full node, but if they do they use the same client/P2P rules. No VM receives an architecturally privileged networking route just because it hosted genesis. The verified R55 WSL→VM4707 real TCP+UDP payloads demonstrate the overlay can carry packets, **NOT** that native Besu/Lighthouse P2P works or that every host has already joined.
+
+**Native Ethereum bootstrap is separate from overlay membership:** new full nodes independently download and authenticate the **exact public EL and Beacon genesis plus fork config**; establish both genuine Besu devp2p/discovery and Lighthouse discv5+libp2p P2P; obtain multiple independently republished signed, dynamically refreshed EL/CL ENRs/node identities; verify actual network peers, canonical roots and finalized checkpoints. Seed ENRs are **optional discovery hints, NOT an allowlist or an authorization service**. The initial operator cannot be required online forever; nodes must keep and gossip discovered peers, accept unknown honest peers and bootstrap after original seeds disappear when other actual reachable peers exist. No fixed IP, total peer count, role cap, single seed or mandatory genesis-operator RPC is allowed.
+
+**Underlay caveat:** a ZeroTier 6plane address does NOT prove packets avoid an underlying provider-private LAN. ZeroTier can discover direct or relayed underlay paths; since VM4706/VM4707 share cloud infrastructure, validate the original chain against a non-provider outside laptop and inspect actual underlay path before claiming `no private LAN used`. Do NOT call overlay addressing alone proof of independent WAN transit. For strict path isolation, enforce and test explicit no-direct-provider-LAN routing/firewall behavior in a separately reviewed operator-networking policy; never silently trust same-provider VM-to-VM link measurements as independent Internet proof.
+
+**Decentralization qualification:** ZeroTier ad-hoc networks have no administrator admission controller but still use third-party root/discovery/relay infrastructure; public open-join transport is *not equivalent* to infrastructure-independent Ethereum networking. For a fully permissionless deployment, operators must be able to use substitutable transports/relays or native direct Internet P2P when reachable, with no single third-party root, commercial VPN or relay as mandatory consensus authority or global liveness dependency. This resilience/failover requirement remains UNIMPLEMENTED. Honest claims must distinguish no whitelisting, cryptographic consensus membership, actual physical/ISP independence and transport infrastructure availability.
+
+**Production UX:** GitHub/private SSH/manual VM-to-VM SCP and repeated sudo prompts are LAB DEVELOPMENT ONLY; the real joining flow is a publicly available verifiable original genesis + signed/hash-pinned release, one-time local OS authorization, node-local identities, automatic P2P discovery, runtime auto-restarts, safe reconfiguration after dynamic address changes, and no network-admin enrollment. Do not require the first owner machine as a file server, onboarding broker, or permanently special seed.
+
 ## Nonnegotiable properties
 
 1. **Our own Ethereum-compatible Proof-of-Stake chain, valueless TEST ETH.**
@@ -115,20 +137,23 @@ and software versions are actually reviewed. Chain ID alone is NOT
 globally unique and MUST be confirmed alongside the exact execution
 genesis, Beacon validators root and fork config.
 
-A recommended first physical experiment has **four independently
-controlled PoS operators** (each can run EL+CL and optional VC),
-two or more separate Internet-reachable bootnodes, one real provider,
-one real consumer, and four or more independently controlled
-bonded monitors, with a spare. Initial validator stake fractions
-should avoid one host holding >=1/3 active stake; for example,
-four equal operators with 25% each leaves 75% attesting if one host
-fails, nominally above the >2/3 finalization requirement.
-This is a fault-domain/consensus argument, NOT a guarantee of
-liveness under correlated partitions or a permanent four-node
-protocol roster. New validators can deposit and activate later.
-Genesis validator-key count, resource size and block occupancy
-must be measured against protocol requirements and host capacity;
-do not present arbitrary count as research optimization.
+The protocol has **NO fixed number of nodes for ANY role**.
+At genesis, the initiating independently owned validators form a finite
+explicitly documented initial snapshot (not a future-validator cap).
+After genesis, eligible outsiders join through standard Beacon deposits
+and exit rules; users independently choose any combination of full-node,
+validator, consumer, provider, and bonded monitor roles.
+For experimental fault-domain arguments, four independent PoS owners
+with 25% stake each is just ONE example: after one fails, the remaining
+75% nominal stake exceeds the >2/3 finality threshold. It is NOT a
+four-validator/owner admission requirement, persistent roster, proof
+of physical independence or guarantee of liveness under partitions.
+Public discovery uses multiple genuinely independent and replaceable
+reachable seeds; source mirror counts do not constrain P2P membership.
+Genesis count, measured resource sizes, gas utilization, security assumptions
+and active stakes require real benchmarks. Explicit per-genesis acceptance
+thresholds are config inputs, NOT code defaults or global membership caps.
+See [R21 adaptive roles and quorum](R21_ADAPTIVE_ROLES_AND_QUORUM.md).
 
 **Bootstrap/public source distribution:** This repository is PRIVATE.
 The future network's public genesis, Beacon config, client versions,
@@ -137,13 +162,21 @@ must be available on a genuinely public HTTPS/mirror endpoint without
 a GitHub invitation. A public repository, release mirror or
 HTTPS-hosted signed manifest works; a private repo URL does NOT.
 
+## No-administrator test-ETH funding — mandatory for economic roles
+
+Public full nodes and observers join and synchronize with **zero** test ETH. New external validators, monitors, consumers and providers generate independent local EOA wallets and (where selected) BLS keys; their role requirements are funded with **chain-native, worthless TEST ETH**, not real Ethereum Mainnet ETH or a central operator's private keys. A validator needs the protocol's 32-test-ETH deposit per validator plus measured gas; monitors need the actual on-chain `minimumBond()`; consumers need their actual lease escrow, incentive deposits and gas; providers need gas and any on-chain required collateral. Funds and role activation are NEVER inferred from UI tags.
+
+A public ownerless claim contract with independent gas sponsors and transparent finite reserves is a candidate route, not a deployed system or promise of infinite test ETH. Sponsor nodes are replaceable participants, not an SSE authorization authority; public donation/claim accounting is verifiable on-chain. Anyone can run a sponsor and transfer their own test ETH. Publicly funded claims do not establish human uniqueness; unlimited Sybil addresses can deplete finite free reserves despite per-address/per-block rate limits. No one wallet, website, faucet key or registry may decide who can join the P2P network or whitelist validators. On depletion, joining and full-node sync remain available, while economic role activation truthfully remains pending.
+
+Candidate `contracts/OpenTestEthFaucet.sol`, adversarial Foundry tests and design/remaining integration gates: [PUBLIC_TEST_ETH_FUNDING.md](PUBLIC_TEST_ETH_FUNDING.md); tracked in #37. **No faucet or independent auto-funding has yet been observed live on chain31340.**
+
 ## Source and boundary map
 
 `contracts/OpenMonitorCommittee.sol`,
 `contracts/SSESettlement.sol`, and
 `contracts/OpenResourceBoard.sol` already implement actual
 bonded registration, global or bounded monitor election, funded
-resource bidding, 3-of-4 threshold reporting and escrow accounting.
+resource bidding, **legacy fixed 3-of-4** threshold reporting and escrow accounting. This fixed committee is NOT the required adaptive production behavior; the R21 dynamic migration is an explicit public-release blocker (#38).
 The current delayed-block entropy is **proposer-biasable**, not a
 strong unbiased VRF. Benchmark/selection/security work remains.
 
@@ -187,10 +220,12 @@ dependencies.
 - [ ] A consumer and provider on separate hosts exchange signed
       live work against an actually allocated pinned worker/container;
       record actual CPU/memory/network metering and request/result.
-- [ ] At least four monitors on independent hosts bond/test real
-      service behavior and commit signed raw evidence tied to the
-      correct canonical lease; 3/4 agree OR an inconclusive window
-      is handled conservatively on-chain.
+- [ ] Vary the REAL population of independently owned bonded monitors,
+      then elect and snapshot a gas/budget/risk-affordable committee of
+      size k for each lease. Freeze a justified threshold q BEFORE votes,
+      verify correct evidence and signed outcomes at q unique seats,
+      and handle all undecided windows as inconclusive on-chain.
+      Neither total monitor membership nor q is fixed to 4/3.
 - [ ] Provider/consumer withdrawals and monitor compensation are
       real successful/finalized transactions with gas and timing
       measurements, signed evidence hash chain and crash recovery.

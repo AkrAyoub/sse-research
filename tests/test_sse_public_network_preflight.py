@@ -37,7 +37,8 @@ def fixture():
             {"operatorId":"operator-b","nodeId":"node-b",
              "executionEnode":enode2,"consensusENR":"enr:"+"B"*120},
         ],
-        "permissionlessRoles":ROLE_RULES,
+        # Fresh JSON-shaped copy: test mutations must never rewrite policy.
+        "permissionlessRoles":dict(ROLE_RULES),
     }
 
 class SSEPublicNetworkTests(unittest.TestCase):
@@ -88,6 +89,37 @@ class SSEPublicNetworkTests(unittest.TestCase):
         with self.assertRaises(PublicManifestError):validate(f)
         f=fixture();del f["permissionlessRoles"]["monitor"]
         with self.assertRaises(PublicManifestError):validate(f)
+
+    def test_canonical_role_policy_immutable_across_manifest_edits(self):
+        original=dict(ROLE_RULES)
+        manifest=fixture()
+        self.assertIsNot(manifest["permissionlessRoles"], ROLE_RULES)
+        del manifest["permissionlessRoles"]["monitor"]
+        self.assertEqual(dict(ROLE_RULES), original)
+        self.assertIn("monitor", ROLE_RULES)
+        with self.assertRaises(TypeError):
+            ROLE_RULES["monitor"]="APPROVAL_BY_SSE_OWNER"
+        with self.assertRaises(PublicManifestError):
+            validate(manifest)
+        # A different external participant's manifest must still validate
+        # independently, without any global state leaked by the previous one.
+        self.assertEqual(validate(fixture())["targetChainId"], 31340)
+
+    def test_public_ipv4_literals_are_not_bootstrap_dns_names(self):
+        for host in ("10.50.56.13", "127.0.0.1", "8.8.8.8",
+                     "1.2.3.4", "0.0.0.0", "999.999.999.999"):
+            f=fixture()
+            f["bootnodes"][0]["executionEnode"]=(
+                "enode://"+"12"*64+f"@{host}:30303")
+            with self.subTest(host=host),self.assertRaises(PublicManifestError):
+                validate(f)
+
+    def test_public_ipv4_literals_are_not_genesis_mirror_dns_names(self):
+        for host in ("10.50.56.13","8.8.8.8","127.0.0.1"):
+            f=fixture()
+            f["executionGenesisFile"]=f"https://{host}/genesis.json"
+            with self.subTest(host=host),self.assertRaises(PublicManifestError):
+                validate(f)
 
     def test_missing_public_artifact_digest_or_fake_urls_refused(self):
         f=fixture();f["executionGenesisSha256"]="0"*64

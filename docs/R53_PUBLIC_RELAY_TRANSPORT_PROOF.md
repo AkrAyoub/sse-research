@@ -1,0 +1,32 @@
+# R53 — Real public raw TCP+UDP relay proof on NON-SIGNING VM4707
+
+STATUS: GitHub SOURCE ONLY. No relay, blockchain, VM or signing service launched by R53.
+
+Owner VM4706 has real original chain31340 with one BLS signer, and is privately addressed 10.50.56.2. VM4707 (10.50.56.8) is a real separate same-provider host with 4 vCPUs, 11 GiB RAM and Docker 29; two pings between them succeeded. No global address is assigned directly to either VM, and no native public Ethereum P2P handshake has occurred.
+
+Official Pinggy CLI docs https://pinggy.io/docs/cli/ show separate raw TCP and UDP tunnels. Official https://pinggy.io/docs/udp_tunnels/ explicitly requires its CLI for UDP; plain SSH cannot forward UDP. Free public endpoints and ports change and expire after 60 minutes. Third-party Pinggy may ask to enable a remote-terminal device agent; DO NOT authorize that on VM4706 containing validator secrets. Only use VM4707 for relay experiments. A raw TCP and UDP echo success does NOT equal signed ENR compatibility or real Besu/Lighthouse handshake. Different remote TCP and UDP IP/ports must be considered when configuring native execution and consensus endpoint advertisement.
+
+NEW GitHub source tools/sse_pos_r53_relay_transport_probe.py: pure Python stdlib, 8 source tests; NO Docker, original chain, genesis, JWT, BLS signer, keystore, slashing or system configurations touched. Server mode binds ONLY loopback 127.0.0.1 TCP23353/UDP23354; waits at most 12 minutes and quits when exact echo probes arrive through both transports. Check mode requires explicit PUBLIC relay TCP and UDP hosts/ports; refuses non-global IPv4 DNS targets; requires actual exact roundtrip, reports no Ethereum P2P proof.
+
+## Actions (two-machine, no blockchain client modifications)
+
+1. On VM4706: git fetch immutable R53 commit and run 8 tests. Copy ONLY this reviewed nonsecret R53 probe file via verified SSH to VM4707, or make a read-only GitHub checkout on VM4707. Never copy the owner SSH private key, BLS validator material, Engine JWT or slashing DB. LAN ICMP success does not imply SSH access; verify VM4707 SSH host fingerprint out of band before any SCP transfer.
+2. On VM4707 terminal A: run the reviewed probe with --server. It listens ONLY on local 23353 TCP and 23354 UDP; no P2P or RPC exposure.
+3. On VM4707 terminal B: install official Pinggy CLI after reviewing installer / independently verifying binary. Skip optional device login and remote-control service. Start TCP tunnel with command: pinggy --type tcp -l 23353 --b. Start UDP tunnel: pinggy --type udp -l 23354 --b. Run pinggy ps to obtain ACTUAL assigned public hostnames and ports. These are never guessed. Follow docs for exact installed client syntax.
+4. On VM4706, run same reviewed R53 script with --check and four flags: --tcp-host ACTUAL_TCP_HOST --tcp-port ACTUAL_TCP_PORT --udp-host ACTUAL_UDP_HOST --udp-port ACTUAL_UDP_PORT. Do NOT run the server on VM4706. A positive result proves only roundtrip via that relay, not independent physical operator, native Ethereum peer or permanent service.
+5. Stop test tunnels by IDs shown from pinggy ps, via pinggy stop TUNNEL_ID. Loopback test server exits after matching both echo requests or at 12 min.
+
+After BOTH actual public relay transports work, transfer only the 16,218-byte ORIGINAL real public chain31340 genesis archive (SHA256 1d21e6bfb7609d1797edd9d36561b1dc47a520153d1c6f698f807c29266c2ce7), install strictly pinned Besu26.11.1/Lighthouse8.3.3 on VM4707 with NEW local Engine JWT and non-signing data, verify native TCP+UDP advertised signed peer records through relay, and only then review controlled original VM4706 P2P maintenance while preserving its sole signer. Continue building public installer using stable verified bootstrap manifest independent of relay vendor; private GitHub repo and expiring free tunnels are remaining permissionless-release blockers. Never claim permissionless participation without genuinely reachable native external peer handshakes.
+
+
+## Simplest VM4707 relay trial with official Pinggy Docker image, no Pinggy installation
+
+Official source: https://pinggy.io/docs/docker/ confirms Linux host-network Docker image for both raw TCP and UDP (UDP cannot be handled by plain SSH). For the 12-minute echo trial only, on VM4707 TWO NEW terminal tabs, execute each command in FOREGROUND:
+
+TCP terminal:
+    sudo -n docker run --rm --net=host -it --name sse-r53-tcp pinggy/pinggy -p 443 -R0:localhost:23353 tcp@free.pinggy.io
+
+UDP terminal:
+    sudo -n docker run --rm --net=host -it --name sse-r53-udp pinggy/pinggy -p 443 -R0:localhost:23354 udp@free.pinggy.io
+
+The third-party Docker containers must NOT have access to Docker daemon socket, signer keys, Engine JWT, or any host mount. No validator on this host. Do NOT copy them to the original signer VM4706. The image tag is unpinned upstream for this initial disposable trial; record actual pulled immutable image ID/digest before trusting a long-running implementation, and never treat temporary output as verified identity. Pinggy returns actual PUBLIC TCP and UDP endpoint hostnames/ports; don't invent any. Keep a third VM4707 terminal running R53 --server on loopback before launching either tunnel. Then on VM4706 run R53 --check with the two actual public host:port pairs. Stop the two foreground Docker terminals with Ctrl+C after test. VM4707 relay is non-signing; VM4706 original finality is untouched.

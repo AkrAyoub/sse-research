@@ -1,0 +1,97 @@
+# R25 — Genuine chain31340 SSZ genesis from real owner-held BLS keys
+
+**Status 2026-11-20:** **G0 code tested:** VM4706 at `f1ddae763735fe365e49e7286ae83e5fb689ed3a` passed **13/13** R25 builder + **9/9** public keystore-export + **16/16** collector Python tests, all using synthetic source-test fixtures. Earlier R24 **31/31** funded-V2 and **196/196** total Solidity tests also PASS at their separate immutable revision `298518e51eeaf59477a92450fbec48bb8980eccd`. **No actual encrypted EOA/BLS validators, EL/CL Genesis, `genesis.ssz` or PoS nodes have yet been created or launched on chain31340.**
+
+## Why the R25 lab path exists
+
+The eventual SSE chain is fully permissionless and has **no fixed number of participants in ANY role**, including validators. Genesis, however, is necessarily a finite initial snapshot. The project's machine inventory is limited to its provisionable VMs and exactly one physically external non-VM laptop. It is scientifically dishonest to invent four distinct administrators, four VMs, or 64 true independent signing operators to satisfy an early "real client smoke" gate.
+
+The original public contribution collector required at least two independent operators; the R25 change admits exactly **one locally controlled operator** ONLY with the explicit command flags `--min-operators 1 --single-operator-lab`. It labels results `singleOperatorLabOnly=true`, `publicMultioperatorNetworkReady=false`, BLS PoP/physical independence unverified, network not started. The regular multioperator collector policy remains explicit, with `min_operators>=2` if not in lab mode. **No R25 lab can be presented as public decentralization or external community acceptance.**
+
+## What the real code does (no synthetic blockchain, no fake validators)
+
+- `tools/sse_pos_genesis_build.py` reads only a REAL owner-provided execution `genesis.json`, consensus `config.yaml` and actual public BLS validator contribution JSON. No mnemonic or keystore upload, dummy BLS generator, fake PoS peers, fake funding or simulated SLA workload.
+- Strictly validate chain ID **31340** (NOT compromised 31339), PoS terminal difficulty 0, non-QBFT/non-Clique client configuration, distinct execution deposit contract address matching the Beacon config, explicitly selected Shanghai/Cancun/Prague/Osaka fork schedule, correct genesis minimum for the actual number of validator keys, custom non-mainnet Genesis fork version, and honest protocol-baseline 12-second slots. These are *preflight schema* checks; they do NOT prove fork schedule parity or runtime compatibility.
+- The default `--inspect` path is **read-only**. It returns only PUBLIC hashes and flags `blsPubkeySubgroupAndPossessionVerified=false`, `independentAdministratorsVerified=false`, `permissionlessPublicNetworkReady=false`. It does not create files or launch processes.
+- For one actual operator's **owner-generated REAL BLS keys only**, optional `--build-single-operator-lab` verifies a clean exact source SHA and the previously verified official `ethpandaops/eth-beacon-genesis v0.0.8` executable SHA256 `5ee29389cb29e8a1ace8cfc83ff30a1726409152e88cf07681764740ca9244d2`, then runs the **real** `eth-genesis-state-generator beaconchain --eth1-config ... --config ... --additional-validators ... --state-output ...` with an actual, validated PUBLIC validators list. Output is create-only, never overwrites; records SSZ hash and provenance without printing any keys. No use of `--mnemonics`.
+- If actual generator errors, the tool fails closed; it never substitutes mock genesis bytes or forged signatures. After successful SSZ generation it still reports **NO real client acceptance, validator activation, secure independent proof, public chain or cross-host networking** until observed separately. The public network release must verify BLS PoP, deposit contract, EL/CL compatibility, actual Beacon slot/finality and outsider P2P.
+
+## Required owner inputs — not invented by source code
+
+1. An independently controlled new **test-only EOA** for execution/withdrawal credentials. The previously reviewed owner-local script `scripts/r20_create_local_operator_withdrawal.sh <exact SHA>` requests the literal `CREATE` and a hidden wallet password. The user previously entered a different value, so wallet creation was correctly refused; **no wallet was generated**. Do not retry it automatically, store password in GitHub or use a Mainnet wallet.
+2. Real owner-controlled **Lighthouse BLS validators** generated using the verified v8.3.3 CLI, encrypted keystores and slashing protection. The R20 step probed the actual available flags `account wallet create --name --password-file`, `account validator create --wallet-name --wallet-password --count`, `validator_manager create --mnemonic-path --eth1-withdrawal-address --testnet-dir`. These are only prior observed `--help` outputs, not a verified end-to-end keygen workflow. Do not assume a named generated key is a cryptographically valid validator without checking custody and fork/withdrawal binding.
+3. Actual, mutually consistent owner-approved EL `genesis.json` and Lighthouse `config.yaml`. The tool does **not guess a deposit-contract runtime**, fake a deployed deposit contract, or make up scientific network timings. Current Besu genesis documentation lists `depositContractAddress`, `terminalTotalDifficulty` and timestamp-based post-Merge milestones. The official eth-beacon-genesis CLI accepts exact files and public `--additional-validators`. Manual/protocol review is mandatory before real startup.
+
+**Sensitive upstream CLI finding (actual Lighthouse v8.3.3 source, tag `v8.3.3`, `account_manager/src/wallet/create.rs`):** `lighthouse account wallet create` **prints the new BIP39 mnemonic to stdout by default**, even though the wallet keystore is encrypted. Any future owner BLS key-generation script MUST redirect its entire stdout/stderr to a private owner-only file or use an explicit owner-only `--mnemonic-output-path` as appropriate, must NEVER echo mnemonic data or logs to terminal, GitHub Actions or chat, and must require human consent and offline backup. We have inspected the upstream source; this caution is not itself proof any validator keys exist. Also `account validator create` generates local 0600 voting keystores and slashing-protection DB, and its default deposit metadata must be checked against the custom 31340 genesis configuration before usage. **Do not point it at Ethereum Mainnet or import any research-only key into a real-value network.**
+
+## Local PUBLIC-only export from actual encrypted BLS keystores
+
+New R25 `tools/sse_pos_public_keystore_export.py` extracts **only real EIP-2335 keystore JSON's public `pubkey` metadata**, never imports or decrypts the voting keys or touches wallet passwords. It accepts actual keystore file layouts from EthStaker-style flat `*.json` files or Lighthouse's encrypted `<validator-dir>/voting-keystore.json`, requires every containing directory to be owner-only 0700 and key file to be owner-only 0600, refuses symlinks/duplicates and writes a create-only 0600 **public-only** JSON contribution with the chosen TEST-only EOA withdrawal address. It can use a directory containing genuinely generated encrypted keystores only; the **unit fixture keystores are synthetic** and must never be used to start a chain.
+
+After the owner has explicitly created real locally controlled encrypted validators and a test-only withdrawal EOA (none has yet been created), on the same owner host:
+
+```bash
+python3 -B tools/sse_pos_public_keystore_export.py \
+  --keystore-dir /absolute/OWNER-LOCAL/ENCRYPTED-KEYSTORE-DIR \
+  --operator-id operator-own-one \
+  --withdrawal-address 0xACTUAL_OWNER_TEST_ONLY_EOA_ADDRESS \
+  --output /absolute/OWNER-LOCAL/new-PUBLIC-only-operator.json
+```
+
+These paths and address are **placeholders**, not commands ready to execute. Do not paste a keystore, mnemonic or password in chat/GitHub. `blsPrivateKeyPossessionVerified=false` is intentionally emitted: metadata alone does NOT prove BLS custody. Real testnet/fork-specific proof and validator-client signing checks are still required.
+
+`tests/test_sse_pos_public_keystore_export.py` contains 9 new adversarial synthetic-file tests (not yet VM tested) for owner-only permission enforcement, EIP-2335 shape checks, flat/nested Lighthouse layouts, duplicate/symlink rejection, public-only output and no-overwrite. This is in addition to the 13 R25 genesis builder preflight tests (the additional test rejects fixed roster sizes above a minimum).
+
+## R29 additional fail-closed public Genesis checks (SOURCE ONLY)
+
+After G1 real EOA was verified but BLS wallet creation was declined, we continued **non-secret** public-genesis hardening. The revised `tools/sse_pos_genesis_build.py` now rejects a deceptively configured EL `depositContractAddress` unless the same normalized address has **explicit nonempty bounded EVM runtime `code` in the public genesis `alloc`**, and rejects duplicate allocation aliases differing only in case or the optional `0x` prefix. It records a public SHA256 of that bytecode in `elFields.depositContractBytecodeHashSha256` and **`depositContractRuntimeAuthenticityVerified=false`**. Merely putting arbitrary code at that address cannot demonstrate working deposit and event behavior, and is **NOT permissionless new validator onboarding**. The actual deposited 32-worthless-TEST-ETH contract code and chain initialization must be verified against real Besu+Lighthouse before any public release; never use a mocked/stub deposit runtime to run a real chain.
+
+The genesis test fixtures contain a **deliberate REVERT stub `0x60006000fd`** solely to test parser behavior, with three new negative/shape tests. It is NOT the real Ethereum Beacon deposit contract and MUST NEVER be deployed as it would prevent joining. This raises `test_sse_pos_genesis_build.py` source test count to **16** (the previous 13 methods passed at Step31; all 16 revised methods require new VM validation). The existing 9 public keystore exporter and 16 contribution tests were already verified at older G0 source and were not changed here. Actual G1 BLS approval remains **refused** and cannot be bypassed by these changes.
+
+## R30 fork-schedule preflight (new GitHub source, NOT VM-tested)
+
+Following the 36/36 Step36 source pass, `tools/sse_pos_genesis_build.py` now refuses **out-of-order EL Shanghai/Cancun/Prague/Osaka timestamp activations**, malformed uint64 timestamps, missing or out-of-order **CL Altair/Bellatrix/Capella/Deneb/Electra/Fulu** fork epochs and invalid/reused four-byte fork versions. The CL config must explicitly declare all six fork versions and epochs. This aligns with the input formats documented by the pinned upstream ethpandaops `eth-beacon-genesis v0.0.8` and Besu's Genesis reference, but **it does NOT establish that a chosen CL epoch and EL timestamp activate at the same real slot**. The public output explicitly labels `executionConsensusForkParityVerified=false`. Actual cross-layer parity, Besu/Lighthouse acceptance, genesis-time/slot mapping and EIP compatibility must be proven before G2.
+
+The test suite `tests/test_sse_pos_genesis_build.py` now has **19 source methods**, including 3 new adversarial fork-policy regression tests. Older 16/16 builder methods were VM-verified at Step36 before this extension; **none of these new edits have been VM-tested yet**. The local test fixture still includes a deliberately **nonfunctional EVM REVERT deposit stub** and fake BLS-shaped values solely for parsing security tests; absolutely never generate a real PoS chain from test fixtures. No human BLS key generation/approval or live public network is implied.
+
+## Actual CLI workflow after owner has real public data
+
+**Read-only preflight (safe, no key creation):**
+
+```bash
+python3 -B tools/sse_pos_genesis_build.py \
+  --eth1-genesis /absolute/path/to/public/genesis.json \
+  --consensus-config /absolute/path/to/public/config.yaml \
+  --contribution /absolute/path/to/operator-local-PUBLIC-keys.json \
+  --min-operators 1 --min-validators <ACTUAL_POSITIVE_KEY_COUNT> \
+  --single-operator-lab --inspect
+```
+
+**Only after real BLS custody and explicit operator approval**, run:
+
+```bash
+python3 -B tools/sse_pos_genesis_build.py \
+  --eth1-genesis /absolute/path/to/public/genesis.json \
+  --consensus-config /absolute/path/to/public/config.yaml \
+  --contribution /absolute/path/to/operator-local-PUBLIC-keys.json \
+  --min-operators 1 --min-validators <ACTUAL_POSITIVE_KEY_COUNT> \
+  --single-operator-lab --build-single-operator-lab \
+  --generator "$HOME/.local/share/sse-r19-toolchains/eth-beacon-genesis-v0.0.8/eth-genesis-state-generator" \
+  --expected-commit <IMMUTABLE_GITHUB_SHA> \
+  --output-dir "$HOME/sse-pos31340-fresh-onehost-public-artifacts"
+```
+
+The angle-bracket spans are **placeholders and NOT runnable instructions**: replace them only with actual owner-owned key count and approved SHA. This generator's success is still NOT sufficient to launch a public chain. No key/password/seed/keystore should be put into these public artifacts.
+
+## Native PoS acceptance that must follow
+
+- Hash-pin `genesis.json`, `config.yaml` and `genesis.ssz`; verify deposit-contract address/runtime, EL block0 hash and CL genesis validator root using **actual** client RPC/Beacon API.
+- Start pinned Besu26.11.1 and Lighthouse8.3.3 in isolated, unprivileged, resource-limited single-host Linux containers; private Engine JWT, loopback-only Engine API, no public wallet/keymanager; only deliberate controlled P2P publishing. Start a real validator-client process from the owner's actual BLS keys and observe actual signed attestations/proposals, slots and finalized checkpoints. No static-IP or human admission service may be required by the *protocol*, even if limited lab connectivity is not yet public.
+- After genuinely working 1-host lab, bring a different VM and the **one external laptop** as real independently networked peers, check actual TCP+UDP ingress, different network paths and recovery. Same owner controlling VM+laptop remains a shared organizational fault domain; do not call it two independent operators.
+- A public release requires real externally independent validator custodians and proven public reachability; otherwise mark security acceptance incomplete, never fake identities. The live Beacons deposit contract must accept real 32-worthless-TEST-ETH transactions for NEW post-genesis validators, not just genesis preload.
+
+## Test discipline
+
+`tests/test_sse_pos_genesis_build.py` contains **13** and `tests/test_sse_pos_public_keystore_export.py` contains **9** pure Python unit fixture tests of parsing, wrong-chain/unsafe genesis refusal, secret fields, duplicate input, config mismatch, one-real-operator lab flag, and no generator execution in inspect. These synthetic *unit fixture values* are only shape tests and **must NEVER be used in real Genesis**. New R25 test methods are SOURCE ONLY; none is VM-passed until exact Git checkout and operator `python3 -B -m unittest ...`.
+
+Existing old `scripts/sse_pos_launch.sh` is **31339 historical** and must NOT be used for public chain31340: upstream old package emitted known compromised/shared mnemonic; it intentionally refuses public exposure. No main merge or GitHub Actions. This R25 builder provides the actual new Genesis path rather than reusing the compromised historical launcher.
