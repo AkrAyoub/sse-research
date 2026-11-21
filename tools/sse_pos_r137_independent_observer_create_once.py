@@ -98,7 +98,8 @@ def apply(plan, el_enode, bn_enr, *, unattended=False):
         approval = Path("/var/lib/sse/selection.json")
         if approval.is_symlink() or not approval.is_file():
             raise Refused("no locally selected SSE installation roles")
-        if os.geteuid() != 0 or approval.stat().st_mode & 0o077:
+        if (os.geteuid() != 0 or approval.stat().st_uid != 0
+                or approval.stat().st_mode & 0o077):
             raise Refused("unattended installation requires root-owned private selection")
         state = json.loads(approval.read_text("utf-8"))
         roles = state.get("selectedRoles")
