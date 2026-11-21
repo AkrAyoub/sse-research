@@ -155,7 +155,10 @@ def discover(urls, getter=fetch, now=None, *, min_sources=2):
             elif old != (el, bn):
                 candidates[node] = False
     accepted = sorted((node, *data) for node, data in candidates.items() if data)
-    if successful < min_sources or len(accepted) < 2:
+    # A network with exactly ONE reachable first-online peer must admit
+    # its second node. Two independent source URLs avoid a single *directory*
+    # dependency; two distinct PEER IDENTITIES are not an admission rule.
+    if successful < min_sources or len(accepted) < 1:
         raise Refused("insufficient unconflicted multi-source bootstrap hints")
     return {
         "schema": "SSE_R142_PUBLIC_DISCOVERY_RESULT_V1",
