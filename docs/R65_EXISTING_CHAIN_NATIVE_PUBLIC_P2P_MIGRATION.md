@@ -2,13 +2,21 @@
 
 **2026-11-21 status: GitHub SOURCE ONLY, no migration applied.** This is the FIRST reviewed migration implementation for enabling real native P2P on the **existing original live chain31340**, not an architecture mock or a second genesis. Previous G2 has one actual Lighthouse validator and remains on an IPv4-only Docker internal bridge with Besu `--p2p-enabled=false`. The original owner now has the same controllerless public ZeroTier transport as VM4707 and the outside laptop.
 
+## Observed actual R65 first run and source correction — 2026-11-21
+
+**Actual VM4706 evidence:** Corrected R59 17/17, R61 6/6 and R65 17/17 source tests all PASS (**40/40**). At immutable Git SHA `31bb642e9e15313a302e0aeab1087aca4095648b`, owner `--plan` passed original chain + shared PUBLIC overlay and absent migration resources, but REFUSED at original client Docker metadata with `custom entrypoint/environment requires separate source review`. There was **NO --apply** or interruption of EL/BN/VC; original chain still runs untouched.
+
+**GitHub-only fix:** Normalize **only** Docker's `Entrypoint=None` versus `[]` (both absent) and Env list order when exact key/value mappings match. Strictly REFUSE custom entrypoint, duplicated/added/missing/changed Env values; do not print Env content or secrets. Controlled refusal now categorizes counts to diagnose the source of a real mismatch. Added six focused safety tests: **R65 now 23 tests**, source only until operator reruns. The corrected source does NOT permit arbitrary custom env/entrypoint; changed effective runtime behavior needs explicit review and safe preservation. No maintenance authorized.
+
+**Important:** The R65 `--apply` mode, which can interrupt the only live validator, remains **NOT AUTHORIZED** until the corrected read-only plan passes, client effective Docker host ports and IPv6 bridge behavior are verified, actual original signer/chain databases have recoverable consistent backups, and rollback is independently reviewed. Its existence in GitHub is not a tested execution or successful public Ethereum bootstrap.
+
 ## What the original VM actually proved
 
 At immutable Git SHA `ada6cf9bc84a1fd6944e6c7a40b1feff2901ef7c`, VM4706 operator ran R64 **10/10 source tests PASS** and real original R64 network/state audit. Output verified owner actual ZeroTier `ff2328775f000000` `OK PUBLIC`, assigned `fca0:2328:776e:4750:395b::1`; original single EL/BN/VC running; same isolated internal Docker trust network `sse31340-g2-internal`; exact pinned image IDs and immutable original genesis/JWT metadata; EL P2P explicitly false, actual native peers `0x0`. EL/BN each bind-mount **exactly three owner-private paths** at `/data` (writable), `/testnet` and `/jwt/engine.jwt` (readonly), no extra original attached Docker networks; VC has four existing private mounts and **must never be recreated**. Real in-namespace EL execution chainId31340 block `0xc62` = **3170**; Lighthouse head **slot 3388**, finalized **epoch 101**, finalized root `0xf30b621acbfda2ee5ebaef9e0dd26c516481f27c545a49fb78f81f94484ddf85`. These advance from R62 EL3029, BN head3247, epoch97. They do not prove ongoing multi-peer finality or native P2P beyond the single owner host.
 
 ## Implemented migration source (NOT YET OPERATOR-RUN)
 
-`tools/sse_pos_r65_original_chain_native_public_p2p_migration.py`, `tests/test_sse_pos_r65_original_chain_native_public_p2p_migration.py` (**17 mocked/source tests**, not executed on VM), and this document. Source is GitHub-only in feature branch. The implementation has two mutually exclusive modes:
+`tools/sse_pos_r65_original_chain_native_public_p2p_migration.py`, `tests/test_sse_pos_r65_original_chain_native_public_p2p_migration.py` (**23 mocked/source tests**, not executed on VM), and this document. Source is GitHub-only in feature branch. The implementation has two mutually exclusive modes:
 
 **`--plan --expected-commit SHA`** reads the exact original G2 + owner overlay state through R60/R62/R63/R64, checks that exactly one original execution+Beacon pair is running, normal image digest and private mount layout, preserved Engine JWT metadata, hardening and trusted Docker network, current canonical execution/Beacon health. It checks no old `-r65-preserved` containers or R65 P2P bridge exist. It builds a minimal proposed public IPv6 P2P publication list:
 - Besu existing client: primary *internal IPv4* `30303` (NOT host-published, NOT private provider-LAN advertised), **secondary IPv6 30404 TCP+UDP** published ONLY to owner `[fca0:2328:776e:4750:395b::1]` (computed dynamically from current ZeroTier host membership). Besu v26.11 IPv6 options `--p2p-enabled=true`, `--p2p-host=127.0.0.1`, `--p2p-host-ipv6=<actual6plane>`, `--p2p-interface-ipv6=::`, `--p2p-port-ipv6=30404`, `--p2p-discovery-port-ipv6=30404`, IPv6 outbound preference and discovery BOTH. Host EL JSON-RPC only `127.0.0.1:18545:8545/tcp`; **NO Engine8551 host publication**.
@@ -27,7 +35,7 @@ At immutable Git SHA `ada6cf9bc84a1fd6944e6c7a40b1feff2901ef7c`, VM4706 operator
  cd "$HOME/sse-research"
  export GIT_SSH_COMMAND="ssh -i $HOME/.ssh/sse_vm4706_readonly -o IdentitiesOnly=yes -o StrictHostKeyChecking=yes -o BatchMode=yes"
  git fetch --no-tags origin feature/r19-fresh-external-node-preflight
- SHA="31bb642e9e15313a302e0aeab1087aca4095648b"
+ SHA="574c79f30c4feb96a09fc28993f81524081b4784"
  git switch --detach "$SHA"
  test "$(git rev-parse HEAD)" = "$SHA"
  python3 -B -m unittest discover -s tests -p 'test_sse_pos_r59_native_ipv6_observer.py' -v
