@@ -68,6 +68,13 @@ class R59NativeObserverTests(unittest.TestCase):
         self.assertIn('"--disable-enr-auto-update"',source)
         self.assertIn('"--enr-address=" + ip',source)
 
+    def test_actual_observer_besu_6plane_advertise_uses_same_owner_separate_discovery_port(self):
+        src=(ROOT/"tools/sse_pos_r59_native_ipv6_observer.py").read_text("utf-8")
+        self.assertIn('"--p2p-host=127.0.0.1"',src)
+        self.assertIn('"--p2p-discovery-port-ipv6=30404"',src)
+        self.assertIn('"--p2p-host-ipv6=" + ip',src)
+        self.assertIn('"--p2p-ipv6-outbound-enabled=true"',src)
+
     def test_besu_separate_ipv6_port_and_seed_protocol(self):
         src=(ROOT/"tools/sse_pos_r59_native_ipv6_observer.py").read_text("utf-8")
         self.assertIn('"--p2p-port-ipv6=30404"',src)
