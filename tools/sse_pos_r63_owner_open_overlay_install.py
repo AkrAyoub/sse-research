@@ -96,8 +96,12 @@ def membership() -> tuple[bool,str|None]:
     relevant=[n for n in networks if isinstance(n,dict) and n.get("nwid")==NETWORK]
     if not relevant:
         return False,None
-    if len(relevant)!=1 or relevant[0].get("status")!="OK" or relevant[0].get("type")!="PUBLIC":
+    if len(relevant)!=1 or relevant[0].get("type")!="PUBLIC":
         raise R63Refused("unexpected existing overlay membership")
+    if relevant[0].get("status") in ("REQUESTING_CONFIGURATION","NOT_FOUND"):
+        return False,None  # asynchronous post-join provisioning; not confirmed
+    if relevant[0].get("status")!="OK":
+        raise R63Refused("existing ad-hoc network status is not healthy")
     assigned=relevant[0].get("assignedAddresses",[])
     if not isinstance(assigned,list):
         raise R63Refused("overlay IPv6 assignments invalid")
@@ -162,13 +166,18 @@ def verify_key(path: Path) -> None:
 
 def ensure_no_existing_package_sources() -> None:
     for path in (ROOT_KEY,ROOT_SOURCE,"/etc/apt/sources.list.d/zerotier.list"):
-        state=priv(["test","-e",path],timeout=10) if False else None
-        # Read-only filesystem metadata through sudo to handle root-owned dirs.
-        p=subprocess.run(["sudo","-n","test","-e",path],capture_output=True,timeout=10)
-        if p.returncode==0:
-            raise R63Refused("ZeroTier repository state already exists; manual review required")
-        if p.returncode!=1:
-            raise R63Refused("cannot safely inspect existing apt repository state")
+        # Reject existing files AND broken symlinks; do not overwrite any
+        # package source/key material installed by another administrator.
+        for flag in ("-e","-L"):
+            try:
+                p=subprocess.run(["sudo","-n","test",flag,path],
+                                 capture_output=True,timeout=10)
+            except (OSError,subprocess.TimeoutExpired) as exc:
+                raise R63Refused("cannot safely inspect apt repository state") from exc
+            if p.returncode==0:
+                raise R63Refused("ZeroTier repository state already exists; manual review required")
+            if p.returncode!=1:
+                raise R63Refused("cannot safely inspect existing apt repository state")
 
 def install_and_join(commit: str) -> dict:
     outcome=plan(commit)
@@ -216,10 +225,12 @@ def install_and_join(commit: str) -> dict:
     # Membership can be temporarily REQUESTING_CONFIGURATION after join;
     # report no success until operator confirms OK PUBLIC + new 6plane IPv6.
     active,addr=membership()
+    original_state_guard(commit)
     outcome.update({
         "mode":"one_time_owner_authorized_transport_install",
         "signedOfficialZeroTierPackageInstalled":True,
         "joinedPublicControllerlessOverlayConfirmed":active,
+        "overlayProvisioningMayStillBePending":not active,
         "observedHost6planeIpv6":addr,
         "originalHostDefaultIpv4RouteUnchanged":True,
         "originalNativeExecutionP2pStillDisabled":True,
