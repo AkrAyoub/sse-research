@@ -109,7 +109,7 @@ class R65NativePublicOwnerMigrationTests(unittest.TestCase):
 
     def test_preflight_does_not_modify_docker_or_restart_signer(self):
         source=(ROOT/"tools/sse_pos_r65_original_chain_native_public_p2p_migration.py").read_text("utf-8")
-        body=source[source.index("def read_only_plan("):source.index("def rollback(")]
+        body=source[source.index("def read_only_plan("):source.index("def start_if_stopped(")]
         for banned in ('docker(["stop"', 'docker(["start"', 'docker(["run"',
                        'docker(["network","create"', 'docker(["rename"',
                        'clone_args(', 'rollback('):
