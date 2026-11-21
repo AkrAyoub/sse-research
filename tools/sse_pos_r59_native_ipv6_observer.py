@@ -195,7 +195,9 @@ def bootnodes(el_enr: str | None, bn_enr: str | None) -> bool:
 
 
 def port_bindings(ip: str, is_el: bool) -> list[str]:
-    ipaddress.IPv6Address(ip)
+    validated = ipaddress.IPv6Address(ip)
+    if validated not in ipaddress.ip_network("fca0::/16"):
+        raise R59Refused("P2P port publication requires assigned 6plane IPv6")
     if is_el:
         return [f"[{ip}]:30303:30303/tcp", f"[{ip}]:30303:30303/udp",
                 "127.0.0.1:28545:8545/tcp"]
@@ -335,6 +337,7 @@ def apply(el_enr: str | None, bn_enr: str | None) -> dict:
         "--discovery-enabled=true", "--discovery-mode=BOTH",
         "--p2p-interface=0.0.0.0", "--p2p-interface-ipv6=::",
         "--p2p-host-ipv6=" + ip, "--p2p-port=30303", "--p2p-port-ipv6=30303",
+        "--p2p-ipv6-outbound-enabled=true",
         "--nat-method=NONE",
         "--rpc-http-enabled", "--rpc-http-host=0.0.0.0",
         "--rpc-http-port=8545", "--rpc-http-api=ETH,NET,WEB3",
