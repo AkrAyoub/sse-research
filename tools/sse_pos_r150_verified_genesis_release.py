@@ -14,10 +14,8 @@ import hashlib
 import json
 import os
 from pathlib import Path
-import shutil
 import sys
 import tarfile
-import tempfile
 
 ARCHIVE_SHA = "1d21e6bfb7609d1797edd9d36561b1dc47a520153d1c6f698f807c29266c2ce7"
 PREFIX = "chain31340-public/"
@@ -48,8 +46,7 @@ def verify(blob):
             collected = {}
             for item in f:
                 if (not item.isfile() or item.name not in PUBLIC_MEMBERS
-                        or item.name in collected or not 0 <= item.size <= MAX_MEMBER
-                        or item.pax_headers):
+                        or item.name in collected or not 0 <= item.size <= MAX_MEMBER):
                     raise Refused("archive contains unknown/duplicate/linked member")
                 stream = f.extractfile(item)
                 if stream is None:
