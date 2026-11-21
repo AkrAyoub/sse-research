@@ -267,6 +267,7 @@ def revised_cmd(name:str,original:list[str],ipv6:str)->list[str]:
         "--quic-port6=9001","--enr-address="+ipv6,
         "--enr-tcp6-port=9000","--enr-udp6-port=9000",
         "--enr-quic6-port=9001","--enable-private-discovery","--disable-upnp",
+        "--disable-enr-auto-update",
     ]
     keys={x.split("=",1)[0] for x in replacements}
     result=[a for a in original if a.split("=",1)[0] not in keys]
@@ -400,6 +401,22 @@ def read_only_plan(commit:str)->tuple[dict,dict,dict]:
         cmd=revised_cmd(name,definition["cmd"],ipv6)
         if len(cmd)>200 or any("\x00" in a for a in cmd):
             raise R65Refused("updated native CLI unexpectedly large")
+        # Build the exact proposed replacement create command IN MEMORY now.
+        # No subprocess, Docker change, private mount path output, or start.
+        candidate=clone_args(definition,ipv6)
+        if len(candidate)>250 or any(
+            not isinstance(part,str) or "\x00" in part for part in candidate
+        ):
+            raise R65Refused("proposed native client create argv invalid")
+        if name==BN and (
+            candidate.count("--entrypoint")!=1 or
+            candidate[candidate.index("--entrypoint")+1]!="lighthouse"
+        ):
+            raise R65Refused("proposed Beacon executable does not match original")
+        if candidate.count("--workdir")!=1 or (
+            candidate[candidate.index("--workdir")+1]!=definition["original_workdir"]
+        ):
+            raise R65Refused("proposed Docker workdir does not match existing process")
         if name==EL and not any(a=="--p2p-port-ipv6=30404" for a in cmd):
             raise R65Refused("EL native IPv6 port missing")
     return ({
