@@ -256,6 +256,18 @@ class R65NativePublicOwnerMigrationTests(unittest.TestCase):
         self.assertEqual(argv[argv.index("--workdir")+1],"/opt/besu")
         self.assertNotIn("--entrypoint",argv)
 
+    def test_beacon_6plane_signed_enr_is_pinned_no_auto_update(self):
+        args=m.revised_cmd(m.BN,["bn","--testnet-dir=/testnet"],IP)
+        self.assertIn("--disable-enr-auto-update",args)
+        self.assertIn("--enr-address="+IP,args)
+
+    def test_plan_generates_beacon_and_execution_launch_candidates_without_docker_creating(self):
+        src=(ROOT/"tools/sse_pos_r65_original_chain_native_public_p2p_migration.py").read_text("utf-8")
+        plan=src[src.index("def read_only_plan("):src.index("def start_if_stopped(")]
+        self.assertIn("candidate=clone_args(definition,ipv6)",plan)
+        self.assertIn('candidate[candidate.index("--entrypoint")+1]!="lighthouse"',plan)
+        self.assertNotIn('docker(["create"',plan)
+
     def test_refuse_original_client_already_migrated(self):
         owner={"originalELP2pExplicitlyDisabled":False}
         with patch.object(m.r64,"current_owner_audit",return_value=owner):
@@ -267,8 +279,10 @@ class R65NativePublicOwnerMigrationTests(unittest.TestCase):
         body=source[source.index("def read_only_plan("):source.index("def start_if_stopped(")]
         for banned in ('docker(["stop"', 'docker(["start"', 'docker(["run"',
                        'docker(["network","create"', 'docker(["rename"',
-                       'clone_args(', 'rollback('):
+                       'rollback('):
             self.assertNotIn(banned,body)
+        self.assertIn('candidate=clone_args(definition,ipv6)',body)
+        self.assertIn('candidate.count("--workdir")!=1',body)
         self.assertIn('"nothingModifiedByPlan":True',body)
 
     def test_refuse_apply_without_attested_backup_even_when_plan_passes(self):
