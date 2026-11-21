@@ -102,7 +102,10 @@ def prepare_original_archive(source):
     if target.is_symlink():
         raise Refused("original archive target is symlinked")
     if target.exists():
-        r136.verify_archive(target)
+        try:
+            r136.verify_archive(target)
+        except r136.Refused as exc:
+            raise Refused("preexisting original archive failed exact chain verification") from exc
         if target.read_bytes()!=source.read_bytes():
             raise Refused("preexisting original archive differs")
         return target
