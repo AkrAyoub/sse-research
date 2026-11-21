@@ -63,6 +63,15 @@ class R48NonsigningIndependentObserverTests(unittest.TestCase):
         self.assertNotIn('docker(["network", "create"', plan)
         self.assertNotIn("mkdir(", plan)
 
+    def test_archive_and_enr_must_never_be_claimed_as_live_public_peer(self):
+        src = (ROOT/"tools/sse_pos_r48_external_observer.py").read_text("utf-8")
+        self.assertIn("archive.stat().st_size <= bundle.MAX_TARBALL", src)
+        self.assertIn('"actualSeedReachabilityWasVerifiedByPreflight": False', src)
+        self.assertIn('"authenticatedInternetPeerHandshakesObserved": False', src)
+        self.assertIn('"realExternalFinalityVerified": False', src)
+        self.assertIn('"sourceOnlyEnrSyntaxNotCryptographicVerification": True', src)
+        self.assertIn('"noServicesCreatedOrChanged": False', src)
+
     def test_apply_is_one_time_and_explicitly_approved(self):
         source = (ROOT/"tools/sse_pos_r48_external_observer.py").read_text("utf-8")
         self.assertIn("START-EXTERNAL-31340-OBSERVER", source)
