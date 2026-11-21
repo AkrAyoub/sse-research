@@ -136,7 +136,7 @@ echo "== SUBMIT PINNED BESU EXECUTION =="
 sudo -n docker run -d --pull never --platform linux/amd64 \
   --name "$EL" --hostname "$EL" --init --network "$NET" \
   -p 127.0.0.1:18545:8545/tcp \
-  --user "$USER_ID" --read-only --tmpfs /tmp:rw,nosuid,noexec,size=256m \
+  --user "$USER_ID" --read-only --tmpfs /tmp:rw,nosuid,exec,size=256m \
   --cpus 2 --memory 4g --pids-limit 384 \
   --cap-drop ALL --security-opt no-new-privileges \
   --mount "type=bind,source=$RUN/testnet,target=/testnet,readonly" \
