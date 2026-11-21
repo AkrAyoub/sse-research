@@ -369,7 +369,7 @@ class R65NativePublicOwnerMigrationTests(unittest.TestCase):
                        'wallet create','genesis-build','import-validator',
                        'scp ','ssh '):
             self.assertNotIn(banned,source)
-        self.assertIn('"originalValidatorSigningDataAndKeystoreNeverCloned":True',source)
+        self.assertIn('"originalValidatorSigningDataNeverProvisionedToAnotherActiveSigner":True',source)
         self.assertIn('"externalNativeEthereumP2pSyncAndFinalizedRootMatchObserved":False',source)
 
     def test_source_only_no_real_peer_claim_and_dynamic_host_ip(self):
