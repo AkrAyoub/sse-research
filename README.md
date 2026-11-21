@@ -15,6 +15,27 @@ network using valueless TEST ETH**.
 > chain31339 on VM4705 has known exposed genesis validator keys and is
 > **not safe to expose publicly**.
 
+## R147 — Public repository source onboarding (one role prompt)
+
+GitHub now lists this repository as **public**. Fresh Ubuntu 24.04 VMs can
+download a *pinned* public bootstrap directly: see
+[the R147 one-command installer and first-peer semantics](docs/R147_PUBLIC_ONE_COMMAND_INSTALL_AND_FIRST_PEER.md).
+`scripts/sse_install.py` asks once for role choices, installs basic
+signed Ubuntu source prerequisites and clones this exact GitHub release;
+it explicitly **does not claim a live node or activated marketplace
+role** until the original chain31340 genesis archive, dynamically
+discoverable real native EL/CL peers, verified client images and
+economic-role infrastructure are genuinely published and available.
+No GitHub SSH deploy key or preselected VM IP is needed.
+
+**First online peer:** zero bootstrap peers is allowed, with correct
+original genesis and no fabricated consensus/finality. First host of
+a **new chain** needs a real genesis ceremony and active signing
+validators; the existing original chain31340 must never be
+reinitialized. Source release metadata may name replaceable discovery
+mechanisms; it may not establish an owner-managed admission gate.
+**No fixed VM addresses or privileged permanent bootstrap operator.**
+
 ## R146 correction — manual bootstrap is not the required installer
 
 **Operator requirement: NO per-VM interaction.** Earlier R145 SSH deploy-key
