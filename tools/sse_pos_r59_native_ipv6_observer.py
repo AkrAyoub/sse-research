@@ -50,7 +50,7 @@ LIGHTHOUSE_ID = "sha256:53f9063d98c3d3a2d290207873f019ea2298cfc02f8cd58d87c33b04
 ENR = re.compile(r"enr:[A-Za-z0-9_-]{75,2000}\Z")
 
 
-ENODE6 = re.compile(r"enode://[a-fA-F0-9]{128}@\\[[0-9a-fA-F:]+\\]:[1-9][0-9]{1,4}(?:\\?discport=[1-9][0-9]{1,4})?\\Z")
+ENODE6 = re.compile(r"enode://[a-fA-F0-9]{128}@\[[0-9a-fA-F:]+\]:[1-9][0-9]{1,4}(?:\?discport=[1-9][0-9]{1,4})?\Z")
 
 
 class R59Refused(ValueError):
