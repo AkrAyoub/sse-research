@@ -113,9 +113,21 @@ def require_existing(sha: str):
 
 def wire(method: str, port: int, path: str, body: dict | None) -> str:
     if (method, port, path) not in (
-        ("POST", 8545, "/"), ("GET", 5052, "/eth/v1/beacon/genesis")
+        ("POST", 8545, "/"),
+        ("GET", 5052, "/eth/v1/beacon/genesis"),
+        ("GET", 5052, "/eth/v1/beacon/headers/head"),
+        ("GET", 5052, "/eth/v1/beacon/states/head/finality_checkpoints"),
+        ("GET", 5052, "/eth/v1/node/syncing"),
     ):
-        raise Refuse("only two local read-only API queries allowed")
+        raise Refuse("only strict internal read-only chain identity/health API queries allowed")
+    if method == "POST" and (
+            type(body) is not dict
+            or body.get("method") not in ("eth_chainId", "eth_blockNumber", "eth_getCode")
+            or body.get("jsonrpc") != "2.0"
+            or body.get("params", []) not in (
+                [], ["0x00000000219ab540356cbb839cbe05303d7705fa", "latest"]
+            )):
+        raise Refuse("unapproved JSON-RPC method or contract inspection")
     data = json.dumps(body, separators=(",", ":")).encode("ascii") if body else b""
     parts = [f"{method} {path} HTTP/1.1", "Host: localhost",
              "Accept: application/json", "Connection: close"]
