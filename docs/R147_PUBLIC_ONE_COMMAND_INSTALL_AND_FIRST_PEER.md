@@ -105,6 +105,32 @@ The currently committed installer performs **only base source
 provisioning**, then reports explicit missing consensus/economic
 release gates.
 
+## R149 original-genesis public release status (machine-readable)
+
+`release/chain31340-public-release.json` now pins the actual observed
+chain ID, original EL genesis block hash, Beacon genesis validators root
+and exact R59 archive SHA256. It contains an **empty list** of
+`originalGenesisArchiveSources` and
+`replaceablePeerDirectorySources`, because neither actual public source
+has been verified yet. Those lists can later contain independent HTTPS
+mirror documents without hardcoding a VM, peer, fixed IP, or permanent
+admission service in the installer.
+
+`tools/sse_public_genesis.py` validates the complete pinned release
+manifest, limits untrusted HTTPS downloads, refuses IP-literal and
+redirected mirror source URLs, verifies byte-for-byte original archive
+SHA256, and writes a create-once private copy without touching any
+live chain. If there are no published sources, it returns
+`ORIGINAL_GENESIS_NOT_YET_PUBLICLY_RELEASED` and **never** invents
+genesis.
+
+`scripts/sse_install.py` now calls the verifier after cloning the
+public repository. It stages the archive with that exact release only
+if verified source URLs exist. It still **does not** launch Besu,
+Lighthouse or economic roles, because client install and real discovery
+must be integrated and independently host-tested. An existing machine's
+private BLS keys and Engine JWT are never copied into new peers.
+
 ## Required to reach the complete requested behavior
 
 1. **Public original chain31340 artifact:** export the same R59
