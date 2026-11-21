@@ -393,10 +393,10 @@ def verify_old_absent_and_new_reachability(ipv6:str)->dict:
 def read_only_plan(commit:str)->tuple[dict,dict,dict]:
     print("R65_PLAN_STAGE=VERIFY_CURRENT_ORIGINAL_CHAIN_AND_OPEN_OVERLAY",file=sys.stderr,flush=True)
     owner=r64.current_owner_audit(commit)  # current genuine chain, both clients, VC
-    vc_policy=get_json(["inspect","--format","{{json .HostConfig.RestartPolicy}}",VC])
-    safe_original_restart_policy(vc_policy)
     if not owner["originalELP2pExplicitlyDisabled"]:
         raise R65Refused("owner Besu already migrated; never rerun")
+    vc_policy=get_json(["inspect","--format","{{json .HostConfig.RestartPolicy}}",VC])
+    safe_original_restart_policy(vc_policy)
     print("R65_PLAN_STAGE=VERIFY_NO_PREEXISTING_MIGRATION_RESOURCES",file=sys.stderr,flush=True)
     for old in PRESERVED.values():
         not_exists("container",old)
