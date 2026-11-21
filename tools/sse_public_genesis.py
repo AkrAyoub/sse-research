@@ -17,6 +17,8 @@ import tempfile
 import urllib.parse
 import urllib.request
 
+import sse_pos_r150_verified_genesis_release as original_release
+
 SCHEMA = "SSE_CHAIN31340_PUBLIC_RELEASE_V1"
 ARCHIVE_SHA = "1d21e6bfb7609d1797edd9d36561b1dc47a520153d1c6f698f807c29266c2ce7"
 EL_GENESIS = "0x5f7cbcd4f1ddfbbedbdd2b180b83d9eff49d4b7263643858d7be2e9c243936bf"
@@ -108,6 +110,10 @@ def download(url):
         raise Refused("missing or oversized original chain archive")
     if hashlib.sha256(blob).hexdigest()!=ARCHIVE_SHA:
         raise Refused("original immutable genesis archive SHA256 mismatch")
+    try:
+        original_release.verify(blob)
+    except original_release.Refused as exc:
+        raise Refused("original archive public member verification failed") from exc
     return blob
 
 def acquire(release,target,downloader=download):
@@ -124,6 +130,7 @@ def acquire(release,target,downloader=download):
             if (type(blob) is not bytes or len(blob)>MAX_ARCHIVE
                     or hashlib.sha256(blob).hexdigest()!=ARCHIVE_SHA):
                 raise Refused("original genesis artifact digest mismatch")
+            original_release.verify(blob)
         except (Refused,OSError,ValueError,TypeError):
             continue
         # Install only after digest verified, never on a live node's data root.
