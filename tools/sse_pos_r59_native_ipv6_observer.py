@@ -50,6 +50,9 @@ LIGHTHOUSE_ID = "sha256:53f9063d98c3d3a2d290207873f019ea2298cfc02f8cd58d87c33b04
 ENR = re.compile(r"enr:[A-Za-z0-9_-]{75,2000}\Z")
 
 
+ENODE6 = re.compile(r"enode://[a-fA-F0-9]{128}@\\[[0-9a-fA-F:]+\\]:[1-9][0-9]{1,4}(?:\\?discport=[1-9][0-9]{1,4})?\\Z")
+
+
 class R59Refused(ValueError):
     pass
 
@@ -183,13 +186,20 @@ def images() -> None:
             raise R59Refused("pinned R57 immutable Docker client image ID/platform differs")
 
 
-def bootnodes(el_enr: str | None, bn_enr: str | None) -> bool:
-    if (el_enr is None) != (bn_enr is None):
+def bootnodes(el_enode: str | None, bn_enr: str | None) -> bool:
+    if (el_enode is None) != (bn_enr is None):
         raise R59Refused("execution and beacon bootnodes must be supplied together")
-    if el_enr is None:
+    if el_enode is None:
         return False
-    if not (ENR.fullmatch(el_enr) and ENR.fullmatch(bn_enr) and el_enr != bn_enr):
-        raise R59Refused("two distinct real public ENR strings required")
+    if not (ENODE6.fullmatch(el_enode) and ENR.fullmatch(bn_enr)):
+        raise R59Refused("execution enodeV6 and Beacon ENR syntax required")
+    host = el_enode.split("@[",1)[1].split("]",1)[0]
+    try:
+        address = ipaddress.IPv6Address(host)
+    except ValueError as exc:
+        raise R59Refused("execution enode IPv6 invalid") from exc
+    if address not in ipaddress.ip_network("fca0::/16"):
+        raise R59Refused("execution bootstrap cannot use private-LAN IPv4 or nonoverlay IP")
     # Valid ENR syntax != validated signature, provenance or accessibility.
     return True
 
@@ -199,7 +209,7 @@ def port_bindings(ip: str, is_el: bool) -> list[str]:
     if validated not in ipaddress.ip_network("fca0::/16"):
         raise R59Refused("P2P port publication requires assigned 6plane IPv6")
     if is_el:
-        return [f"[{ip}]:30303:30303/tcp", f"[{ip}]:30303:30303/udp",
+        return [f"[{ip}]:30404:30404/tcp", f"[{ip}]:30404:30404/udp",
                 "127.0.0.1:28545:8545/tcp"]
     return [f"[{ip}]:9000:9000/tcp", f"[{ip}]:9000:9000/udp",
             f"[{ip}]:9001:9001/udp", "127.0.0.1:25052:5052/tcp"]
@@ -216,14 +226,14 @@ def no_conflicting_clients() -> None:
             raise R59Refused("existing R59 container cannot be overwritten")
 
 
-def preflight(el_enr: str | None = None, bn_enr: str | None = None) -> dict:
+def preflight(el_enode: str | None = None, bn_enr: str | None = None) -> dict:
     guard_owner()
     public = inspect_archive()
     iface, ip = overlay_ip()
     docker(["info", "--format", "{{.ServerVersion}}"])
     images()
     no_conflicting_clients()
-    has_bootnodes = bootnodes(el_enr, bn_enr)
+    has_bootnodes = bootnodes(el_enode, bn_enr)
     return {
         "schema": "SSE_R59_GENUINE_NONSIGNING_IPV6_OBSERVER_CREATE_ONCE_PREFLIGHT_V1",
         "realOriginalChain31340ArchiveSha256": ARCHIVE_SHA,
@@ -239,7 +249,7 @@ def preflight(el_enr: str | None = None, bn_enr: str | None = None) -> dict:
         "plannedBeaconRestHostBindingOnlyLoopback": True,
         "dockerNetworkDesign": "dedicated_ipv6_enabled_user_defined_bridge_not_host_network",
         "ipv6DockerPublishAndNativeClientHandshakeAlreadyVerified": False,
-        "twoActualSourceEnrsProvidedSyntaxOnly": has_bootnodes,
+        "executionEnodeV6AndBeaconEnrProvidedSyntaxOnly": has_bootnodes,
         "actualBootnodesAuthenticatedOrReachableByPreflight": False,
         "originalOwnerP2pReachabilityVerifiedByThisTool": False,
         "noLocalOrRemoteSignerCreatedOrUsed": True,
@@ -303,8 +313,8 @@ def inspect_published(name: str, expected: list[str], image_id: str) -> None:
         raise R59Refused("unexpected host Docker port publication; inspect immediately")
 
 
-def apply(el_enr: str | None, bn_enr: str | None) -> dict:
-    result = preflight(el_enr, bn_enr)
+def apply(el_enode: str | None, bn_enr: str | None) -> dict:
+    result = preflight(el_enode, bn_enr)
     if not (sys.stdin.isatty() and sys.stderr.isatty()):
         raise R59Refused("interactive local operator approval required")
     print("This creates TWO REAL NON-SIGNING native chain31340 clients; "
@@ -336,7 +346,7 @@ def apply(el_enr: str | None, bn_enr: str | None) -> dict:
         "--data-path=/data", "--p2p-enabled=true",
         "--discovery-enabled=true", "--discovery-mode=BOTH",
         "--p2p-interface=0.0.0.0", "--p2p-interface-ipv6=::",
-        "--p2p-host-ipv6=" + ip, "--p2p-port=30303", "--p2p-port-ipv6=30303",
+        "--p2p-host-ipv6=" + ip, "--p2p-port=30303", "--p2p-port-ipv6=30404",
         "--p2p-ipv6-outbound-enabled=true",
         "--nat-method=NONE",
         "--rpc-http-enabled", "--rpc-http-host=0.0.0.0",
@@ -346,8 +356,8 @@ def apply(el_enr: str | None, bn_enr: str | None) -> dict:
         "--engine-host-allowlist=" + EL,
         "--engine-jwt-secret=/jwt/engine.jwt",
     ]
-    if el_enr:
-        el_args.append("--bootnodes=" + el_enr)
+    if el_enode:
+        el_args.append("--bootnodes=" + el_enode)
     run_container(BESU_REF, EL,
                   [*common, "--mount", f"type=bind,source={ROOT / 'el'},target=/data"],
                   port_bindings(ip, True), el_args)
@@ -389,11 +399,11 @@ def main() -> int:
     x = p.add_mutually_exclusive_group(required=True)
     x.add_argument("--plan", action="store_true")
     x.add_argument("--apply", action="store_true")
-    p.add_argument("--execution-seed-enr")
+    p.add_argument("--execution-seed-enode-v6")
     p.add_argument("--beacon-seed-enr")
     args = p.parse_args()
     try:
-        report = preflight(args.execution_seed_enr, args.beacon_seed_enr) if args.plan else apply(
+        report = preflight(args.execution_seed_enode_v6, args.beacon_seed_enr) if args.plan else apply(
             args.execution_seed_enr, args.beacon_seed_enr)
         if args.plan:
             report["mode"] = "read_only"
