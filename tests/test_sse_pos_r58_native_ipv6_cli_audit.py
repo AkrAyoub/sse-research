@@ -117,11 +117,12 @@ class R58NativeIpv6AuditTests(unittest.TestCase):
 
     def test_no_chain_launcher_or_network_modifiers_in_source(self):
         src = (ROOT/"tools/sse_pos_r58_native_ipv6_cli_audit.py").read_text("utf-8")
-        for bad in ('"--pull"', '"--apply"', '"--server"', '"--join"', '"wallet create"',
+        for bad in ('"docker", "pull"', '"--apply"', '"--server"', '"--join"', '"wallet create"',
                     '"--network", "host"', '"docker", "start"', '"docker", "network", "create"',
                     '"--publish"', '"--mount"', '"--privileged"'):
             self.assertNotIn(bad, src)
         self.assertIn('"--network", "none"', src)
+        self.assertIn('"--pull", "never"', src)
         self.assertIn('"actualELCLServiceOrP2pStarted": False', src)
         self.assertIn('"actualEthereumPeerHandshakeObserved": False', src)
 
