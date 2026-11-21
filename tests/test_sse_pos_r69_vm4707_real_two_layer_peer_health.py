@@ -73,7 +73,8 @@ class R69ReadOnlyObserverTests(unittest.TestCase):
                      '"admin_addPeer"','"validator","create"','"wallet"','"engine.jwt"'):
             self.assertNotIn(term,source)
         self.assertIn('"noDockerOrBlockchainMutations":True',source)
-        self.assertIn('"realIndependentSameEpochFinalizedRootAgreementStillNeedsOwnerComparison":True',source)
+        self.assertIn('"realIndependentSameEpochFinalizedRootAgreementStillNeedsOwnerComparison"',source)
+        self.assertIn('out["realIndependentSameEpochFinalizedRootAgreementStillNeedsOwnerComparison"]=True',source)
 
 if __name__=="__main__":
     unittest.main()
