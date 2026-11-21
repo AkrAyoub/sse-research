@@ -57,6 +57,17 @@ class R59NativeObserverTests(unittest.TestCase):
         with self.assertRaises(m.R59Refused):
             m.bootnodes("enode://" + "a"*128 + "@[2001:db8::1]:30404", "enr:" + "B"*90)
 
+    def test_actual_apply_uses_declared_execution_enode_arg_not_removed_enr_name(self):
+        source=(ROOT/"tools/sse_pos_r59_native_ipv6_observer.py").read_text("utf-8")
+        self.assertIn('args.execution_seed_enode_v6, args.beacon_seed_enr)',source)
+        self.assertNotIn('args.execution_seed_enr',source)
+        self.assertIn('p.add_argument("--execution-seed-enode-v6")',source)
+
+    def test_beacon_enr_does_not_auto_update_away_from_public_overlay(self):
+        source=(ROOT/"tools/sse_pos_r59_native_ipv6_observer.py").read_text("utf-8")
+        self.assertIn('"--disable-enr-auto-update"',source)
+        self.assertIn('"--enr-address=" + ip',source)
+
     def test_besu_separate_ipv6_port_and_seed_protocol(self):
         src=(ROOT/"tools/sse_pos_r59_native_ipv6_observer.py").read_text("utf-8")
         self.assertIn('"--p2p-port-ipv6=30404"',src)
