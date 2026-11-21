@@ -23,6 +23,7 @@ import sse_pos_r137_independent_observer_create_once as r137
 import sse_pos_r142_public_peer_discovery as r142
 import sse_public_genesis as public_genesis
 import sse_pos_r152_unattended_host_dependencies as host_packages
+import sse_pos_r153_local_node_evidence as local_evidence
 
 class Refused(ValueError):
     pass
@@ -202,6 +203,16 @@ def main(argv=None):
         ready["liveNativeP2pHandshakeVerified"]=False
         ready["actualFinalityVerified"]=False
         ready["status"]="REAL_CLIENT_CONTAINERS_SUBMITTED_AWAITING_R141_EVIDENCE"
+        # Background local evidence is READ-ONLY. Failure to install its
+        # timer does not roll back a successfully created live EL/CL node.
+        try:
+            timer=local_evidence.install_timer(
+                RELEASES/selection["sourceCommit"],selection["nodeId"])
+            ready["automaticEvidenceTimerInstalled"]=True
+            ready["evidenceTimer"]=timer["timer"]
+        except (local_evidence.Refused,OSError):
+            ready["automaticEvidenceTimerInstalled"]=False
+            ready["evidenceTimer"]="LOCAL_TIMER_NEEDS_REVIEW"
         print(json.dumps(ready,sort_keys=True,indent=2,default=str))
         return 0
     except (Refused,r59.R59Refused,r136.Refused,r137.Refused,
