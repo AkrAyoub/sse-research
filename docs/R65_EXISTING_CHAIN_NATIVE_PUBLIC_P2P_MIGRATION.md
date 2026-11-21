@@ -68,10 +68,9 @@ At immutable Git SHA `ada6cf9bc84a1fd6944e6c7a40b1feff2901ef7c`, VM4706 operator
  SHA="98f0e509a5a3165c9545eb1986f71b2ce26b61fe"
  git switch --detach "$SHA"
  test "$(git rev-parse HEAD)" = "$SHA"
- python3 -B -m unittest discover -s tests -p 'test_sse_pos_r59_native_ipv6_observer.py' -v
- python3 -B -m unittest discover -s tests -p 'test_sse_pos_r61_common_public_p2p_policy.py' -v
  python3 -B -m unittest discover -s tests -p 'test_sse_pos_r65_original_chain_native_public_p2p_migration.py' -v
- echo "R65_SOURCE_SUITE_PASSED=true"
+ python3 -B -m unittest discover -s tests -p 'test_sse_pos_r66_consistent_owner_recovery_snapshot.py' -v
+ echo "R65_R66_SOURCE_GATE_PASSED=true"
  sudo -v
  python3 -B tools/sse_pos_r65_original_chain_native_public_p2p_migration.py --plan --expected-commit "$SHA"
 )
