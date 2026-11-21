@@ -267,15 +267,19 @@ def verify_old_absent_and_new_reachability(ipv6:str)->dict:
     }
 
 def read_only_plan(commit:str)->tuple[dict,dict,dict]:
+    print("R65_PLAN_STAGE=VERIFY_CURRENT_ORIGINAL_CHAIN_AND_OPEN_OVERLAY",file=sys.stderr,flush=True)
     owner=r64.current_owner_audit(commit)  # current genuine chain, both clients, VC
     if not owner["originalELP2pExplicitlyDisabled"]:
         raise R65Refused("owner Besu already migrated; never rerun")
+    print("R65_PLAN_STAGE=VERIFY_NO_PREEXISTING_MIGRATION_RESOURCES",file=sys.stderr,flush=True)
     for old in PRESERVED.values():
         not_exists("container",old)
     not_exists("network",PUBLIC_BRIDGE)
+    print("R65_PLAN_STAGE=VERIFY_EXISTING_DOCKER_METADATA_AND_MOUNTS",file=sys.stderr,flush=True)
     el=original_definition(EL)
     bn=original_definition(BN)
     ipv6=owner["actualOwnerOverlayIpv6"]
+    print("R65_PLAN_STAGE=VALIDATE_OVERLAY_ONLY_NATIVE_PORT_PUBLICATION",file=sys.stderr,flush=True)
     ports=validated_host_ports(ipv6)
     # Check original requested APIs were loopback-only, no Engine publication.
     for name,definition in ((EL,el),(BN,bn)):
@@ -437,9 +441,14 @@ def main()->int:
             result=apply(args.expected_commit,args.backup_attested)
         print(json.dumps(result,sort_keys=True,indent=2))
         return 0
-    except (R65Refused,r64.R64Refused,r64.r63.R63Refused,
+    except R65Refused as exc:
+        # The reason is a controlled static message, never raw Docker stderr
+        # or untrusted private data, and makes failed plans diagnosable.
+        print("R65_NATIVE_MIGRATION_REFUSED: "+str(exc),file=sys.stderr)
+        return 2
+    except (r64.R64Refused,r64.r63.R63Refused,
             r62.R62Refused,OWNER.R60Refused,OSError,ValueError,TypeError,KeyError) as exc:
-        print("R65_NATIVE_MIGRATION_REFUSED: "+type(exc).__name__,file=sys.stderr)
+        print("R65_OWNER_DEPENDENCY_REFUSED: "+type(exc).__name__,file=sys.stderr)
         return 2
 
 if __name__=="__main__":
