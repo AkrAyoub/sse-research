@@ -78,6 +78,13 @@ class R48NonsigningIndependentObserverTests(unittest.TestCase):
         self.assertIn("weak-subjectivity", src)
         self.assertIn('"realExternalFinalityVerified": False', src)
 
+    def test_external_vm_launch_pins_actual_linux_amd64_image_ids(self):
+        src = (ROOT / "tools/sse_pos_r48_external_observer.py").read_text("utf-8")
+        self.assertIn('pin["tag"]', src)
+        self.assertIn('pin["imageId"]', src)
+        self.assertIn('"{{.Os}}/{{.Architecture}}"', src)
+        self.assertIn('refs[role] = image_id', src)
+
     def test_apply_is_one_time_and_explicitly_approved(self):
         source = (ROOT/"tools/sse_pos_r48_external_observer.py").read_text("utf-8")
         self.assertIn("START-EXTERNAL-31340-OBSERVER", source)
