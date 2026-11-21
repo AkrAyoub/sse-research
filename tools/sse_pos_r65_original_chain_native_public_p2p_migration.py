@@ -100,6 +100,26 @@ def normalized_env(value:object)->dict[str,str]:
     return result
 
 
+def original_container_workdir(value:object)->str:
+    """Validate the original effective in-container directory, not the host cwd.
+
+    Docker image WORKDIR may be absent while the running container reports "/".
+    Preserve the *running container* value at recreate via an explicit
+    --workdir so image metadata defaults can never silently change it.
+    """
+    if value is None or value=="":
+        return "/"
+    if not isinstance(value,str) or len(value)>200 or not value.startswith("/"):
+        raise R65Refused("original Docker working directory is not a bounded absolute path")
+    if any(ord(ch)<32 or ord(ch)==127 for ch in value):
+        raise R65Refused("original Docker working directory contains control characters")
+    if "//" in value or any(part in (".","..") for part in value.split("/")):
+        raise R65Refused("original Docker working directory is not normalized")
+    if not re.fullmatch(r"/[A-Za-z0-9_./+@-]*",value):
+        raise R65Refused("original Docker working directory contains unexpected characters")
+    return value
+
+
 def verify_unmodified_image_launch_config(
     container:dict,image:dict,name:str|None=None
 )->str|None:
@@ -158,8 +178,10 @@ def original_definition(name:str)->dict:
     if not isinstance(image,dict):
         raise R65Refused("pinned image config unreadable")
     entrypoint_override=verify_unmodified_image_launch_config(config,image,name)
-    if config.get("WorkingDir")!=image.get("WorkingDir"):
-        raise R65Refused("custom working directory requires separate review")
+    # Preserve the ACTUAL original container cwd, not an implicit or changed
+    # pinned-image default. The paths are in the container, not on the host.
+    original_workdir=original_container_workdir(config.get("WorkingDir"))
+    image_workdir=original_container_workdir(image.get("WorkingDir"))
     if host.get("Privileged") or host.get("ReadonlyRootfs") is not True:
         raise R65Refused("original root filesystem security not preserved")
     if not host.get("Init") or "ALL" not in (host.get("CapDrop") or []):
@@ -206,7 +228,9 @@ def original_definition(name:str)->dict:
     # Preserve exact trusted chain process data; no validator keys touched.
     return {"name":name,"image":ref,"cmd":cmd,"mounts":mounts,"config":config,
             "host":host,"network":networks[TRUSTED],
-            "entrypoint_override":entrypoint_override}
+            "entrypoint_override":entrypoint_override,
+            "original_workdir":original_workdir,
+            "originalWorkdirDiffersFromImageDefault":original_workdir!=image_workdir}
 
 def validated_host_ports(ip:str)->dict[str,list[str]]:
     try:
@@ -258,7 +282,9 @@ def clone_args(definition:dict,ipv6:str)->list[str]:
           "--network",TRUSTED,
           "--read-only","--cap-drop","ALL",
           "--security-opt","no-new-privileges",
-          "--user",config["User"],"--memory",str(host["Memory"]),
+          "--user",config["User"],
+          "--workdir",original_container_workdir(definition.get("original_workdir")),
+          "--memory",str(host["Memory"]),
           "--pids-limit",str(host["PidsLimit"])]
     if host.get("NanoCpus"):
         args.extend(["--cpus",str(host["NanoCpus"]/1_000_000_000)])
@@ -395,6 +421,10 @@ def read_only_plan(commit:str)->tuple[dict,dict,dict]:
         "oldELAndBNContainersPreservedStoppedForRollback":list(PRESERVED.values()),
         "nativeOutsideProviderP2pPeerAndContinuedFinalityStillUnverified":True,
         "ownerBackupAndMaintenanceConsentRequiredBeforeApply":True,
+        "originalELWorkdirPreservedWithoutPrintingHostPaths":True,
+        "originalBNWorkdirPreservedWithoutPrintingHostPaths":True,
+        "originalELWorkdirDiffersFromImageDefault":el["originalWorkdirDiffersFromImageDefault"],
+        "originalBNWorkdirDiffersFromImageDefault":bn["originalWorkdirDiffersFromImageDefault"],
         "nothingModifiedByPlan":True,
     },el,bn)
 
