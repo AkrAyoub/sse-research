@@ -167,6 +167,20 @@ def install_source(commit, plan, root=TARGET_ROOT, state=STATE):
     with os.fdopen(fd,"w") as dest:
         json.dump(data,dest,indent=2,sort_keys=True)
         dest.write("\n")
+    # After the only role-choice prompt, continue automatically into
+    # the genuine reviewed R137 Docker/Besu/Lighthouse installation.
+    # Never do this unless the exact original PUBLIC genesis was acquired
+    # and verified. No new genesis or validator key is ever generated.
+    full_roles = {"full_node", "observer", "validator"}
+    if (full_roles.intersection(data["selectedRoles"])
+            and (release/"original-chain31340.tar.gz").is_file()):
+        command(["python3","-B",str(release/"tools/sse_pos_r151_unattended_full_node.py"),
+                 "--execute"],timeout=900)
+        data["realNonsigningClientsSubmitted"] = True
+        data["nativeP2pAndFinalityVerified"] = False
+    else:
+        data["realNonsigningClientsSubmitted"] = False
+        data["nativeP2pAndFinalityVerified"] = False
     return data
 
 def main(argv=None):
