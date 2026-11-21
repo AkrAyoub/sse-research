@@ -146,6 +146,73 @@ class R65NativePublicOwnerMigrationTests(unittest.TestCase):
             with self.subTest(invalid=invalid),self.assertRaises(m.R65Refused):
                 m.normalized_env(invalid)
 
+    def test_real_original_lighthouse_entrypoint_override_is_allowlisted(self):
+        # VM4706 read-only Docker evidence: Beacon container ENTRYPOINT
+        # ["lighthouse"], pinned image ENTRYPOINT null; no Env differences.
+        override=m.verify_unmodified_image_launch_config(
+            {"Entrypoint":["lighthouse"],"Env":["PATH=/usr/bin"]},
+            {"Entrypoint":None,"Env":["PATH=/usr/bin"]},
+            m.BN
+        )
+        self.assertEqual(override,"lighthouse")
+        self.assertIsNone(m.verify_unmodified_image_launch_config(
+            {"Entrypoint":["besu-entry.sh"],"Env":[]},
+            {"Entrypoint":["besu-entry.sh"],"Env":[]},
+            m.EL
+        ))
+
+    def test_override_requires_exact_original_beacon_executable(self):
+        image={"Entrypoint":None,"Env":[]}
+        for name,entry in ((m.EL,["lighthouse"]),(m.BN,["/bin/bash"]),
+                           (m.BN,["sh"]),(m.BN,["lighthouse","--unsafe"]),
+                           (m.BN,["/bin/lighthouse"]),(m.VC,["lighthouse"])):
+            with self.subTest(name=name,entry=entry),self.assertRaises(m.R65Refused):
+                m.verify_unmodified_image_launch_config(
+                    {"Entrypoint":entry,"Env":[]},image,name
+                )
+
+    def test_beacon_clone_explicitly_preserves_original_binary_not_image_bash(self):
+        defn={
+            "name":m.BN,"image":m.LIGHTHOUSE_REF,
+            "entrypoint_override":"lighthouse",
+            "config":{"User":"1000:1000"},
+            "host":{"Memory":4294967296,"PidsLimit":384,
+                    "NanoCpus":2000000000,
+                    "Tmpfs":{"/tmp":"rw,nosuid,exec,size=256m"}},
+            "mounts":[
+                {"Source":"/owner/testnet","Destination":"/testnet","RW":False},
+                {"Source":"/owner/engine.jwt","Destination":"/jwt/engine.jwt","RW":False},
+                {"Source":"/owner/beacon","Destination":"/data","RW":True},
+            ],
+            "cmd":["--testnet-dir=/testnet","--datadir=/data","bn",
+                   "--execution-endpoint=http://sse31340-g2-el:8551",
+                   "--execution-jwt=/jwt/engine.jwt"]
+        }
+        argv=m.clone_args(defn,IP)
+        self.assertIn("--entrypoint",argv)
+        self.assertEqual(argv[argv.index("--entrypoint")+1],"lighthouse")
+        self.assertLess(argv.index("--entrypoint"),argv.index(m.LIGHTHOUSE_REF))
+        self.assertEqual(argv[argv.index(m.LIGHTHOUSE_REF)+1],
+                         "--testnet-dir=/testnet")
+        self.assertNotIn("/bin/bash",argv)
+        self.assertNotIn("8551:8551",json.dumps(argv))
+
+    def test_beacon_clone_refuses_missing_or_arbitrary_entrypoint(self):
+        defn={
+            "name":m.BN,"image":m.LIGHTHOUSE_REF,
+            "config":{"User":"1000:1000"},
+            "host":{"Memory":4294967296,"PidsLimit":384,
+                    "NanoCpus":2000000000,
+                    "Tmpfs":{"/tmp":"rw,nosuid,exec,size=256m"}},
+            "mounts":[],
+            "cmd":["bn"]
+        }
+        with self.assertRaises(m.R65Refused):
+            m.clone_args(defn,IP)
+        defn["entrypoint_override"]="/bin/bash"
+        with self.assertRaises(m.R65Refused):
+            m.clone_args(defn,IP)
+
     def test_refuse_original_client_already_migrated(self):
         owner={"originalELP2pExplicitlyDisabled":False}
         with patch.object(m.r64,"current_owner_audit",return_value=owner):
