@@ -66,7 +66,8 @@ def gateway_route() -> str | None:
             addr = ipaddress.IPv4Address(name)
         except ipaddress.AddressValueError:
             continue
-        if addr.is_loopback or addr.is_multicast or addr.is_link_local:
+        if (addr.is_loopback or addr.is_multicast or addr.is_link_local
+                or addr.is_unspecified or addr.is_reserved):
             continue
         # Limit packet destinations to directly connected PRIVATE or CGNAT
         # gateway IPs on the operator's VM. Never probe arbitrary public IPs.
@@ -80,6 +81,7 @@ def is_private_source(value: str) -> bool:
     except (ValueError, ipaddress.AddressValueError):
         return False
     return (not addr.is_loopback and not addr.is_multicast
+            and not addr.is_unspecified and not addr.is_reserved
             and (addr.is_private or addr in ipaddress.ip_network("100.64.0.0/10")))
 
 def pcp_announce_request(source_ipv4: str) -> bytes:
@@ -131,23 +133,29 @@ def query_gateway(gateway: str) -> dict:
         raise GatewayRefused("target not a private IPv4 gateway") from exc
     if not (parsed.is_private or parsed in ipaddress.ip_network("100.64.0.0/10")):
         raise GatewayRefused("never send probes to an arbitrary public IP")
-    try:
+    def single_query(request_type: str) -> bytes:
+        # Separate ephemeral UDP sockets: a delayed PCP response cannot be
+        # accidentally interpreted as the NAT-PMP public address response.
         with socket.socket(socket.AF_INET, socket.SOCK_DGRAM) as probe:
             probe.settimeout(2)
             probe.connect((gateway, PORT))
             local = probe.getsockname()[0]
             if not is_private_source(local):
                 raise GatewayRefused("local source is not owner private IPv4")
-            probe.send(pcp_announce_request(local))
+            if request_type == "pcp":
+                payload = pcp_announce_request(local)
+            elif request_type == "natpmp":
+                payload = bytes((NATPMP_VERSION, NATPMP_PUBLIC_ADDRESS_OPCODE))
+            else:
+                raise GatewayRefused("only metadata-only gateway query allowed")
+            probe.send(payload)
             try:
-                pcp_response = probe.recv(MAX_REPLY + 1)
+                return probe.recv(MAX_REPLY + 1)
             except (OSError, TimeoutError):
-                pcp_response = b""
-            probe.send(bytes((NATPMP_VERSION, NATPMP_PUBLIC_ADDRESS_OPCODE)))
-            try:
-                natpmp_response = probe.recv(MAX_REPLY + 1)
-            except (OSError, TimeoutError):
-                natpmp_response = b""
+                return b""
+    try:
+        pcp_response = single_query("pcp")
+        natpmp_response = single_query("natpmp")
     except (OSError, TimeoutError) as exc:
         raise GatewayRefused("gateway UDP metadata query inaccessible") from exc
     return {
