@@ -127,7 +127,7 @@ def peer_hints(release, *, lookup=r142.discover):
         raise Refused("insufficient live independent bootnode hints")
     return ",".join(els),",".join(bns),"PUBLIC_MULTISOURCE_NATIVE_HINTS"
 
-def plan(selection, release, archive, *, observe=r137.preflight,
+def plan(selection, release, archive, *, observe=None,
          lookup=r142.discover):
     safe_selection(selection)
     if not archive.is_file():
@@ -135,15 +135,17 @@ def plan(selection, release, archive, *, observe=r137.preflight,
     el,bn,mode=peer_hints(release,lookup=lookup)
     # Do not call preflight during a pure source-only unit test; it must
     # inspect LIVE Docker/ZeroTier/image state before claiming readiness.
-    with tempfile.TemporaryDirectory(prefix="sse-r151-") as tmp:
-        path=Path(tmp)/"observer.json"
-        data={
-            "schema":r136.SCHEMA,"chainId":31340,
-            "nodeId":selection["nodeId"],"role":"observer",
-            "networkId":r136.NETWORK_ID,
-            "archiveSha256":r136.ARCHIVE_SHA}
-        path.write_text(json.dumps(data))
-        observed=observe(path,archive,el,bn,allow_no_peers=(el is None))
+    observed=None
+    if observe is not None:
+        with tempfile.TemporaryDirectory(prefix="sse-r151-") as tmp:
+            path=Path(tmp)/"observer.json"
+            data={
+                "schema":r136.SCHEMA,"chainId":31340,
+                "nodeId":selection["nodeId"],"role":"observer",
+                "networkId":r136.NETWORK_ID,
+                "archiveSha256":r136.ARCHIVE_SHA}
+            path.write_text(json.dumps(data))
+            observed=observe(path,archive,el,bn,allow_no_peers=(el is None))
     return {
         "schema":"SSE_R151_REAL_NON_SIGNING_RUNTIME_PREFLIGHT_V1",
         "nodeId":selection["nodeId"],"discoveryMode":mode,
@@ -170,7 +172,8 @@ def main(argv=None):
         # R59 path (only for execute, never for plan).
         if args.execute:
             archive=prepare_original_archive(archive)
-        ready=plan(selection,descriptor,archive)
+        ready=plan(selection,descriptor,archive,
+                   observe=r137.preflight if args.execute else None)
         if not args.execute:
             ready.pop("peerExecutionHints")
             ready.pop("peerConsensusHints")
