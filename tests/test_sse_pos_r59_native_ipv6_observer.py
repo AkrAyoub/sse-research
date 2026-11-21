@@ -32,6 +32,11 @@ class R59NativeObserverTests(unittest.TestCase):
             f"[{ip}]:9000:9000/tcp", f"[{ip}]:9000:9000/udp",
             f"[{ip}]:9001:9001/udp", "127.0.0.1:25052:5052/tcp"])
 
+    def test_reject_arbitrary_or_wildcard_ipv6_port_publication(self):
+        for addr in ("::", "::1", "2001:db8::1", "fe80::1"):
+            with self.subTest(addr=addr), self.assertRaises(m.R59Refused):
+                m.port_bindings(addr, True)
+
     def test_no_privileged_engine_port_exposed(self):
         all_bindings = m.port_bindings("fca0:2328:77b8:6578:a55::1", True) + m.port_bindings(
             "fca0:2328:77b8:6578:a55::1", False)
