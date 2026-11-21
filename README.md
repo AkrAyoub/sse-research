@@ -15,6 +15,35 @@ network using valueless TEST ETH**.
 > chain31339 on VM4705 has known exposed genesis validator keys and is
 > **not safe to expose publicly**.
 
+## Unified fresh-node onboarding and role selection (R144)
+
+**ONE repository and entry point:** after obtaining this verified source
+on a NEW Ubuntu host, run
+`python3 -B tools/sse_join.py --node-id <local-unique-id> --plan`
+for an interactive role selection menu, or add
+`--roles full_node,monitor` (for example).
+A participant may combine full node, observer, validator, provider,
+consumer and monitor subject to protocol-specific funding,
+eligibility and conflicts of interest. User selection is a
+**configuration preference**, not consensus membership, active
+validator status or on-chain role authority.
+
+The current unified command does *read-only planning*, and can
+delegate to the guarded R137 nonsigning full-node **plan** after
+the original verified chain31340 archive, image pins and real public
+peer directories are available. It does NOT yet perform zero-touch
+first-boot packages, new validator BLS staking deposits, public mirror
+publication, marketplace smart contract deployments or real on-chain
+role activation. Source distribution from this PRIVATE repository
+requires development-only read access until public authenticated
+release mirrors exist; do not confuse that with a permissionless
+network join.
+
+Detailed role/scale reference:
+[complete architecture and all roles](docs/SSE_COMPLETE_ROLES_PERMISSIONLESS_SCALING_AND_VM_EXPERIMENTS.md).
+[Unified installer specification and honest gates](docs/R144_UNIFIED_ROLE_SELECTING_INSTALLER.md).
+[Fresh-VM sizing](docs/R143_NEW_VM_INVENTORY_AND_FIRST_BOOT_GATE.md).
+
 ## Canonical architecture
 
 One open Ethereum-compatible PoS chain, with **separate** execution
