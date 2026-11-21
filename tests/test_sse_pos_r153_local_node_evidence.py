@@ -128,6 +128,8 @@ class R153Tests(unittest.TestCase):
         self.assertIn("--node-id node-third-operator",unit)
         self.assertIn("ProtectSystem=strict",unit)
         self.assertIn("OnUnitActiveSec=2min",timer)
+        self.assertIn("sse_pos_r156_local_native_peer_identity.py",unit)
+        self.assertIn("public-peer.json",unit)
         self.assertNotIn("validator",unit)
         self.assertNotIn("docker run",unit)
         self.assertNotIn("Engine",unit)
