@@ -22,6 +22,14 @@ class HostDependencies(unittest.TestCase):
             m.setup(execute=True,runner=lambda args,**kwargs:called.append(args))
         self.assertEqual(called,[])
 
+    def test_vendor_key_uses_confirmed_official_upstream_path(self):
+        self.assertEqual(
+            m.VENDOR_KEY,
+            "https://raw.githubusercontent.com/zerotier/ZeroTierOne/master/doc/contact%40zerotier.com.gpg")
+        self.assertEqual(
+            m.VENDOR_FINGERPRINT,
+            "74A5E9C458E1A431F1DA57A71657198823E52A61")
+
     def test_urls_are_vendor_exact_only(self):
         with self.assertRaises(m.Refused):
             m.fetch_https("http://install.zerotier.com")
