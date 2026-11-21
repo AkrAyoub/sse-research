@@ -121,7 +121,8 @@ def preflight(archive: Path, commit: str,
         "realExternalFinalityVerified": False,
         "physicalIndependenceOfOperatorVerifiedByTool": False,
         "noServicesCreatedOrChanged": True,
-        "readyToApplyOnlyAfterRealSeedReachability": seeds,
+        "operatorMayReviewApplyAfterSeparateSeedReachabilityEvidence": seeds,
+        "actualSeedReachabilityWasVerifiedByPreflight": False,
     }
 
 def create_file(path: Path, data: bytes) -> None:
@@ -216,11 +217,13 @@ def apply(archive: Path, commit: str, el_enr: str, bn_enr: str) -> dict:
     result.update({
         "mode": "one_time_external_operator_apply",
         "newIndependentObserverOnlyClientsSubmitted": [EL, BN],
+        "noServicesCreatedOrChanged": False,
         "independentLocalEngineJwtGeneratedWithoutDisclosure": True,
         "noOriginalSignerOrValidatorClientCreated": True,
         "noPublicEngineApiOrSignerApiExposed": True,
         "onlyOutboundNativeP2pRequiredForThisObserver": True,
         "realNativeP2pAndConsensusFinalityStillNeedIndependentObservation": True,
+        "sourceOnlyEnrSyntaxNotCryptographicVerification": True,
     })
     return result
 
