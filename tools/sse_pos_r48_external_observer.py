@@ -73,9 +73,15 @@ def client_images() -> dict:
     refs = {}
     for role in ("besu", "lighthouse"):
         pin = pins["images"][role]
-        if docker(["image", "inspect", "--format", "{{.Id}}", pin["ref"]]) != pin["imageId"]:
-            raise ExternalObserverRefused("external host client image differs from pinned digest")
-        refs[role] = pin["ref"]
+        # A fresh Docker host may not have the tag's RepoDigest alias even
+        # when the local linux/amd64 image bytes have the expected immutable
+        # image identity. Require the EXACT original pinned image ID, then
+        # launch by that immutable sha256 ID, not by mutable image tag.
+        image_id = docker(["image", "inspect", "--format", "{{.Id}}", pin["tag"]])
+        arch = docker(["image", "inspect", "--format", "{{.Os}}/{{.Architecture}}", pin["tag"]])
+        if image_id != pin["imageId"] or arch != "linux/amd64":
+            raise ExternalObserverRefused("external client image ID/platform differs from pinned owner evidence")
+        refs[role] = image_id
     return refs
 
 def validate_bootstrap(el_enr: str | None, bn_enr: str | None) -> bool:
