@@ -108,8 +108,11 @@ class R151Tests(unittest.TestCase):
         with tempfile.TemporaryDirectory() as temp:
             source=Path(temp)/"source"
             source.write_bytes(b"not real")
-            with self.assertRaises(m.Refused):
+            target=Path(temp)/"preexisting-original"
+            target.write_bytes(b"original-must-not-change")
+            with patch.object(m.r59,"ARCHIVE",target),self.assertRaises(m.Refused):
                 m.prepare_original_archive(source)
+            self.assertEqual(target.read_bytes(),b"original-must-not-change")
 
     def test_r137_legacy_manual_path_default_remains_interactive(self):
         # No implicit privileged installation without selection evidence.
