@@ -114,6 +114,24 @@ research limitation.
 fake public DNS URL or reinitialized genesis is an acceptable
 workaround for these missing live facts.**
 
+## R160 — unattended official package signature compatibility
+
+Prior R152's GPG verification wrongly required precisely one
+`fpr:` record from `gpg --with-colons --fingerprint`.
+An authentic vendor public certificate can have its own signing/
+encryption subkeys, each with a fingerprint. Rejecting a certificate
+for containing these subkeys would break correct unattended
+installation. R160 accepts exactly **one primary public certificate**
+with the known ZeroTier release primary fingerprint
+`74A5E9C458E1A431F1DA57A71657198823E52A61`
+and allows its subordinate `sub:` fingerprints; it rejects
+additional unrelated `pub:` certificates. The official signed
+installer must still verify successfully with GPG before execution.
+This does not bypass signature checks or trust arbitrary new keys.
+
+The previous verified operator result (R153, 1,047 tests) predates
+R160. Its new unit regression remains pending exact VM test.
+
 ## Testing
 
 ```bash
