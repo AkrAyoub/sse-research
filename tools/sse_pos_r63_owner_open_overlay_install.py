@@ -131,7 +131,9 @@ def plan(commit: str) -> dict:
         "actualHostOverlay6planeIpv6":addr,
         "targetNetworkId":NETWORK,
         "targetZeroTierVersion":VERSION,
-        "aptRepositoryIsOfficialGpgSigned":True,
+        "officialGpgSignedAptRepositoryPlanned":True,
+        "officialGpgRepositoryActuallyConfiguredByPlan":False,
+        "signedZeroTierPackageActuallyInstalledByPlan":False,
         "officialGpgKeyFingerprintExpected":KEY_FINGERPRINT,
         "noNativeEthereumP2pStarted":True,
         "noHostNetworkOrSignerMutationByPlan":True,
@@ -229,6 +231,7 @@ def install_and_join(commit: str) -> dict:
     outcome.update({
         "mode":"one_time_owner_authorized_transport_install",
         "signedOfficialZeroTierPackageInstalled":True,
+        "officialRepositoryConfiguredDuringInstall":True,
         "joinedPublicControllerlessOverlayConfirmed":active,
         "overlayProvisioningMayStillBePending":not active,
         "observedHost6planeIpv6":addr,
