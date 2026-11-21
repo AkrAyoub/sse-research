@@ -25,7 +25,7 @@ Developer-stage commands on VM4706 (update the exact SHA to the newest immutable
  cd "$HOME/sse-research"
  export GIT_SSH_COMMAND="ssh -i $HOME/.ssh/sse_vm4706_readonly -o IdentitiesOnly=yes -o StrictHostKeyChecking=yes -o BatchMode=yes"
  git fetch --no-tags origin feature/r19-fresh-external-node-preflight
- SHA="d83c1b5bda7eb6bdfbb1034a80ed57ab777268c8"
+ SHA="4b88f459e14510e6fc117e0e1d4ec9e3427a94b3"
  git switch --detach "$SHA"
  test "$(git rev-parse HEAD)" = "$SHA"
  python3 -B -m unittest discover -s tests -p 'test_sse_pos_r59_native_ipv6_observer.py' -v
