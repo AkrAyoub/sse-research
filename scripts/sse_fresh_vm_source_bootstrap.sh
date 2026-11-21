@@ -43,9 +43,18 @@ done
 [[ "$COMMIT" =~ ^[0-9a-f]{40}$ ]] || refuse 'expected reviewed full lowercase Git SHA'
 [[ "$NODE_ID" =~ ^[a-z][a-z0-9-]{2,62}$ ]] || refuse 'invalid node label'
 [[ "$ROLES" =~ ^[a-z_]+(,[a-z_]+)*$ ]] || refuse 'invalid comma-separated roles'
+declare -A SELECTED_ROLES=()
+IFS=',' read -r -a ROLE_ARRAY <<< "$ROLES"
+for role in "${ROLE_ARRAY[@]}"; do
+  case "$role" in
+    full_node|observer|validator|provider|consumer|monitor) ;;
+    *) refuse 'unknown role' ;;
+  esac
+  [[ ! -v "SELECTED_ROLES[$role]" ]] || refuse 'duplicate role'
+  SELECTED_ROLES["$role"]=1
+done
 [[ "$(uname -s)" == Linux && "$(uname -m)" == x86_64 ]] ||
   refuse 'reviewed Linux x86_64 host required'
-[[ "$EUID" != 0 ]] || refuse 'run as ordinary local owner, not root'
 [[ "$HOME" == /* && "$HOME" != '/' ]] || refuse 'unsafe home directory'
 TARGET="$HOME/sse-research"
 [[ ! -e "$TARGET" && ! -L "$TARGET" ]] ||
@@ -77,6 +86,7 @@ if [[ "$MODE" == '--plan' ]]; then
   exit 0
 fi
 
+[[ "$EUID" != 0 ]] || refuse 'run apply as ordinary local owner, not root'
 [[ -t 0 && -t 2 ]] || refuse 'create-once apply requires an interactive local terminal'
 printf '%s\n' 'R145 installs ONLY basic git/Python/SSH source tools and clones pinned SSE source.' \
   'It will NOT install Docker, join ZeroTier, create validator keys, or broadcast transactions.' >&2
