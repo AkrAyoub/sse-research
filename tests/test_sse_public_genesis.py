@@ -64,6 +64,31 @@ class PublicArtifactTests(unittest.TestCase):
         self.assertEqual(m.verify_url("https://mirror.example.org/a.tar.gz"),
                          "https://mirror.example.org/a.tar.gz")
 
+    def test_only_canonical_github_genesis_release_may_redirect_to_cdn(self):
+        from urllib.request import Request
+        source=("https://github.com/AkrAyoub/sse-research/releases/download/"
+                "chain31340-genesis-v1/"
+                "chain31340-public-native-observer-v1.tar.gz")
+        handler=m._ReleaseRedirects(source)
+        target="https://release-assets.githubusercontent.com/abc?se=expires"
+        req=handler.redirect_request(Request(source),None,302,"Found",{},target)
+        self.assertEqual(req.full_url,target)
+        self.assertEqual(handler.count,1)
+        for evil in ("http://release-assets.githubusercontent.com/abc",
+                     "https://127.0.0.1/private",
+                     "https://untrusted.example.org/payload"):
+            with self.subTest(evil=evil),self.assertRaises(m.Refused):
+                m._ReleaseRedirects(source).redirect_request(
+                    Request(source),None,302,"Found",{},evil)
+
+    def test_unrelated_mirror_redirect_is_not_implicitly_trusted(self):
+        from urllib.request import Request
+        source="https://independent.example.org/genesis.tar.gz"
+        with self.assertRaises(m.Refused):
+            m._ReleaseRedirects(source).redirect_request(
+                Request(source),None,302,"Found",{},
+                "https://release-assets.githubusercontent.com/foo")
+
     def test_public_source_list_unique_and_bounded(self):
         obj=release()
         obj["originalGenesisArchiveSources"]=["https://a.example.org/archive"]*2
