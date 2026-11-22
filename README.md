@@ -15,6 +15,30 @@ network using valueless TEST ETH**.
 > chain31339 on VM4705 has known exposed genesis validator keys and is
 > **not safe to expose publicly**.
 
+## R163 — First genuine public chain31340 genesis release
+
+VM4707 has now VERIFIED AND STAGED the original public-only
+chain31340 R59 archive, matching original SHA256
+`1d21e6bfb7609d1797edd9d36561b1dc47a520153d1c6f698f807c29266c2ce7`
+and all four member hashes, without creating a new genesis or
+copying validator secrets.
+
+[The R163 release publisher](tools/sse_pos_r163_publish_verified_genesis.py)
+and [release documentation](docs/R163_REAL_PUBLIC_GENESIS_RELEASE_PUBLISHING.md)
+provide a one-time authorized GitHub Release binary upload from the
+already staged R150 public asset, followed by an **anonymous**
+public release download/byte-for-byte SHA256 and member verification.
+The R149 public artifact downloader now narrowly permits GitHub's
+own HTTPS release CDN redirects while rejecting unrelated mirror
+redirects and non-HTTPS targets.
+
+**CURRENT STATUS:** The public asset is **NOT YET uploaded** and
+`release/chain31340-public-release.json` must retain its empty
+genesis URLs until the actual public binary download is verified.
+GitHub source commits alone cannot read the already staged VM4707
+binary file. The release operation is one-time maintainer work,
+**never** a requirement for future joining nodes.
+
 ## R155–R159 — verified local native identity and optional open rendezvous
 
 The latest development increments close a first-to-second-node discovery
