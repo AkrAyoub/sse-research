@@ -243,7 +243,7 @@ def write_atomic(path, record):
         temporary=Path(out.name)
         os.fchmod(out.fileno(),0o600)
         json.dump(record,out,sort_keys=True,indent=2)
-        out.write("\\n")
+        out.write("\n")
         out.flush()
         os.fsync(out.fileno())
     os.replace(temporary,path)
