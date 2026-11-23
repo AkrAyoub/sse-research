@@ -87,6 +87,32 @@ class R168Tests(unittest.TestCase):
         with self.assertRaises(m.Refused):
             m.compile_comments([alice,bob],now=NOW)
 
+    def test_anon_public_diagnosis_distinguishes_empty_cache_and_fresh_record(self):
+        empty=m.diagnose_public(getter=lambda:[],now=NOW)
+        self.assertEqual(empty["publicCommentsReturned"],0)
+        self.assertFalse(empty["publicReadbackProven"])
+        self.assertFalse(empty["nativePeerHandshakeVerified"])
+        visible=m.diagnose_public(
+            getter=lambda:[{"body":"human note"},comment()],now=NOW)
+        self.assertEqual(visible["publicCommentsReturned"],2)
+        self.assertEqual(visible["markedNativeComments"],1)
+        self.assertEqual(visible["freshValidNativeComments"],1)
+        self.assertTrue(visible["publicReadbackProven"])
+        self.assertFalse(visible["independentInfrastructureVerified"])
+        self.assertNotIn("executionEnode",visible)
+        self.assertNotIn("beaconEnr",visible)
+
+    def test_public_diagnosis_reports_expired_or_invalid_without_peer_success(self):
+        old=comment(record(expiry=NOW-1))
+        malformed={"body":m.MARKER+"bad JSON"}
+        view=m.diagnose_public(getter=lambda:[old,malformed],now=NOW)
+        self.assertEqual(view["markedNativeComments"],2)
+        self.assertEqual(view["freshValidNativeComments"],0)
+        self.assertEqual(view["expiredOrInvalidNativeComments"],2)
+        self.assertFalse(view["publicReadbackProven"])
+        with self.assertRaises(m.Refused):
+            m.discover(getter=lambda:[old,malformed],now=NOW)
+
     def test_absence_of_comments_does_not_fabricate_a_peer(self):
         with self.assertRaises(m.Refused):
             m.discover(getter=lambda:[],now=NOW)
