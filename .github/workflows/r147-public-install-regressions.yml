@@ -18,6 +18,19 @@ jobs:
         uses: actions/checkout@v4
         with:
           persist-credentials: false
+      - name: Compile all checked-in Python sources and tests
+        run: |
+          python3 - <<'PY'
+          import ast
+          from pathlib import Path
+          sources = [
+              p for folder in ("tools", "scripts", "tests")
+              for p in Path(folder).rglob("*.py")
+          ]
+          for source in sorted(sources):
+              ast.parse(source.read_text("utf-8"), filename=str(source))
+          print("Python modules syntax verified:", len(sources))
+          PY
       - name: Validate Python installer syntax
         run: |
           python3 -m py_compile scripts/sse_install.py tools/sse_join_phase.py
