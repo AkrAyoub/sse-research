@@ -202,22 +202,9 @@ contract SSEAdaptiveMarketV2 is EIP712 {
             revert InvalidInput();
         uint256 service = bid.epochFee * t.epochs;
         if (msg.value != service + t.monitorBudget) revert InsufficientFunding();
-        // Freeze ALL currently available non-party bonded candidates, rather
-        // than a caller-provided shortlist. No joining later can change this set.
-        uint256 totalActive = activeMonitors.length;
-        uint256 scan = totalActive > MAX_ELIGIBLE ? MAX_ELIGIBLE : totalActive;
-        address[] memory scanned = new address[](scan);
-        uint256 n;
-        // Bounded rotating window is an explicit per-lease GAS limit,
-        // NEVER a global membership limit. Not a uniform global sample.
-        uint256 cursor = totalActive == 0 ? 0 : nextSnapshotCursor % totalActive;
-        for (uint256 i; i < scan; ++i) {
-            address candidate = activeMonitors[(cursor + i) % totalActive];
-            if (candidate != msg.sender && candidate != bid.provider) scanned[n++] = candidate;
-        }
-        if (totalActive != 0) nextSnapshotCursor = (cursor + scan) % totalActive;
-        address[] memory eligible = new address[](n);
-        for (uint256 i; i < n; ++i) eligible[i] = scanned[i];
+        // Select from the bounded rotating window, never hand-pick accounts.
+        address[] memory eligible = _frozenEligible(msg.sender, bid.provider);
+        uint256 n = eligible.length;
         AdaptiveMonitorQuorum.Decision memory d = AdaptiveMonitorQuorum.decide(
             n, t.requiredFaultTolerance, t.gasBoundSeats,
             t.monitorBudget, t.epochs, t.perMonitorEpochReward
@@ -227,8 +214,36 @@ contract SSEAdaptiveMarketV2 is EIP712 {
 
         r.selected = true;
         leaseId = nextLeaseId++;
+        _recordLease(leaseId, requestId, bid, t, service, eligible);
+        emit LeaseFunded(leaseId, requestId, msg.sender, bid.provider, service, t.monitorBudget);
+    }
+
+    function _frozenEligible(address consumer, address provider)
+        private returns (address[] memory eligible)
+    {
+        uint256 totalActive = activeMonitors.length;
+        uint256 scan = totalActive > MAX_ELIGIBLE ? MAX_ELIGIBLE : totalActive;
+        address[] memory scanned = new address[](scan);
+        uint256 n;
+        // This is a deterministic bounded rotating window, NOT global
+        // cryptographically uniform election or proof of independence.
+        uint256 cursor = totalActive == 0 ? 0 : nextSnapshotCursor % totalActive;
+        for (uint256 i; i < scan; ++i) {
+            address candidate = activeMonitors[(cursor + i) % totalActive];
+            if (candidate != consumer && candidate != provider) scanned[n++] = candidate;
+        }
+        if (totalActive != 0) nextSnapshotCursor = (cursor + scan) % totalActive;
+        eligible = new address[](n);
+        for (uint256 i; i < n; ++i) eligible[i] = scanned[i];
+    }
+
+    function _recordLease(
+        uint256 leaseId, uint256 requestId, Bid memory bid,
+        Terms calldata t, uint256 service, address[] memory eligible
+    ) private {
+        Request storage r = requests[requestId];
         Lease storage l = leases[leaseId];
-        l.consumer = msg.sender;
+        l.consumer = r.consumer;
         l.provider = bid.provider;
         l.profileHash = r.profileHash;
         l.policyHash = r.policyHash;
@@ -241,22 +256,20 @@ contract SSEAdaptiveMarketV2 is EIP712 {
         l.perMonitorEpochReward = t.perMonitorEpochReward;
         l.requiredFaultTolerance = t.requiredFaultTolerance;
         l.gasBoundSeats = t.gasBoundSeats;
-        l.eligibleCount = n;
+        l.eligibleCount = eligible.length;
         l.confirmationSeconds = t.confirmationSeconds;
         l.responseSeconds = t.responseSeconds;
         l.monitoringSeconds = t.monitoringSeconds;
-        // Must be drawn from a block fixed only AFTER the consumer commits
-        // fee, provider, candidate list, profile and policy. Proposer-biasable.
         l.entropyBlock = block.number + 2;
         l.phase = Phase.PendingDraw;
-        for (uint256 i; i < n; ++i) eligibilitySnapshots[leaseId].push(eligible[i]);
+        for (uint256 i; i < eligible.length; ++i)
+            eligibilitySnapshots[leaseId].push(eligible[i]);
         l.snapshotRoot = keccak256(abi.encode(
             block.chainid, address(this), leaseId, requestId,
-            msg.sender, bid.provider, r.profileHash, r.policyHash, eligible
+            r.consumer, bid.provider, r.profileHash, r.policyHash, eligible
         ));
         totalServiceEscrow += service;
-        emit LeaseFunded(leaseId, requestId, msg.sender, bid.provider, service, t.monitorBudget);
-        emit EligibilityFrozen(leaseId, l.snapshotRoot, n, l.entropyBlock);
+        emit EligibilityFrozen(leaseId, l.snapshotRoot, eligible.length, l.entropyBlock);
     }
 
     function drawCommittee(uint256 leaseId) external {
