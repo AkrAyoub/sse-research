@@ -192,6 +192,31 @@ class R168Tests(unittest.TestCase):
                       client=lambda _:events.append("gh"))
         self.assertEqual(events,[])
 
+    def test_public_api_rate_limit_vs_transport_classified_without_leak(self):
+        import urllib.error
+        cases=[
+            (urllib.error.HTTPError(m.API,403,"forbidden",
+              {"X-RateLimit-Remaining":"0"},None),
+             "GITHUB_ANONYMOUS_API_RATE_LIMIT_EXHAUSTED"),
+            (urllib.error.HTTPError(m.API,403,"forbidden",
+              {"X-RateLimit-Remaining":"17"},None),
+             "GITHUB_ANONYMOUS_API_THROTTLED_OR_FORBIDDEN"),
+            (urllib.error.HTTPError(m.API,429,"throttled",{},None),
+             "GITHUB_ANONYMOUS_API_THROTTLED_OR_FORBIDDEN"),
+            (urllib.error.HTTPError(m.API,404,"not found",{},None),
+             "GITHUB_PUBLIC_API_HTTP_404"),
+            (urllib.error.URLError("SECRET_PROXY_URL"),
+             "GITHUB_PUBLIC_API_DNS_TLS_OR_EGRESS_FAILED"),
+        ]
+        for error,expected in cases:
+            with (self.subTest(expected=expected),
+                  patch.object(m.urllib.request.OpenerDirector,"open",
+                               side_effect=error)):
+                with self.assertRaisesRegex(m.Refused,expected) as failure:
+                    m._github_get(m.API,allowed_path=(
+                        "/repos/AkrAyoub/sse-research/issues/42/comments"))
+                self.assertNotIn("SECRET_PROXY_URL",str(failure.exception))
+
     def test_bad_public_api_source_refused_before_network(self):
         with self.assertRaises(m.Refused):
             m.fetch_public("http://127.0.0.1/evil")
