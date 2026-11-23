@@ -1,3 +1,26 @@
+## R191 — Real VM4709 native EL/CL peering and local finality VERIFIED
+
+At 2026-11-23T13:18:40Z actual VM4709 R153/R141 localhost
+client evidence reached `ACTUAL_LOCAL_CHAIN_FINALITY_VERIFIED`
+on the original chain31340: original EL and Beacon genesis,
+healthy Besu EL, live Lighthouse CL, **2 actual native EL peers
+and 2 actual native CL peers**, both client head-sync flags
+false, `is_optimistic=false`, `el_offline=false`,
+finalized **epoch 570** and root
+`0x7d34c66101291c4939a42bfe21a13a3c9700bd8cecfe0422959c3a1e9865cc73`.
+Real Besu imported PoS execution payloads through
+EngineNewPayloadV4 / FCU(VALID), while Lighthouse received
+new blocks. This is actual node evidence, not a test mock.
+
+Original invalid VM4709 clients and populated Beacon database
+were preserved, and e565 public owner SSZ checkpoint imported
+into a new Beacon DB. Historical blocks are still backfilling,
+so head synchronization does not prove archival completion.
+**Independent VM4707/VM4709 simultaneous checkpoint agreement,
+public Internet admission outside the overlay and the full SSE
+marketplace are NOT YET verified.** See
+[R191 actual running node finality evidence](docs/R191_ACTUAL_VM4709_NATIVE_EL_CL_FINALITY_VERIFIED.md).
+
 ## R188 — Actual e565 checkpoint received and existing VM4709 client repair prepared
 
 The real VM4709 R187 receiver verified both e565 public owner
