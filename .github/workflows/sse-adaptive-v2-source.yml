@@ -11,6 +11,14 @@ on:
       - "tools/sse_pos_r206_adaptive_v2_deployment_audit.py"
       - "tests/test_sse_pos_r201_v2_readonly_live_chain_gate.py"
       - "tests/test_sse_pos_r206_adaptive_v2_deployment_audit.py"
+      - "tools/sse_pos_r226_adaptive_v2_transaction_planner.py"
+      - "tools/sse_pos_r227_v2_finalized_event_audit.py"
+      - "tools/sse_pos_r228_v2_typed_data.py"
+      - "tools/sse_pos_r229_v2_finalized_lease_snapshot.py"
+      - "tests/test_sse_pos_r226_adaptive_v2_transaction_planner.py"
+      - "tests/test_sse_pos_r227_v2_finalized_event_audit.py"
+      - "tests/test_sse_pos_r228_v2_typed_data.py"
+      - "tests/test_sse_pos_r229_v2_finalized_lease_snapshot.py"
       - ".github/workflows/sse-adaptive-v2-source.yml"
   workflow_dispatch:
 
@@ -29,6 +37,12 @@ jobs:
       - uses: foundry-rs/foundry-toolchain@v1
         with:
           version: v1.9.0
+      - name: Install pinned Python application test dependencies
+        run: python3 -m pip install --disable-pip-version-check -r requirements.txt
+      - name: Compile R226-R229 unsigned operator modules
+        run: python3 -m compileall -q tools/sse_pos_r22*.py tests/test_sse_pos_r22*.py
+      - name: Test V2 role planner, finalized event log and typed evidence APIs
+        run: python3 -B -m unittest discover -s tests -p 'test_sse_pos_r22*.py' -v
       - name: Compile and report contract size
         run: forge build --sizes
       - name: Adversarial adaptive-marketplace EVM tests
