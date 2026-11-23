@@ -27,6 +27,7 @@ import urllib.request
 
 import sse_pos_r142_public_peer_discovery as native
 import sse_pos_r157_public_peer_directory as directory
+import sse_pos_r156_local_native_peer_identity as local_identity
 
 REPO="AkrAyoub/sse-research"
 ISSUE=42
@@ -223,11 +224,23 @@ def main(argv=None):
     modes=p.add_mutually_exclusive_group(required=True)
     modes.add_argument("--discover",action="store_true")
     modes.add_argument("--publish",type=Path,metavar="R156_JSON")
+    modes.add_argument("--publish-live",action="store_true",
+                       help="read real local Besu+Lighthouse public P2P APIs then update own issue comment")
+    p.add_argument("--node-id",
+                   help="required for --publish-live; not a validator key or membership credential")
     args=p.parse_args(argv)
     try:
         if args.discover:
+            if args.node_id:
+                raise Refused("--discover does not need node identity")
             result=discover()
+        elif args.publish_live:
+            if not args.node_id:
+                raise Refused("--publish-live requires local public node ID")
+            result=publish(local_identity.capture(args.node_id))
         else:
+            if args.node_id:
+                raise Refused("--node-id only supported for local live capture")
             result=publish(directory.load_public_record(args.publish))
         print(json.dumps(result,sort_keys=True,indent=2))
         return 0
