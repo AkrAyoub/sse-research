@@ -90,12 +90,12 @@ class TestR234SourceOnlyRealHttpUnit(unittest.TestCase):
         def fake_worker(lease,epoch,request):
             invoked.append((lease,epoch,request))
             return compute_result(lease,epoch,request)
-        server=mod.make_server(8894,ready_context(),signed(),PROFILE,fake_worker)
+        server=mod.make_server(0,ready_context(),signed(),PROFILE,fake_worker)
         self.assertEqual(server.server_address[0],"127.0.0.1")
         thread=threading.Thread(target=server.serve_forever,daemon=True)
         thread.start()
         try:
-            url="http://127.0.0.1:8894/v2/challenge"
+            url=f"http://127.0.0.1:{server.server_port}/v2/challenge"
             raw=json.dumps({"leaseId":1,"epochId":0,"requestHash":HASH}).encode()
             with urlopen(Request(url,data=raw,method="POST"),timeout=5) as response:
                 self.assertEqual(response.status,200)
@@ -115,11 +115,11 @@ class TestR234SourceOnlyRealHttpUnit(unittest.TestCase):
     def test_worker_failure_does_not_release_signed_reply(self):
         def fail_worker(*_):
             raise mod.Refused("actual worker unavailable")
-        server=mod.make_server(8895,ready_context(),signed(),PROFILE,fail_worker)
+        server=mod.make_server(0,ready_context(),signed(),PROFILE,fail_worker)
         thread=threading.Thread(target=server.serve_forever,daemon=True)
         thread.start()
         try:
-            url="http://127.0.0.1:8895/v2/challenge"
+            url=f"http://127.0.0.1:{server.server_port}/v2/challenge"
             req=Request(url,data=json.dumps({
                 "leaseId":1,"epochId":0,"requestHash":HASH
             }).encode(),method="POST")
