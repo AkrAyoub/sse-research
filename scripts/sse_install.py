@@ -140,7 +140,12 @@ def install_source(commit, plan, root=TARGET_ROOT, state=STATE):
             # Do not pretend archived data are a live synchronized node.
             plan["originalGenesisArchiveAcquired"]=True
         else:
-            plan["originalGenesisArchiveAcquired"]=False
+            # Do not leave a fresh VM with a permanent, misleading
+            # /var/lib/sse/selection.json and a release checkout that
+            # refuses all retries. This state happened before R163 publication.
+            # Retry of the same immutable release remains possible when the
+            # public original archive is genuinely distributed.
+            raise Refused("PUBLIC_ORIGINAL_GENESIS_NOT_YET_AVAILABLE: no source-only pseudo-install")
         # The existing local role engine is reused; it is only a plan, never
         # silently advertised as on-chain authority.
         node_id=plan["nodeId"]
@@ -172,6 +177,10 @@ def install_source(commit, plan, root=TARGET_ROOT, state=STATE):
     # Never do this unless the exact original PUBLIC genesis was acquired
     # and verified. No new genesis or validator key is ever generated.
     full_roles = {"full_node", "observer", "validator"}
+    if not full_roles.intersection(data["selectedRoles"]):
+        # Application agents are not implemented in this entry point.
+        # Never write installed success for consumer/provider/monitor.
+        raise Refused("MARKETPLACE_ROLE_INSTALLER_NOT_YET_IMPLEMENTED")
     if (full_roles.intersection(data["selectedRoles"])
             and (release/"original-chain31340.tar.gz").is_file()):
         command(["python3","-B",str(release/"tools/sse_pos_r151_unattended_full_node.py"),
