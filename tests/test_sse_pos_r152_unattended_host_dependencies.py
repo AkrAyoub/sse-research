@@ -47,7 +47,7 @@ class HostDependencies(unittest.TestCase):
                     self.assertNotIn("private diagnostic",str(failure.exception))
 
     def test_apt_metadata_preflight_is_readonly_and_requires_clearsign(self):
-        valid=b"-----BEGIN PGP SIGNED MESSAGE-----\\nHash: SHA256\\n"
+        valid=b"-----BEGIN PGP SIGNED MESSAGE-----\nHash: SHA256\n"
         observed=m.verify_vendor_repo_metadata(getter=lambda url:valid)
         self.assertTrue(observed["officialNobleRepoMetadataReachable"])
         self.assertFalse(observed["aptOrServiceStateModified"])
@@ -78,7 +78,7 @@ class HostDependencies(unittest.TestCase):
             def runner(argv,**kw):
                 calls.append(argv)
                 if "--fingerprint" in argv:
-                    return "pub::::::::::\\n"+"fpr:::::::::"+m.VENDOR_FINGERPRINT+":\\n"
+                    return "pub::::::::::\n"+"fpr:::::::::"+m.VENDOR_FINGERPRINT+":\n"
                 if "--dearmor" in argv:
                     Path(argv[argv.index("--output")+1]).write_bytes(b"DEARMORED_TEST_FIXTURE")
                 return ""
@@ -107,7 +107,7 @@ class HostDependencies(unittest.TestCase):
             source=root/"zt.list"
             def runner(argv,**kw):
                 if "--fingerprint" in argv:
-                    return "pub::::::::::\\nfpr:::::::::DEADBEEF:\\n"
+                    return "pub::::::::::\nfpr:::::::::DEADBEEF:\n"
                 return ""
             with (patch.object(m.os,"geteuid",return_value=0),
                   patch.object(m,"verify_vendor_repo_metadata",
