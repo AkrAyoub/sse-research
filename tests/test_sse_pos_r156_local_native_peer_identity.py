@@ -128,6 +128,56 @@ class R156Tests(unittest.TestCase):
             m.write_atomic(target,original)
             self.assertEqual(json.loads(target.read_text()),original)
 
+    def test_full_local_capture_file_to_discovery_feed_and_announcement(self):
+        # One actual read-only capture path, with simulated loopback
+        # responses only; checks that all three real parsers interoperate.
+        import json
+        import tempfile
+        from datetime import datetime, timezone
+        from pathlib import Path
+        import sse_pos_r157_public_peer_directory as feeds
+        import sse_pos_r159_native_peer_announce as announce
+        import sse_public_genesis as genesis
+        def fetch(url,method="GET",rpc_method=None):
+            if rpc_method=="eth_chainId":
+                return hex(31340)
+            if rpc_method=="eth_getBlockByNumber":
+                return {"hash":genesis.EL_GENESIS}
+            if rpc_method=="net_enode":
+                return ENODE
+            if url.endswith("/eth/v1/node/identity"):
+                return {"enr":enr()}
+            if url.endswith("/eth/v1/beacon/genesis"):
+                return {"genesis_validators_root":genesis.CL_GENESIS}
+            raise AssertionError(url)
+        captured=m.capture(ID,fetch=fetch,
+                           overlay_reader=lambda:("ztrb6cq527",ADDR))
+        now=int(datetime.now(timezone.utc).timestamp())
+        with tempfile.TemporaryDirectory() as tmp:
+            source=Path(tmp)/"r156.json"
+            output=Path(tmp)/"r157.json"
+            m.write_atomic(source,captured)
+            feed=feeds.build([feeds.load_public_record(source)],now=now)
+            feeds.write_rotating(output,feed)
+            self.assertEqual(len(json.loads(output.read_text())["peers"]),1)
+            release={
+                "schema":genesis.SCHEMA,"chainId":31340,
+                "executionGenesisHash":genesis.EL_GENESIS,
+                "beaconGenesisValidatorsRoot":genesis.CL_GENESIS,
+                "originalGenesisArchiveSha256":genesis.ARCHIVE_SHA,
+                "originalGenesisArchiveSources":[],
+                "replaceablePeerDirectorySources":[],
+                "currentPublicReleaseStatus":
+                    "BLOCKED_UNPUBLISHED_ORIGINAL_GENESIS_AND_DISCOVERY",
+                "noFixedBootstrapPeerOrIp":True,"noMemberAllowlist":True,
+                "noAutomaticGenesisRecreation":True,
+            }
+            status=announce.announce(
+                feeds.load_public_record(source),release,now=now)
+            self.assertEqual(status["state"],
+                             "AWAITING_REAL_PUBLIC_DIRECTORY_SOURCES")
+            self.assertFalse(status["nativePeerHandshakeVerified"])
+
     def test_api_allowlist_disallows_remote_or_mutating_rpc(self):
         for url,method,rpc in (
             ("http://example.org:28545","POST","net_enode"),
