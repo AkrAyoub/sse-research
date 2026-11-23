@@ -199,19 +199,28 @@ contract SSEAdaptiveMarketV2Test is Test {
         assertEq(votes.withdrawable(consumer), 4 * REWARD);
     }
 
-    function testInconclusiveRequiresBothBilateralSignatures() public {
-        uint256 consumerKey = 0xC0A10001;
-        address consumerSigner = vm.addr(consumerKey);
+
+    struct ResidualClaim {
+        uint256 leaseId;
+        uint256 consumerShare;
+        uint256 providerShare;
+        uint256 nonce;
+        uint256 expiry;
+    }
+
+    function _openSignedConsumerLease(address consumerSigner)
+        internal returns (uint256 leaseId)
+    {
         vm.deal(consumerSigner, 10 ether);
-        // Consumer signer cannot retroactively take the previous consumer's
-        // lease. Create an independent real lease with this test's signer.
         vm.prank(consumerSigner);
-        uint256 requestId = market.requestResource(PROFILE, POLICY, FEE, uint64(block.timestamp + 20));
+        uint256 requestId = market.requestResource(
+            PROFILE, POLICY, FEE, uint64(block.timestamp + 20)
+        );
         vm.prank(provider);
         market.placeBid(requestId, FEE);
         vm.warp(block.timestamp + 21);
         vm.prank(consumerSigner);
-        uint256 leaseId = market.chooseBidAndFund{value: FEE + 4 * REWARD}(
+        leaseId = market.chooseBidAndFund{value: FEE + 4 * REWARD}(
             requestId, 0, _terms(4)
         );
         _draw(leaseId);
@@ -220,37 +229,62 @@ contract SSEAdaptiveMarketV2Test is Test {
         market.acceptLease(leaseId);
         vm.prank(consumerSigner);
         market.startEpoch(leaseId, keccak256("unsigned-real-request"));
-        SSEAdaptiveVoteLedger.Epoch memory ep = votes.epoch(leaseId, 0);
-        vm.warp(uint256(ep.monitoringClose) + 1);
-        assertEq(uint8(market.finalizeEpoch(leaseId, 0)), uint8(SSEAdaptiveVoteLedger.Outcome.None));
+    }
 
-        uint256 consumerShare = 2e15;
-        uint256 providerShare = 1e15;
-        uint256 nonce = 0;
-        uint256 expiry = block.timestamp + 1000;
+    function _signResidualClaim(uint256 signerKey, ResidualClaim memory claim)
+        internal returns (bytes memory)
+    {
         bytes32 typeHash = keccak256(
             "ResidualAllocation(uint256 leaseId,uint256 epochId,uint256 consumerShare,uint256 providerShare,uint256 nonce,uint256 expiry)"
         );
         bytes32 digest = keccak256(abi.encodePacked(
             "\x19\x01", market.domainSeparator(),
-            keccak256(abi.encode(typeHash, leaseId, uint256(0),
-                                 consumerShare, providerShare, nonce, expiry))
+            keccak256(abi.encode(
+                typeHash, claim.leaseId, uint256(0), claim.consumerShare,
+                claim.providerShare, claim.nonce, claim.expiry
+            ))
         ));
-        (uint8 cv, bytes32 cr, bytes32 cs) = vm.sign(consumerKey, digest);
-        (uint8 pv, bytes32 pr, bytes32 ps) = vm.sign(providerKey, digest);
-        bytes memory consumerSig = abi.encodePacked(cr, cs, cv);
-        bytes memory providerSig = abi.encodePacked(pr, ps, pv);
+        (uint8 v, bytes32 r, bytes32 sigS) = vm.sign(signerKey, digest);
+        return abi.encodePacked(r, sigS, v);
+    }
+
+    function testInconclusiveRequiresBothBilateralSignatures() public {
+        uint256 consumerKey = 0xC0A10001;
+        address consumerSigner = vm.addr(consumerKey);
+        uint256 leaseId = _openSignedConsumerLease(consumerSigner);
+        vm.warp(uint256(votes.epoch(leaseId, 0).monitoringClose) + 1);
+        assertEq(
+            uint8(market.finalizeEpoch(leaseId, 0)),
+            uint8(SSEAdaptiveVoteLedger.Outcome.None)
+        );
+
+        ResidualClaim memory claim = ResidualClaim({
+            leaseId: leaseId,
+            consumerShare: 2e15,
+            providerShare: 1e15,
+            nonce: 0,
+            expiry: block.timestamp + 1000
+        });
+        bytes memory consumerSig = _signResidualClaim(consumerKey, claim);
+        bytes memory providerSig = _signResidualClaim(providerKey, claim);
+
         vm.expectRevert(SSEAdaptiveMarketV2.InvalidSignature.selector);
-        market.resolveInconclusive(leaseId, 0, consumerShare, providerShare,
-                                   nonce, expiry, providerSig, providerSig);
-        market.resolveInconclusive(leaseId, 0, consumerShare, providerShare,
-                                   nonce, expiry, consumerSig, providerSig);
-        assertEq(market.withdrawable(consumerSigner), consumerShare);
-        assertEq(market.withdrawable(provider), providerShare);
+        market.resolveInconclusive(
+            claim.leaseId, 0, claim.consumerShare, claim.providerShare,
+            claim.nonce, claim.expiry, providerSig, providerSig
+        );
+        market.resolveInconclusive(
+            claim.leaseId, 0, claim.consumerShare, claim.providerShare,
+            claim.nonce, claim.expiry, consumerSig, providerSig
+        );
+        assertEq(market.withdrawable(consumerSigner), claim.consumerShare);
+        assertEq(market.withdrawable(provider), claim.providerShare);
         assertEq(market.totalServiceEscrow(), 0);
         vm.expectRevert(SSEAdaptiveMarketV2.InvalidPhase.selector);
-        market.resolveInconclusive(leaseId, 0, consumerShare, providerShare,
-                                   nonce, expiry, consumerSig, providerSig);
+        market.resolveInconclusive(
+            claim.leaseId, 0, claim.consumerShare, claim.providerShare,
+            claim.nonce, claim.expiry, consumerSig, providerSig
+        );
     }
 
     function testConsumerCannotForceProviderResponseWithoutSignature() public {
@@ -302,7 +336,7 @@ contract SSEAdaptiveMarketV2Test is Test {
             "ProviderResponse(uint256 leaseId,uint256 epochId,bytes32 requestHash,bytes32 responseHash)"
         );
         bytes32 digest = keccak256(abi.encodePacked(
-            "\\x19\\x01", market.domainSeparator(),
+            "\x19\x01", market.domainSeparator(),
             keccak256(abi.encode(typeHash, leaseId, uint256(0),
                                  keccak256("real-request-content"), responseHash))
         ));
