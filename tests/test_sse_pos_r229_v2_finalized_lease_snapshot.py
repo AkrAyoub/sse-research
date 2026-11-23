@@ -42,6 +42,7 @@ def fixture():
         "gasBoundSeats":4,"eligibleCount":9,"confirmationSeconds":3600,
         "responseSeconds":100,"monitoringSeconds":100,
         "entropyBlock":102,"phase":4,"providerAccepted":True,
+        "lastProgressAt":1000,
     }
     committee={
         "consumer":CONSUMER,"provider":PROVIDER,
@@ -96,6 +97,7 @@ class TestR229FinalizedLease(unittest.TestCase):
         result=sample(fixture())
         self.assertEqual(result["finalizedExecutionHeight"],12345)
         self.assertEqual(result["lease"]["phase"],4)
+        self.assertEqual(result["lease"]["lastProgressAt"],1000)
         self.assertEqual(result["selectedMonitors"],SEATS)
         self.assertEqual(result["committee"]["quorum"],3)
         self.assertEqual(result["epoch"]["ledger"]["successVotes"],3)
