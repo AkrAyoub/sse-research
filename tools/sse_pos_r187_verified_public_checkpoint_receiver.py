@@ -79,9 +79,14 @@ def stage(out,*,getter=download):
             raise Refused("downloaded checkpoint SHA256/size mismatch: "+filename)
         blobs[filename]=blob
     # Download and verify everything before making any local changes.
-    out.mkdir(mode=0o700)
+    # These exact SSZ and manifest assets are PUBLIC chain data. The
+    # future hardened Lighthouse container intentionally drops all
+    # capabilities, so its bind-mounted checkpoint must be traversable
+    # and readable even when owned by the non-root joining account.
+    # Do not apply these modes to ANY wallet/JWT/Beacon DB or parent dir.
+    out.mkdir(mode=0o755)
     for name,blob in [("checkpoint-manifest.json",manifest),*blobs.items()]:
-        fd=os.open(out/name,os.O_WRONLY|os.O_CREAT|os.O_EXCL|os.O_NOFOLLOW,0o600)
+        fd=os.open(out/name,os.O_WRONLY|os.O_CREAT|os.O_EXCL|os.O_NOFOLLOW,0o644)
         with os.fdopen(fd,"wb") as f:
             f.write(blob)
             f.flush()
