@@ -1,3 +1,22 @@
+# R225 — New real two-node finalized checkpoint match, formal timing qualification
+
+On 2026-11-23 the real VM4709 separately installed Besu+Lighthouse
+observer reported the **same original chain31340 EL and CL genesis**
+and **exact matching finalized Beacon epoch602/root**
+`0x9d140067a9049103fc482221713f2f0c46cf7d0a89593bef4d6e19fb0dddecd7`
+as VM4707. Both nodes independently reported 2 native EL peers and
+2 native CL peers, no sync/optimism/offline flags; EL head17783 vs
+17798, Beacon slot19394 vs19409. **Actual capture skew 181.223808s**
+exceeded strict R141 180s compare requirement by 1.223808s. This is
+**observed exact checkpoint agreement, NOT a formal same-window R141
+`OBSERVED_CONSISTENT_CHECKPOINTS` result**. The earlier strict R192
+epoch571 pair remains formally accepted. No live contracts, funding,
+independent operators, external beyond-overlay P2P or physical SLA
+were tested here. See
+`docs/R225_VM4707_VM4709_FINALIZED_EPOCH602_MATCH_SKEW_RESTRICTION.md`.
+
+---
+
 # R224 newer actual network evidence — 2026-11-23 16:39:06 UTC
 
 Original VM4707 **actual live two-layer R141 capture** (pinned source
