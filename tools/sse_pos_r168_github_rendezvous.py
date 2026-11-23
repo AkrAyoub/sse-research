@@ -23,6 +23,8 @@ from pathlib import Path
 import re
 import subprocess
 import sys
+import time
+import urllib.parse
 import urllib.request
 
 import sse_pos_r142_public_peer_discovery as native
@@ -45,32 +47,67 @@ class _NoRedirect(urllib.request.HTTPRedirectHandler):
     def redirect_request(self,*args,**kwargs):
         return None
 
-def fetch_public(url=API):
-    if url!=API:
-        raise Refused("only the pinned public research rendezvous issue is permitted")
-    req=urllib.request.Request(url,headers={
+def _github_get(url, *, allowed_path):
+    """Uncached anonymous HTTPS GitHub read, no redirects or private API."""
+    parts=urllib.parse.urlsplit(url)
+    if (parts.scheme!="https" or parts.hostname!="api.github.com"
+            or parts.path!=allowed_path or parts.port not in (None,443)
+            or parts.username or parts.password or parts.fragment):
+        raise Refused("only pinned public Github rendezvous API paths allowed")
+    nonce=str(time.time_ns())
+    suffix="&" if parts.query else "?"
+    request_url=url+suffix+"sse_refresh="+nonce
+    req=urllib.request.Request(request_url,headers={
         "Accept":"application/vnd.github+json",
         "User-Agent":"SSE-chain31340-native-peer-discovery",
-        "Cache-Control":"no-cache",
+        "Cache-Control":"no-store, max-age=0",
         "Pragma":"no-cache"})
-    opener=urllib.request.build_opener(
-        urllib.request.ProxyHandler({}),_NoRedirect())
+    opener=urllib.request.build_opener(urllib.request.ProxyHandler({}),
+                                       _NoRedirect())
     try:
         with opener.open(req,timeout=8) as response:
-            if response.status!=200 or response.url!=url:
-                raise Refused("GitHub public issue API unavailable")
+            if response.status!=200 or response.url!=request_url:
+                raise Refused("unexpected public GitHub API response")
             raw=response.read(MAX_RESPONSE+1)
     except (OSError,ValueError) as exc:
         raise Refused("anonymous public rendezvous unavailable") from exc
     if len(raw)>MAX_RESPONSE:
-        raise Refused("public issue response exceeds resource limit")
+        raise Refused("GitHub public API response exceeds resource limit")
     try:
-        obj=json.loads(raw,object_pairs_hook=native._unique_keys)
+        return json.loads(raw,object_pairs_hook=native._unique_keys)
     except (ValueError,UnicodeError) as exc:
-        raise Refused("invalid public issue response JSON") from exc
-    if type(obj) is not list or len(obj)>MAX_COMMENTS:
+        raise Refused("invalid anonymous Github response") from exc
+
+def fetch_public(url=API):
+    if url!=API:
+        raise Refused("only pinned public research rendezvous API is permitted")
+    parsed=_github_get(url,allowed_path=f"/repos/{REPO}/issues/{ISSUE}/comments")
+    if type(parsed) is not list or len(parsed)>MAX_COMMENTS:
         raise Refused("unbounded public issue comments page")
-    return obj
+    # The issue-comments COLLECTION can stay cached after a PATCH despite
+    # no-cache headers. Read the latest actual marked record by its dynamic
+    # comment ID, never a hardcoded VM identity or permanent peer address.
+    for item in parsed:
+        if (type(item) is not dict or
+                type(item.get("id")) is not int or
+                type(item.get("body")) is not str or
+                not item["body"].startswith(MARKER)):
+            continue
+        ident=item["id"]
+        # This is a single-peer research experiment. Do not turn public
+        # comments into a large N+1 unbounded API request fanout.
+        if sum(type(v) is dict and isinstance(v.get("body"),str)
+               and v["body"].startswith(MARKER) for v in parsed)>8:
+            raise Refused("too many published native comments for bounded live refresh")
+        detail=_github_get(
+            f"https://api.github.com/repos/{REPO}/issues/comments/{ident}",
+            allowed_path=f"/repos/{REPO}/issues/comments/{ident}")
+        if (type(detail) is not dict or detail.get("id")!=ident
+                or not isinstance(detail.get("body"),str)):
+            raise Refused("actual public issue comment readback mismatch")
+        item["body"]=detail["body"]
+        item["updated_at"]=detail.get("updated_at")
+    return parsed
 
 def marker_record(body,*,now):
     if type(body) is not str or not body.startswith(MARKER):
