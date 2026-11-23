@@ -1,3 +1,20 @@
+## R179 — Real owner finality, Besu native entrypoint and guarded trusted-checkpoint diagnosis
+
+VM4707's original running Lighthouse reports a **real finalized epoch 558**
+and root `0xde30135baa11178dc5e539c690d1ba1092337890e2ff81a55b718f389e47c3d1`.
+VM4709's two pinned native clients are still restarting (Besu Docker
+wrapper chmod/chown/setgroups versus hardened readonly mounts; Lighthouse
+original-genesis weak-subjectivity rejection). We have **not** yet
+verified native peers, syncing or cross-host finality.
+
+R179 changes future fresh-node Besu launches to the pinned native
+`/opt/besu/bin/besu` binary without removing original Docker
+capability restrictions or genesis read-only mounts, but does not
+change any already-created VM4709 containers. An owner-only read-only
+Lighthouse checkpoint probe validates the real original Beacon genesis,
+finalized checkpoint and finalized block header. See
+[actual owner finality and client recovery](docs/R179_OWNER_FINALITY_AND_PINNED_CLIENT_ENTRYPOINT_RECOVERY.md).
+
 ## R178 — Actual VM4709 EL/CL startup blockers and reproducible node-onboarding incident log
 
 On the real fresh Ubuntu VM4709, R177 signed ZeroTier package
