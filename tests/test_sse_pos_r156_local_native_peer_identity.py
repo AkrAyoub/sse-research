@@ -124,7 +124,7 @@ class R156Tests(unittest.TestCase):
             m.write_atomic(target,original)
             self.assertEqual(json.loads(target.read_text()),original)
             self.assertEqual(target.stat().st_mode & 0o777,0o600)
-            self.assertEqual(target.read_bytes()[-1:],b"\\n")
+            self.assertEqual(target.read_bytes()[-1:],bytes([10]))
             m.write_atomic(target,original)
             self.assertEqual(json.loads(target.read_text()),original)
 
