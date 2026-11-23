@@ -70,6 +70,19 @@ def verify_checkpoint():
         or m.get("chainId")!=31340 or m.get("finalizedEpoch")!=565
         or m.get("finalizedSlot")!=18080):
         raise Refused("R188_CHECKPOINT_IDENTITY_MISMATCH")
+    # The non-privileged Lighthouse container has CAP_DAC_OVERRIDE
+    # dropped. A read-only bind mount does not bypass host owner/mode
+    # checks. All checkpoint assets are PUBLIC, but R187 originally
+    # stages them with 0700 dir / 0600 files as the joining user,
+    # which blocks container UID 0 from reading them. Fail in preflight
+    # rather than submit another endlessly restarting Lighthouse.
+    directory=CHECKPOINT.stat()
+    if directory.st_mode & 0o005 != 0o005:
+        raise Refused("R189_PUBLIC_CHECKPOINT_DIRECTORY_NOT_CONTAINER_READABLE")
+    for filename in (*PIN,"checkpoint-manifest.json"):
+        item=CHECKPOINT/filename
+        if item.stat().st_mode & 0o004 != 0o004:
+            raise Refused("R189_PUBLIC_CHECKPOINT_FILE_NOT_CONTAINER_READABLE_"+filename)
     return True
 
 def get_port_bindings(role,data):
