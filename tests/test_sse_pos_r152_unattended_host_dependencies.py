@@ -9,6 +9,26 @@ sys.path.insert(0,str(Path(__file__).resolve().parents[1]/"tools"))
 import sse_pos_r152_unattended_host_dependencies as m
 
 class HostDependencies(unittest.TestCase):
+    def test_real_host_prerequisite_failures_have_safe_stages(self):
+        import subprocess
+        cases=[
+            (["apt-get","update","-qq"],"APT_UPDATE"),
+            (["apt-get","install","-y","docker.io"],"APT_DOCKER_GNUPG"),
+            (["systemctl","enable","--now","zerotier-one"],"ZEROTIER_DAEMON"),
+            (["bash","/tmp/vendor.sh"],"ZEROTIER_VENDOR_INSTALL"),
+            (["zerotier-cli","join",m.NETWORK],"ZEROTIER_JOIN"),
+            (["docker","pull","image@sha256:abc"],"PINNED_CLIENT_IMAGE_PULL"),
+        ]
+        for argv,stage in cases:
+            with (self.subTest(stage=stage),
+                  patch.object(m.subprocess,"run",return_value=
+                      subprocess.CompletedProcess(argv,42,"SENSITIVE","PRIVATE_TOKEN"))):
+                with self.assertRaisesRegex(m.Refused,"R152_"+stage+"_EXIT_42") as failure:
+                    m.call(argv)
+                self.assertNotIn("SENSITIVE",str(failure.exception))
+                self.assertNotIn("PRIVATE_TOKEN",str(failure.exception))
+
+
     def test_plan_no_system_change(self):
         with patch.object(m.os,"geteuid",return_value=0):
             result=m.setup()
