@@ -38,8 +38,13 @@ def get(path, *,binary=False,opener=None,maxbytes=None):
             if binary and "application/octet-stream" not in ct.lower():
                 raise Refused("owner Beacon did not return SSZ")
             raw=response.read(maxbytes+1)
+    except urllib.error.HTTPError as exc:
+        # Distinguish unsupported root-pinned state/block lookup without
+        # logging server body, local host details, or authentication.
+        raise Refused(f"R185_OWNER_BEACON_HTTP_{exc.code}_"
+                      +("SSZ" if binary else "JSON")) from exc
     except (OSError,TimeoutError,urllib.error.URLError) as exc:
-        raise Refused("owner Beacon API inaccessible") from exc
+        raise Refused("R185_OWNER_BEACON_TRANSPORT_UNAVAILABLE") from exc
     if len(raw)>maxbytes or not raw:
         raise Refused("owner Beacon response empty or oversized")
     if binary:
