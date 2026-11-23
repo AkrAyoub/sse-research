@@ -25,11 +25,16 @@ def release():
     }
 
 class PublicArtifactTests(unittest.TestCase):
-    def test_repository_release_explicitly_blocked_without_mirrors(self):
+    def test_repository_release_has_exact_verified_public_genesis_asset(self):
         path=Path(__file__).resolve().parents[1]/"release/chain31340-public-release.json"
         obj=m.read_manifest(path)
         self.assertEqual(obj["chainId"],31340)
-        self.assertFalse(obj["originalGenesisArchiveSources"])
+        self.assertEqual(obj["originalGenesisArchiveSha256"],m.ARCHIVE_SHA)
+        self.assertEqual(obj["originalGenesisArchiveSources"],[
+            "https://github.com/AkrAyoub/sse-research/releases/download/"
+            "chain31340-genesis-v1/chain31340-public-native-observer-v1.tar.gz"])
+        self.assertEqual(obj["currentPublicReleaseStatus"],
+                         "PUBLIC_GENESIS_MIRRORED_NATIVE_DISCOVERY_PENDING")
         self.assertFalse(obj["replaceablePeerDirectorySources"])
 
     def test_missing_public_artifact_does_not_create_fake_genesis(self):
