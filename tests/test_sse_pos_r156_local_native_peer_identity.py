@@ -108,6 +108,26 @@ class R156Tests(unittest.TestCase):
         self.assertFalse(out["localSigningKeyRead"])
         self.assertEqual(len(calls),5)
 
+    def test_rotating_private_peer_record_is_valid_json_for_r157_and_r159(self):
+        # Actual R156 local capture succeeded on VM4707, but --out was not
+        # exercised by the prior command. A literal backslash-n corrupted
+        # saved files and would prevent the announcer from reading them.
+        from pathlib import Path
+        import json
+        import tempfile
+        with tempfile.TemporaryDirectory() as temp:
+            target=Path(temp)/"public-peer.json"
+            original={
+                "schema":"SSE_R156_LOCAL_NODE_NATIVE_IDENTITY_V1",
+                "publicPeerRecord":{"nodeId":ID},
+            }
+            m.write_atomic(target,original)
+            self.assertEqual(json.loads(target.read_text()),original)
+            self.assertEqual(target.stat().st_mode & 0o777,0o600)
+            self.assertEqual(target.read_bytes()[-1:],b"\\n")
+            m.write_atomic(target,original)
+            self.assertEqual(json.loads(target.read_text()),original)
+
     def test_api_allowlist_disallows_remote_or_mutating_rpc(self):
         for url,method,rpc in (
             ("http://example.org:28545","POST","net_enode"),
