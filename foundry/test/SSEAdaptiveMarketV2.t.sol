@@ -295,6 +295,18 @@ contract SSEAdaptiveMarketV2Test is Test {
         market.exitMonitor();
     }
 
+    function testConstructorRefusesMainnetOrAnotherResearchChain() public {
+        vm.chainId(1);
+        vm.expectRevert(SSEAdaptiveMarketV2.InvalidInput.selector);
+        new SSEAdaptiveMarketV2(BOND);
+        vm.chainId(31339);
+        vm.expectRevert(SSEAdaptiveMarketV2.InvalidInput.selector);
+        new SSEAdaptiveMarketV2(BOND);
+        vm.chainId(31340);
+        SSEAdaptiveMarketV2 good = new SSEAdaptiveMarketV2(BOND);
+        assertEq(good.minimumBond(), BOND);
+    }
+
     function testMarketBalanceCoversBondServiceAndPendingMonitorLiabilities() public {
         uint256 leaseId = _fund(4);
         (uint256 held, uint256 owed, bool covered) = market.escrowAccounting();
