@@ -99,11 +99,20 @@ def rpc(url, method, params):
     return value["result"]
 
 
+# Independently computed using official OpenSSL KECCAK-256, not
+# hashlib.sha3_256 (which uses incompatible NIST SHA3 domain separation).
+# Fixed audited ABI surface: never process arbitrary user-provided methods.
+ABI_SELECTORS = {
+    "votes()": "0xe168c3ec",
+    "settlement()": "0x51160630",
+    "minimumBond()": "0xaa7517e1",
+}
+
 def selector(signature):
-    from Crypto.Hash import keccak
-    obj = keccak.new(digest_bits=256)
-    obj.update(signature.encode("ascii"))
-    return "0x" + obj.digest()[:4].hex()
+    try:
+        return ABI_SELECTORS[signature]
+    except KeyError as exc:
+        raise Refused("unknown V2 immutable getter ABI") from exc
 
 
 def _read_address(raw):
