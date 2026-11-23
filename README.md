@@ -1,3 +1,21 @@
+## R175 — Official signed ZeroTier package route after VM4709 HTTP 403
+
+VM4709's actual R174 safe probe identified **signing key available
+(3175 bytes)** but the official vendor shell installer HTTPS endpoint
+returned **HTTP 403**. R175 removes reliance on that blocked script;
+it installs `zerotier-one` via the official Ubuntu 24.04 `noble`
+HTTPS APT repository, after verifying the exact pinned vendor primary
+GPG fingerprint and requiring scoped APT `signed-by` package index
+verification. It checks signed repository metadata BEFORE any
+repository file mutation and never installs untrusted root shell
+scripts. See [R175 fail-closed recovery](docs/R175_SIGNED_ZEROTIER_NOBLE_APT_NO_SCRIPT_403.md).
+
+This new runtime path still needs genuine VM4709 execution. Original
+genesis and private observer selection remain preserved. Do NOT
+rerun R147; continue the gated R151 only after repository
+metadata and source-level regressions pass. No native EL/CL
+peer handshake or finalized root has yet been proven.
+
 ## R173 — Preserve original VM4709 source and continue the existing observer runtime
 
 Read-only VM4709 evidence proved the real public R170 source checkout
