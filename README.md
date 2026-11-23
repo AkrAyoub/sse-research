@@ -1,3 +1,30 @@
+## R168 — Real temporary, public, expiring peer rendezvous experiment
+
+VM4707 has now verified **1111 Python tests (OK, 3 skipped)**
+at R167 and produced a genuine EL/CL public-identity discovery
+directory for original chain31340. That local file alone is
+not Internet-reachable.
+
+[R168 source](tools/sse_pos_r168_github_rendezvous.py) and
+[limits and verification](docs/R168_OPTIONAL_PUBLIC_GITHUB_NATIVE_RENDEZVOUS.md)
+introduce **experimental** public
+[Issue #42](https://github.com/AkrAyoub/sse-research/issues/42):
+an operator can publish fresh REAL public Besu/Lighthouse enode+ENR
+metadata using its own GitHub CLI session, while any other machine
+may retrieve short-lived records **anonymously**. No static VM IP
+or signed validator secret is published. The first peer's
+native identity is still unverified as an externally reachable
+public record until the owner actually publishes it and a separate
+machine retrieves it.
+
+**Important:** GitHub is a SINGLE centralized discovery provider:
+this is an interim third-node integration test, **NOT** an
+independently operated final permissionless network discovery
+substrate. No discovered hints are consensus membership lists,
+native handshake proofs, peer reachability attestations, or
+independent operator identity. Public fallback registries/native
+P2P rendezvous remain mandatory.
+
 ## R166 — Actual VM4707 EL/CL public identity captured; local feed integration fix
 
 VM4707 verified R165 at SHA
