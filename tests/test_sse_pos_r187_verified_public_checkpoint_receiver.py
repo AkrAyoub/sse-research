@@ -40,7 +40,12 @@ class TestReceiver(unittest.TestCase):
                 data=json.dumps(manifest).encode()
                 def fetch(url,*,max_bytes):
                     return data if url.endswith("checkpoint-manifest.json") else blobs[url.rsplit("/",1)[-1]]
-                result=m.stage(destination,getter=fetch)
+                import os
+                previous_umask=os.umask(0o077)
+                try:
+                    result=m.stage(destination,getter=fetch)
+                finally:
+                    os.umask(previous_umask)
             self.assertTrue(result["stateAndBlockSha256Verified"])
             self.assertEqual(destination.stat().st_mode & 0o005,0o005)
             for name in ("checkpoint-manifest.json",*blobs):
