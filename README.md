@@ -1,3 +1,19 @@
+## R166 — Actual VM4707 EL/CL public identity captured; local feed integration fix
+
+VM4707 verified R165 at SHA
+`0a108e90ee316dcdd629dcb973de69e2597989ee`:
+**1,108 tests, OK (3 skipped)**, independently downloaded and checked
+the public original genesis, and captured an actual Besu/Lighthouse
+public-native identity with R156. The identity was **NOT**
+published to an externally reachable discovery endpoint.
+
+[The R166 integration status](docs/R166_LIVE_NATIVE_IDENTITY_PIPELINE_AND_ROLE_SAFETY.md)
+records a real defect in R156's `--out` JSON writer and its fix,
+along with a new R156→R157→R159 source-level interoperability test.
+R147 also refuses unsupported *mixed* validator/marketplace role
+selections before host mutations rather than falsely claiming a
+partial role install. **R166 still awaits VM test verification.**
+
 ## R165 — Original chain31340 public genesis RELEASED and verified
 
 The actual ORIGINAL PUBLIC-only genesis archive is now available through
