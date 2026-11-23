@@ -59,6 +59,68 @@ class HostDependencies(unittest.TestCase):
                 (_ for _ in ()).throw(
                     urllib.error.HTTPError(url,403,"blocked",{},None))))
 
+    def test_r177_repo_line_has_actual_newline_not_literal_backslash_n(self):
+        self.assertTrue(m.ZEROTIER_APT_LINE.endswith(chr(10)))
+        self.assertFalse(m.ZEROTIER_APT_LINE.endswith(chr(92)+"n"))
+        self.assertEqual(
+            m.ZEROTIER_APT_R175_BAD_LINE,
+            m.ZEROTIER_APT_LINE[:-1]+chr(92)+"n")
+
+    def test_r177_only_exact_existing_malformed_repo_line_is_repaired(self):
+        import unittest.mock
+        calls=[]
+        with tempfile.TemporaryDirectory() as td:
+            root=Path(td)
+            keyring=root/"key.gpg"
+            source=root/"zero.list"
+            source.write_bytes(m.ZEROTIER_APT_R175_BAD_LINE.encode("ascii"))
+            def runner(argv,**kw):
+                calls.append(argv)
+                if "--fingerprint" in argv:
+                    return "pub::::::::::"+chr(10)+"fpr:::::::::"+m.VENDOR_FINGERPRINT+":"+chr(10)
+                if "--dearmor" in argv:
+                    Path(argv[argv.index("--output")+1]).write_bytes(b"PUBLIC_KEY_FIXTURE")
+                return ""
+            with (patch.object(m.os,"geteuid",return_value=0),
+                  patch.object(m,"verify_vendor_repo_metadata",
+                               return_value={"officialNobleRepoMetadataReachable":True}),
+                  patch.object(m.Path,"is_file",autospec=True,
+                               side_effect=lambda obj:(
+                                   True if str(obj)=="/usr/sbin/zerotier-one"
+                                   else Path.exists(obj) and not Path.is_dir(obj)))):
+                self.assertTrue(m.install_verified_zerotier_apt(
+                    runner=runner,fetcher=lambda url:b"PUBLIC_GPG_FIXTURE",
+                    keyring=keyring,source=source))
+                self.assertEqual(source.read_bytes(),m.ZEROTIER_APT_LINE.encode("ascii"))
+                # Idempotent on the already repaired source.
+                self.assertTrue(m.install_verified_zerotier_apt(
+                    runner=runner,fetcher=lambda url:b"PUBLIC_GPG_FIXTURE",
+                    keyring=keyring,source=source))
+            self.assertEqual(keyring.read_bytes(),b"PUBLIC_KEY_FIXTURE")
+            self.assertTrue(any("zerotier-one" in cmd for cmd in calls))
+
+    def test_r177_refuses_to_rewrite_unrecognized_repo(self):
+        with tempfile.TemporaryDirectory() as td:
+            root=Path(td)
+            source=root/"zero.list"
+            keyring=root/"key.gpg"
+            source.write_text("deb https://untrusted.example invalid main"+chr(10))
+            def runner(argv,**kw):
+                if "--fingerprint" in argv:
+                    return "pub::::::::::"+chr(10)+"fpr:::::::::"+m.VENDOR_FINGERPRINT+":"+chr(10)
+                if "--dearmor" in argv:
+                    Path(argv[argv.index("--output")+1]).write_bytes(b"PUBLIC_KEY_FIXTURE")
+                return ""
+            with (patch.object(m.os,"geteuid",return_value=0),
+                  patch.object(m,"verify_vendor_repo_metadata",
+                               return_value={"officialNobleRepoMetadataReachable":True}),
+                  self.assertRaisesRegex(m.Refused,"CONFIG_CONFLICT")):
+                m.install_verified_zerotier_apt(
+                    runner=runner,fetcher=lambda url:b"PUBLIC_GPG_FIXTURE",
+                    keyring=keyring,source=source)
+            self.assertEqual(source.read_text(),
+                             "deb https://untrusted.example invalid main"+chr(10))
+
     def test_upstream_noble_repo_is_https_and_scoped_signature(self):
         self.assertEqual(m.ZEROTIER_APT_URL,
                          "https://download.zerotier.com/debian/noble")
