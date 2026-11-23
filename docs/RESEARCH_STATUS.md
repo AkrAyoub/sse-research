@@ -1,3 +1,42 @@
+# R243 — Active draft R226–R242 real-role integration, SOURCE-ONLY (unverified)
+
+As of 2026-11-23, new research integration work is on
+`feature/r226-adaptive-v2-operator-runtime` draft PR #43,
+**stacked on** `feature/r136-independent-observer-preflight`
+draft PR #41; original `main`, VM4706 signing validator,
+running VM4707/VM4709 observers, chain31340 genesis and wallets
+have NOT been touched.
+
+New source implements exact V2 unsigned ABI role actions, finalized
+market+ledger event/runtime/lease audits, V2-specific EIP712
+public signature tools and TTY consent-gated app-only signing,
+V2 real HTTP Docker compute/provider/selected monitor evidence adapters,
+public-DNS resource/SLA term commitments, per-node read-only status UI,
+live-node actual gas/balance quoting, plus separately authorized
+owner-local ONE-TX test ETH sender. R236 contract patch prevents
+post-accept inactivity from indefinitely locking selected monitor
+bonds; sealed no-quorum epoch fees remain escrowed for bilateral EIP712
+resolution, and late consumer reactivation is rejected.
+
+**CRITICAL:** NONE of R226–R242 sources, the amended R236 contract
+or its added adversarial cases have yet been compiled/tested on
+the user's VM. No source CI run reported PASS. The earlier R223
+16/16 Foundry V2 success belongs ONLY to
+`9a216518b3ea8c265f5186f6113987eb537d7949`, BEFORE
+the new code. All new runtime/EIP170 sizes must be remeasured.
+Explicit owner approval and a separate encrypted app wallet/funding
+are required before any network transaction. No new native
+testETH has been sent, no V2 market/ledger deployed, and no remote
+physical independent SLA measured.
+
+**Owner return:** see
+`docs/R243_ADAPTIVE_V2_FULL_RUNTIME_INTEGRATION_AND_RETURN_GATES.md`
+and `scripts/r235_vm4707_v2_source_only_gate.sh` at the exact
+immutable branch commit provided in the return handoff.
+If tests fail, correct through GitHub, not by patching a VM.
+
+---
+
 # R225 — New real two-node finalized checkpoint match, formal timing qualification
 
 On 2026-11-23 the real VM4709 separately installed Besu+Lighthouse
