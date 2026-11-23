@@ -25,6 +25,7 @@ import subprocess
 import sys
 import time
 import urllib.parse
+import urllib.error
 import urllib.request
 
 import sse_pos_r142_public_peer_discovery as native
@@ -69,8 +70,21 @@ def _github_get(url, *, allowed_path):
             if response.status!=200 or response.url!=request_url:
                 raise Refused("unexpected public GitHub API response")
             raw=response.read(MAX_RESPONSE+1)
-    except (OSError,ValueError) as exc:
-        raise Refused("anonymous public rendezvous unavailable") from exc
+    except urllib.error.HTTPError as exc:
+        # An unauthenticated GitHub API is limited by egress IP, which
+        # may be shared among independent VMs behind a provider NAT.
+        # Distinguish rate-exhaustion, abuse throttling and other HTTP
+        # responses without ever logging response bodies or credentials.
+        remaining=exc.headers.get("X-RateLimit-Remaining")
+        if exc.code in (403,429) and remaining=="0":
+            raise Refused("GITHUB_ANONYMOUS_API_RATE_LIMIT_EXHAUSTED") from exc
+        if exc.code in (403,429):
+            raise Refused("GITHUB_ANONYMOUS_API_THROTTLED_OR_FORBIDDEN") from exc
+        raise Refused(f"GITHUB_PUBLIC_API_HTTP_{exc.code}") from exc
+    except urllib.error.URLError as exc:
+        raise Refused("GITHUB_PUBLIC_API_DNS_TLS_OR_EGRESS_FAILED") from exc
+    except (OSError,TimeoutError) as exc:
+        raise Refused("GITHUB_PUBLIC_API_TRANSPORT_UNAVAILABLE") from exc
     if len(raw)>MAX_RESPONSE:
         raise Refused("GitHub public API response exceeds resource limit")
     try:
