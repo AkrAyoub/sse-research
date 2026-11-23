@@ -1,3 +1,41 @@
+# Current verified checkpoint — R223, 2026-11-23 (supersedes earlier 2026-11-21 source status)
+
+On **real VM4707**, exact pinned source `9a216518b3ea8c265f5186f6113987eb537d7949`
+was successfully compiled with Forge v1.9.0 / Solidity 0.8.24:
+**68 Solidity sources; new adaptive V2 marketplace tests 16/16 PASS;**
+full `forge test -q` returned exit 0 (full suite count not printed);
+R201 mocked policy tests 5/5 PASS and R206 mocked audit policy tests
+6/6 PASS. Observed operator gate ended with
+`R222_SOURCE_AND_READONLY_GATES_COMPLETED=true`.
+V2 runtime sizes: market 18,087 bytes; ledger 10,668 bytes.
+Compiler/lint warnings remain and are **not** a security clearance.
+
+The same VM4707 command independently queried the *original*
+chain ID 31340 execution genesis and finalized EL block via localhost
+JSON-RPC: EL latest **17751**, finalized **17621**, original genesis
+`0x5f7cbcd4f1ddfbbedbdd2b180b83d9eff49d4b7263643858d7be2e9c243936bf`.
+Original EOA `0x13fb73aace8A11Be2899D047635A757a224Ce00B`
+at finalized state: **1,000,005.544827172 native TEST ETH, nonce 0**.
+R201 did **not** read live Beacon root/peers and did **not** inspect V2
+deployment addresses/code; do not construe its hardcoded
+`marketV2Deployed:false` status as a chain-wide contract absence scan.
+
+Historical real **VM4707+VM4709** cross-host EL/CL finality match
+epoch571/root `0x48c1976b872c24b9fc00d8b7fd3c08e1b82a44534e3eb4034292c2621e25db63`
+remains separately documented by R192. The later R223 EL-only probe
+does not by itself refresh that cross-host proof.
+
+**NOT YET VERIFIED:** current cross-VM CL finalized agreement after the
+R223 time point; a new private application-only deployer EOA; funding
+transactions; V2 market+ledger deployment receipts/runtime; live
+provider/consumer/monitor SLA and payments; multiple independent
+validator operators; outside-overlay globally permissionless admission.
+No new genesis/validator, wallet import, broadcast or Docker changes
+were performed by the R223 tests. Read
+`docs/R223_VM4707_V2_SOURCE_GREEN_AND_LIVE_CHAIN_READONLY.md`.
+
+---
+
 # Verified state and gaps — updated 2026-11-21
 
 ## CURRENT chain31340 live evidence — supersedes older dated status entries below
