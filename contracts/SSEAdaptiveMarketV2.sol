@@ -402,6 +402,8 @@ contract SSEAdaptiveMarketV2 is EIP712 {
         if (msg.sender != l.consumer) revert Unauthorized();
         if (!l.providerAccepted || (l.phase != Phase.Assigned && l.phase != Phase.Active)
             || l.nextEpoch >= l.maxEpochs || l.nextEpoch != l.closedEpochs ||
+            l.lastProgressAt == 0 ||
+            block.timestamp > uint256(l.lastProgressAt) + l.confirmationSeconds ||
             requestHash == bytes32(0)) revert InvalidPhase();
         SSEAdaptiveVoteLedger.Committee memory c = votes.committee(leaseId);
         if (!c.ready) revert InvalidPhase();
