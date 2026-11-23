@@ -69,7 +69,7 @@ class TestR227FinalizedOnchainEvidence(unittest.TestCase):
         specs=mod.specs()
         self.assertEqual(len(specs["market"]),len(mod.MARKET_EVENTS))
         self.assertEqual(len(specs["ledger"]),len(mod.LEDGER_EVENTS))
-        self.assertEqual(len(specs["market"]),15)
+        self.assertEqual(len(specs["market"]),16)
         self.assertEqual(len(specs["ledger"]),12)
 
     def test_frozen_market_and_real_monitor_vote_in_finalized_blocks(self):
@@ -90,6 +90,13 @@ class TestR227FinalizedOnchainEvidence(unittest.TestCase):
         self.assertFalse(result["monitorEvidenceTruthVerified"])
         self.assertFalse(result["ethereumTransactionSignedOrSubmitted"])
         self.assertEqual([c[0] for c in rpc.calls].count("eth_getBlockByNumber"),1)
+
+    def test_finalized_idle_expiry_event_discloses_reserved_and_refunded(self):
+        raw=event("market","LeaseIdleExpired(uint256,uint256,uint256)",
+                  [17],[300,600])
+        result=mod.parse_log(raw,{"market":MARKET,"ledger":LEDGER},mod.specs())
+        self.assertEqual(result["fields"],{
+            "leaseId":"17","unresolvedFeeWei":"300","refundedUnusedWei":"600"})
 
     def test_proposer_block_hash_spoofed_canonical_event_rejected(self):
         log=event("market","LeaseCancelled(uint256)",[7],[])
