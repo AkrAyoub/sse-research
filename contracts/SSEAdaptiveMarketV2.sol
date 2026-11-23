@@ -382,6 +382,11 @@ contract SSEAdaptiveMarketV2 is EIP712 {
         Lease storage l = leases[leaseId];
         if (msg.sender != l.provider) revert Unauthorized();
         if (l.phase != Phase.Assigned || l.providerAccepted) revert InvalidPhase();
+        SSEAdaptiveVoteLedger.Committee memory c = votes.committee(leaseId);
+        // Prevent provider from indefinitely postponing acceptance, and
+        // eliminate the race where a late acceptance defeats cancellation.
+        if (block.timestamp > c.confirmationDeadline || c.confirmationExpired)
+            revert InvalidPhase();
         l.providerAccepted = true;
         emit ProviderAccepted(leaseId);
     }
