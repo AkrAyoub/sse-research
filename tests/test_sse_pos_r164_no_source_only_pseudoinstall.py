@@ -22,7 +22,31 @@ class R164FailClosedTests(unittest.TestCase):
                 root=Path(tmp)/"sse/releases"
                 state=Path(tmp)/"sse/selection.json"
                 with self.assertRaisesRegex(
-                        m.Refused,"MARKETPLACE_ROLE_INSTALLER_NOT_YET_IMPLEMENTED"):
+                        m.Refused,"SELECTED_ROLE_IMPLEMENTATION_NOT_READY"):
+                    m.install_source(COMMIT,m.build_plan(COMMIT,roles,"node-fresh-a"),
+                                     root=root,state=state)
+                runner.assert_not_called()
+                self.assertFalse(root.exists())
+                self.assertFalse(state.exists())
+
+    def test_mixed_and_validator_roles_refuse_before_any_host_change(self):
+        # A single menu selection is atomic. A request to run validator,
+        # provider or monitor must not be reported as full-node-only success.
+        combinations = [
+            ["validator"], ["full_node","validator"],
+            ["full_node","provider"], ["observer","monitor"],
+            ["full_node","consumer","monitor"],
+        ]
+        for roles in combinations:
+            with self.subTest(roles=roles), \\
+                 tempfile.TemporaryDirectory() as tmp, \\
+                 patch.object(m.os,"geteuid",return_value=0), \\
+                 patch.object(m,"guard_existing"), \\
+                 patch.object(m,"command") as runner:
+                root=Path(tmp)/"releases"
+                state=Path(tmp)/"selection.json"
+                with self.assertRaisesRegex(
+                        m.Refused,"SELECTED_ROLE_IMPLEMENTATION_NOT_READY"):
                     m.install_source(COMMIT,m.build_plan(COMMIT,roles,"node-fresh-a"),
                                      root=root,state=state)
                 runner.assert_not_called()
