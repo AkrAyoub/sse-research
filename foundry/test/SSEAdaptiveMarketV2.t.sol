@@ -232,7 +232,7 @@ contract SSEAdaptiveMarketV2Test is Test {
             "ResidualAllocation(uint256 leaseId,uint256 epochId,uint256 consumerShare,uint256 providerShare,uint256 nonce,uint256 expiry)"
         );
         bytes32 digest = keccak256(abi.encodePacked(
-            "\\x19\\x01", market.domainSeparator(),
+            "\x19\x01", market.domainSeparator(),
             keccak256(abi.encode(typeHash, leaseId, uint256(0),
                                  consumerShare, providerShare, nonce, expiry))
         ));
