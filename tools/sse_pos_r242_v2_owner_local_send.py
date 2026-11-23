@@ -90,6 +90,7 @@ def submit_once(plan,offer,manifest,rpc_url,app_keystore,*,confirm,get_password,
         raise Refused("encrypted app wallet password required")
     try:
         from eth_account import Account
+        from eth_utils import to_checksum_address
     except ImportError as exc:
         raise Refused("pinned eth-account unavailable for explicitly approved signer") from exc
     try:
@@ -121,7 +122,7 @@ def submit_once(plan,offer,manifest,rpc_url,app_keystore,*,confirm,get_password,
             raise Refused("fresh node gas estimate exceeds approved padded limit")
         tx={
             "chainId":31340,"nonce":nonce,"gas":gas,
-            "gasPrice":price,"to":plan.target,
+            "gasPrice":price,"to":to_checksum_address(plan.target),
             "value":plan.value_wei,"data":plan.calldata
         }
         signed=account.sign_transaction(tx)
@@ -149,13 +150,18 @@ def submit_once(plan,offer,manifest,rpc_url,app_keystore,*,confirm,get_password,
         if result is None:
             sleep(1)
             continue
-        if type(result) is not dict or result.get("transactionHash","").lower()!=txhash.lower():
+        if (type(result) is not dict or
+            type(result.get("transactionHash")) is not str or
+            result["transactionHash"].lower()!=txhash.lower()):
             raise Refused("receipt tx hash does not match locally signed transaction")
         if rpc_number(result.get("status"),"receipt status")!=1:
             raise Refused("native V2 transaction reverted; transactionHash="+txhash)
         height=rpc_number(result.get("blockNumber"),"receipt inclusion height")
         block=transport(rpc_url,"eth_getBlockByNumber",[hex(height),False])
-        if type(block) is not dict or block.get("hash","").lower()!=result.get("blockHash","").lower():
+        if (type(block) is not dict or
+            type(block.get("hash")) is not str or
+            type(result.get("blockHash")) is not str or
+            block["hash"].lower()!=result["blockHash"].lower()):
             raise Refused("noncanonical transaction inclusion; txHash="+txhash)
         output.update({"receiptSuccessful":True,"includedBlock":height,
                        "gasUsed":rpc_number(result.get("gasUsed"),"receipt gas used")})
