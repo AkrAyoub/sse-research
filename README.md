@@ -1,3 +1,19 @@
+## R188 — Actual e565 checkpoint received and existing VM4709 client repair prepared
+
+The real VM4709 R187 receiver verified both e565 public owner
+checkpoint SSZ assets against independently observed SHA256
+hashes and original genesis. **Existing VM4709 Besu/Lighthouse
+containers are still restarting**, and no real peer handshake,
+sync or finality is proven there. R188 adds exact-name,
+pinned-image, cap-drop, immutable genesis/JWT and loopback RPC
+preflight and explicit, separately authorized recovery of the
+existing observer. The old containers and populated Beacon
+DB are preserved under dedicated backup names; a separate
+fresh Beacon database uses the trusted public SSZ checkpoint.
+No `--ignore-ws-check` or deletion. Do not run R147/R151/R137
+create-once installation again. See
+[R188 guarded existing-client recovery runbook](docs/R188_EXISTING_VM4709_REVERSIBLE_BESU_LIGHTHOUSE_CHECKPOINT_RECOVERY.md).
+
 ## R183 — Actual VM4709→VM4707 native TCP reachability verified, P2P still blocked by client restarts
 
 Real VM4709 `zerotier-cli` reported `ONLINE` on the dynamic
