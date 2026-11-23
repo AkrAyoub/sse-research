@@ -29,6 +29,9 @@ from sse_pos_r228_v2_typed_data import (
 from sse_pos_r206_adaptive_v2_deployment_audit import (
     Refused as AuditRefused,load as load_manifest,verify,
 )
+from sse_pos_r229_v2_finalized_lease_snapshot import (
+    Refused as LeaseRefused, inspect as inspect_finalized_lease,
+)
 
 ORIGINAL_GENESIS_EOA="0x13fb73aace8a11be2899d047635a757a224ce00b"
 MIN_SIZE=150
@@ -97,6 +100,50 @@ def public_intent(kind,message,market,ledger,expected,role):
     }
 
 
+def verify_public_role_state(intent,snapshot):
+    """Authorize the EOA against actual R229 finalized lease and committee.
+
+    EOA role controls alone cannot establish physical independence or
+    objective SLA truth. Finalized state may lag latest head; the actual
+    contract remains the ultimate authorization at submission time.
+    """
+    role=intent["role"]
+    kind=intent["kind"]
+    signer=intent["expectedSigner"]
+    lease=snapshot["lease"]
+    epoch=snapshot["epoch"]
+    if type(epoch) is not dict or not epoch["market"]["exists"]:
+        raise Refused("no actual finalized target epoch to sign")
+    if kind=="provider-response":
+        if (role!="provider" or signer!=lease["provider"] or
+            lease["phase"]!=4 or lease["providerAccepted"] is not True or
+            snapshot["committee"]["ready"] is not True or
+            epoch["ledger"]["responseAuthenticated"] is True or
+            epoch["ledger"]["monitoringSealed"] is True):
+            raise Refused("not the actual active unsent provider response owner")
+    elif kind=="monitor-vote":
+        if (role!="monitor" or signer not in snapshot["selectedMonitors"] or
+            snapshot["committee"]["ready"] is not True or
+            lease["phase"]!=4 or epoch["ledger"]["monitoringSealed"] is True):
+            raise Refused("monitor not eligible in actual finalized committee")
+        if (intent["typedData"]["message"]["outcome"]==1 and
+            epoch["ledger"]["responseAuthenticated"] is not True):
+            raise Refused("signed Success cannot precede authenticated provider response")
+    elif kind=="residual-allocation":
+        if (signer!=lease["consumer"] and signer!=lease["provider"] or
+            role=="consumer" and signer!=lease["consumer"] or
+            role=="provider" and signer!=lease["provider"] or
+            epoch["ledger"]["monitoringSealed"] is not True or
+            epoch["ledger"]["outcome"]!=0 or epoch["market"]["resolved"] is True or
+            intent["typedData"]["message"]["consumerShare"]+
+            intent["typedData"]["message"]["providerShare"]!=epoch["market"]["feeWei"] or
+            intent["typedData"]["message"]["nonce"]!=epoch["market"]["nonce"]):
+            raise Refused("bilateral fee share not authorized for unresolved finalized epoch")
+    else:
+        raise Refused("unknown V2 role evidence type")
+    return True
+
+
 def sign_authorized(intent,keystore,manifest,rpc_url,*,confirm,get_password,
                     expected_tty=True,transport=None):
     if expected_tty and (not sys.stdin.isatty() or not sys.stderr.isatty()):
@@ -111,6 +158,16 @@ def sign_authorized(intent,keystore,manifest,rpc_url,*,confirm,get_password,
               if transport is not None else verify(manifest,rpc_url))
     if verified["deploymentReceiptSuccessfulAndFinalized"] is not True:
         raise Refused("finalized real market runtime not verified")
+    if transport is None:
+        snapshot=inspect_finalized_lease(
+            manifest,rpc_url,intent["typedData"]["message"]["leaseId"],
+            intent["typedData"]["message"]["epochId"],attestation=verified)
+    else:
+        snapshot=inspect_finalized_lease(
+            manifest,rpc_url,intent["typedData"]["message"]["leaseId"],
+            intent["typedData"]["message"]["epochId"],
+            transport=transport,attestation=verified)
+    verify_public_role_state(intent,snapshot)
     document=safe_keystore(keystore)
     print("R237_PUBLIC_TYPED_INTENT="+json.dumps({
         "kind":intent["kind"],"role":intent["role"],
@@ -191,7 +248,7 @@ def main(argv=None):
                                confirm=input,get_password=getpass)
         print(json.dumps(result,sort_keys=True,indent=2))
         return 0
-    except (Refused,TypedRefused,AuditRefused,OSError,
+    except (Refused,TypedRefused,AuditRefused,LeaseRefused,OSError,
             TypeError,ValueError,KeyError,UnicodeError) as exc:
         print("R237_V2_SIGNING_REFUSED: "+str(exc),file=sys.stderr)
         return 2
