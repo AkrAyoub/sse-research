@@ -1,3 +1,20 @@
+## R165 — Original chain31340 public genesis RELEASED and verified
+
+The actual ORIGINAL PUBLIC-only genesis archive is now available through
+[GitHub Release chain31340-genesis-v1](https://github.com/AkrAyoub/sse-research/releases/tag/chain31340-genesis-v1).
+The operator's R163 tool verified the public download byte-for-byte;
+GitHub's public release metadata confirms the uploaded asset's SHA256
+`1d21e6bfb7609d1797edd9d36561b1dc47a520153d1c6f698f807c29266c2ce7`.
+The [R165 public artifact manifest](release/chain31340-public-release.json)
+now includes the **real publicly accessible URL** for automatic genesis
+download on new nodes; it is NOT a bootnode address or membership approval.
+
+**Still NOT a completed network join:** dynamic published EL enodes /
+CL ENRs and independent HTTPS peer directories have not yet been
+verified; `replaceablePeerDirectorySources` remains empty.
+Starting an isolated nonsigning node does not prove live PoS finality.
+See [the R165 real evidence and next gates](docs/R165_PUBLISHED_ORIGINAL_GENESIS_AND_DYNAMIC_PEER_NEXT_GATE.md).
+
 # SSE — permissionless Ethereum PoS resource marketplace
 
 SSE is a research implementation for leasing **actual HTTP and Docker-backed
@@ -50,9 +67,9 @@ The R149 public artifact downloader now narrowly permits GitHub's
 own HTTPS release CDN redirects while rejecting unrelated mirror
 redirects and non-HTTPS targets.
 
-**CURRENT STATUS:** The public asset is **NOT YET uploaded** and
-`release/chain31340-public-release.json` must retain its empty
-genesis URLs until the actual public binary download is verified.
+**Historical R163 status (superseded by R165):** The asset was
+not uploaded when R163 code was initially committed. R165 records
+the successful publication and verified public URL.
 GitHub source commits alone cannot read the already staged VM4707
 binary file. The release operation is one-time maintainer work,
 **never** a requirement for future joining nodes.
