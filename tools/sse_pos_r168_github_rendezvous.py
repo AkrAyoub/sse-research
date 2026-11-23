@@ -50,7 +50,9 @@ def fetch_public(url=API):
         raise Refused("only the pinned public research rendezvous issue is permitted")
     req=urllib.request.Request(url,headers={
         "Accept":"application/vnd.github+json",
-        "User-Agent":"SSE-chain31340-native-peer-discovery"})
+        "User-Agent":"SSE-chain31340-native-peer-discovery",
+        "Cache-Control":"no-cache",
+        "Pragma":"no-cache"})
     opener=urllib.request.build_opener(
         urllib.request.ProxyHandler({}),_NoRedirect())
     try:
@@ -121,6 +123,39 @@ def compile_comments(comments,*,now):
     selected=sorted(latest.values(),
                     key=lambda obj:obj["expiresAt"],reverse=True)
     return directory.build(selected[:directory.MAX_RECORDS],now=now)
+
+def diagnose_public(*,getter=fetch_public,now=None):
+    """Read-only public availability diagnostics, without printing enodes/ENRs.
+
+    An immediately created GitHub issue comment may not yet appear in
+    anonymous list results. This distinguishes empty lists, stale
+    comments and malformed native records; it never fakes a peer.
+    """
+    now=int(datetime.now(timezone.utc).timestamp()) if now is None else now
+    comments=getter()
+    counts={"publicCommentsReturned":len(comments),
+            "markedNativeComments":0,
+            "freshValidNativeComments":0,
+            "expiredOrInvalidNativeComments":0}
+    for item in comments:
+        if type(item) is not dict or not isinstance(item.get("body"),str):
+            continue
+        if not item["body"].startswith(MARKER):
+            continue
+        counts["markedNativeComments"]+=1
+        try:
+            marker_record(item["body"],now=now)
+            counts["freshValidNativeComments"]+=1
+        except Refused:
+            counts["expiredOrInvalidNativeComments"]+=1
+    return {
+        "schema":"SSE_R169_PUBLIC_RENDEZVOUS_DIAGNOSTIC_V1",
+        **counts,
+        "publicReadbackProven":counts["freshValidNativeComments"]>0,
+        "nativePeerHandshakeVerified":False,
+        "independentInfrastructureVerified":False,
+        "fullNodeJoinVerified":False,
+    }
 
 def discover(*,getter=fetch_public,now=None):
     now=int(datetime.now(timezone.utc).timestamp()) if now is None else now
@@ -223,6 +258,8 @@ def main(argv=None):
     p=argparse.ArgumentParser(description=__doc__)
     modes=p.add_mutually_exclusive_group(required=True)
     modes.add_argument("--discover",action="store_true")
+    modes.add_argument("--diagnose-public",action="store_true",
+                       help="anonymous cache/expiry diagnostics, never print enode or ENR")
     modes.add_argument("--publish",type=Path,metavar="R156_JSON")
     modes.add_argument("--publish-live",action="store_true",
                        help="read real local Besu+Lighthouse public P2P APIs then update own issue comment")
@@ -234,6 +271,10 @@ def main(argv=None):
             if args.node_id:
                 raise Refused("--discover does not need node identity")
             result=discover()
+        elif args.diagnose_public:
+            if args.node_id:
+                raise Refused("--diagnose-public does not need node identity")
+            result=diagnose_public()
         elif args.publish_live:
             if not args.node_id:
                 raise Refused("--publish-live requires local public node ID")
