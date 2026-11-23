@@ -110,6 +110,24 @@ class R163Tests(unittest.TestCase):
                 m.upload(asset,SHA,runner=lambda cmd,**kw:"",
                          downloader=lambda url:b"different bytes")
 
+    def test_public_readback_requires_no_github_cli_or_write_access(self):
+        expected=b"fixture-only-not-real-genesis"
+        with patch.object(m.original,"verify",return_value={
+                "sha256":m.original.ARCHIVE_SHA,"memberDigestsVerified":4}), \
+             patch.object(m,"run") as github, \
+             patch.object(m.shutil,"which") as binary:
+            result=m.verify_public_download(downloader=lambda url:expected)
+        self.assertTrue(result["publicOriginalArchiveVerified"])
+        self.assertFalse(result["onChainStateOrGithubReleaseChanged"])
+        self.assertFalse(result["validatorSecretRead"])
+        github.assert_not_called()
+        binary.assert_not_called()
+
+    def test_public_readback_refuses_corrupt_remote_bytes(self):
+        with patch.object(m.original,"verify",side_effect=m.original.Refused("wrong archive")):
+            with self.assertRaises(m.original.Refused):
+                m.verify_public_download(downloader=lambda _:b"corrupt")
+
     def test_no_unpinned_commit_allowed(self):
         for revision in ("main","HEAD","0x"+SHA,SHA[:9]):
             with self.subTest(revision=revision),self.assertRaises(m.Refused):
