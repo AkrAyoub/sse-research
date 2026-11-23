@@ -1,3 +1,20 @@
+## R172 — First real VM4709 installation attempt needs staged diagnostics
+
+The independent Ubuntu VM4709 successfully retrieved one *current*
+original chain31340 Besu/Lighthouse public native peer record,
+selected the observer role, and then failed its R170 privileged
+installer with a generic host-command message. **No new native
+EL/CL synchronization or finalized checkpoint has been proven.**
+
+[R172 source and incident evidence](docs/R172_VM4709_FIRST_INSTALL_FAILURE_STAGE_DIAGNOSTICS.md)
+add SAFE fixed-stage error labels for APT/Git/role-plan/runtime
+commands, and a read-only `--inspect-failed-host` command that
+checks whether this first attempt left selected-role or release
+state. **Never blindly retry an unknown partial state or remove
+existing signer/client resources.** Latest confirmed VM4707
+suite is R170: 1131 tests OK (3 skipped). R172 remains untested
+on the real VM.
+
 ## R170 — Temporary native join source after stale GitHub readback
 
 VM4707 verified **1127 tests OK (3 skipped)** at R169 and
