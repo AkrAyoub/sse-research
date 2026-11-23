@@ -34,6 +34,7 @@ MARKET_LEASE=(
     ("responseSeconds","uint64"),("monitoringSeconds","uint64"),
     ("entropyBlock","uint256"),("phase","uint8"),
     ("providerAccepted","bool"),
+    ("lastProgressAt","uint64"),
 )
 LEDGER_COMMITTEE=(
     ("consumer","address"),("provider","address"),
