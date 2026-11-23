@@ -62,8 +62,7 @@ class TestR232ActualBoundedMonitorTransport(unittest.TestCase):
     def test_selected_monitor_must_be_confirmed_on_chain(self):
         origin="https://provider.example.org"
         s=snapshot(origin)
-        fake=lambda url,method,args:"0x"+(1).to_bytes(32,"big").hex()
-        with patch.object(m,"eth_call",side_effect=lambda *a,**kw:fake(*a)):
+        with patch.object(m,"eth_call",return_value="0x"+(1).to_bytes(32,"big").hex()):
             context=m.prepared_monitor(s,MONITOR,origin,
                          rpc_url="http://127.0.0.1:28545")
         self.assertTrue(context["confirmedMonitorAtFinalized"])
