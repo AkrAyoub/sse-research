@@ -78,6 +78,47 @@ class R147Tests(unittest.TestCase):
                 r.install_source(SHA,r.build_plan(SHA,["observer"],"node-a"))
         called.assert_not_called()
 
+    def test_first_install_command_failure_reports_stage_without_secret_stderr(self):
+        import subprocess
+        for args,expected in (
+            (["apt-get","update","-qq"],"STAGE_APT_UPDATE_FAILED_EXIT_100"),
+            (["apt-get","install","-y","git"],"STAGE_APT_INSTALL_FAILED_EXIT_100"),
+            (["git","clone","https://github.com/AkrAyoub/sse-research.git",
+              "/tmp/test"],"STAGE_PUBLIC_GIT_CLONE_FAILED_EXIT_100"),
+            (["python3","-B","/opt/release/tools/sse_pos_r151_unattended_full_node.py",
+              "--execute"],"STAGE_REAL_EL_CL_HOST_AND_CONTAINER_INSTALL_FAILED_EXIT_100"),
+        ):
+            with self.subTest(args=args), \\
+                 patch.object(r.subprocess,"run",return_value=subprocess.CompletedProcess(
+                     args,100,"sensitive output","PRIVATE_SECRET_VALUE")):
+                with self.assertRaisesRegex(r.Refused,expected) as failure:
+                    r.command(args)
+                self.assertNotIn("PRIVATE_SECRET_VALUE",str(failure.exception))
+
+    def test_first_install_timeout_identifies_stage_without_command_output(self):
+        import subprocess
+        with patch.object(r.subprocess,"run",side_effect=subprocess.TimeoutExpired(
+                cmd=["apt-get","update"],timeout=180,stderr=b"SECRET")):
+            with self.assertRaisesRegex(r.Refused,"STAGE_APT_UPDATE_TIMED_OUT"):
+                r.command(["apt-get","update","-qq"],timeout=180)
+
+    def test_readonly_partial_first_attempt_inventory_never_mutates(self):
+        with tempfile.TemporaryDirectory() as home, \\
+             patch.object(r.subprocess,"run") as runner:
+            base=Path(home)
+            report=r.inspect_failed_host(root=base)
+            self.assertFalse(report["selectedRoleStatePresent"])
+            self.assertFalse(report["releaseDirectoryPresent"])
+            self.assertFalse(report["safeToBlindlyRetry"])
+            (base/"opt/sse/releases").mkdir(parents=True)
+            (base/"var/lib/sse").mkdir(parents=True)
+            (base/"var/lib/sse/selection.json").write_text("PRIVATE")
+            report=r.inspect_failed_host(root=base)
+            self.assertTrue(report["selectedRoleStatePresent"])
+            self.assertTrue(report["releaseDirectoryPresent"])
+            self.assertEqual(report["releaseEntriesCount"],0)
+            runner.assert_not_called()
+
     def test_public_https_repository_and_no_hardcoded_host_address(self):
         self.assertEqual(r.REPOSITORY,
                          "https://github.com/AkrAyoub/sse-research.git")
