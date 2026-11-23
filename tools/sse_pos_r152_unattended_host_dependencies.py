@@ -33,10 +33,12 @@ NETWORK = r59.NETWORK
 ZEROTIER_APT_URL="https://download.zerotier.com/debian/noble"
 ZEROTIER_APT_LINE=(
     "deb [arch=amd64 signed-by=/usr/share/keyrings/sse-zerotier.gpg] "
-    +ZEROTIER_APT_URL+" noble main\\n"
+    +ZEROTIER_APT_URL+" noble main\n"
 )
 ZEROTIER_KEYRING=Path("/usr/share/keyrings/sse-zerotier.gpg")
 ZEROTIER_APT_SOURCE=Path("/etc/apt/sources.list.d/sse-zerotier.list")
+# Exact R175 malformed line observed on VM4709; no arbitrary rewrites.
+ZEROTIER_APT_R175_BAD_LINE=ZEROTIER_APT_LINE[:-1]+chr(92)+"n"
 
 
 class Refused(ValueError):
@@ -214,6 +216,9 @@ def install_verified_zerotier_apt(*, runner=call, fetcher=fetch_https,
         converted=prepared.read_bytes()
         if not 0<len(converted)<=200000:
             raise Refused("R175_ZEROTIER_VERIFIED_KEYRING_EMPTY")
+    # Existing verified keyring must match. Only the precise R175 single
+    # malformed line (literal backslash+n) is eligible for repair. All
+    # unrelated existing repo configuration remains protected.
     for location,body in (
         (keyring,converted),
         (source,ZEROTIER_APT_LINE.encode("ascii")),
@@ -221,14 +226,39 @@ def install_verified_zerotier_apt(*, runner=call, fetcher=fetch_https,
         if location.is_symlink():
             raise Refused("R175_ZEROTIER_APT_CONFIG_SYMLINK_REFUSED")
         if location.exists():
-            if not location.is_file() or location.read_bytes()!=body:
+            if not location.is_file():
                 raise Refused("R175_ZEROTIER_APT_CONFIG_CONFLICT")
-        else:
-            fd=os.open(location,os.O_WRONLY|os.O_CREAT|os.O_EXCL|os.O_NOFOLLOW,0o644)
-            with os.fdopen(fd,"wb") as out:
-                out.write(body)
-                out.flush()
-                os.fsync(out.fileno())
+            existing=location.read_bytes()
+            if existing==body:
+                continue
+            if (location!=source or
+                    existing!=ZEROTIER_APT_R175_BAD_LINE.encode("ascii")):
+                raise Refused("R175_ZEROTIER_APT_CONFIG_CONFLICT")
+            # Atomic, exclusive same-directory replacement; never truncate
+            # an existing file, never touch original keyring or chain state.
+            with tempfile.NamedTemporaryFile(prefix=".sse-r177-",
+                    dir=source.parent,delete=False) as out:
+                staged=Path(out.name)
+                try:
+                    os.fchmod(out.fileno(),0o644)
+                    out.write(body)
+                    out.flush()
+                    os.fsync(out.fileno())
+                except BaseException:
+                    staged.unlink(missing_ok=True)
+                    raise
+            try:
+                if source.is_symlink() or source.read_bytes()!=existing:
+                    raise Refused("R177_ZEROTIER_REPO_CHANGED_DURING_REPAIR")
+                os.replace(staged,source)
+            finally:
+                staged.unlink(missing_ok=True)
+            continue
+        fd=os.open(location,os.O_WRONLY|os.O_CREAT|os.O_EXCL|os.O_NOFOLLOW,0o644)
+        with os.fdopen(fd,"wb") as out:
+            out.write(body)
+            out.flush()
+            os.fsync(out.fileno())
     runner(["apt-get","update","-qq"],timeout=180)
     runner(["apt-get","install","-y","-qq","--no-install-recommends",
             "zerotier-one"],timeout=180)
