@@ -1,4 +1,129 @@
-# Verified state and gaps — 2026-11-19
+# R225 — New real two-node finalized checkpoint match, formal timing qualification
+
+On 2026-11-23 the real VM4709 separately installed Besu+Lighthouse
+observer reported the **same original chain31340 EL and CL genesis**
+and **exact matching finalized Beacon epoch602/root**
+`0x9d140067a9049103fc482221713f2f0c46cf7d0a89593bef4d6e19fb0dddecd7`
+as VM4707. Both nodes independently reported 2 native EL peers and
+2 native CL peers, no sync/optimism/offline flags; EL head17783 vs
+17798, Beacon slot19394 vs19409. **Actual capture skew 181.223808s**
+exceeded strict R141 180s compare requirement by 1.223808s. This is
+**observed exact checkpoint agreement, NOT a formal same-window R141
+`OBSERVED_CONSISTENT_CHECKPOINTS` result**. The earlier strict R192
+epoch571 pair remains formally accepted. No live contracts, funding,
+independent operators, external beyond-overlay P2P or physical SLA
+were tested here. See
+`docs/R225_VM4707_VM4709_FINALIZED_EPOCH602_MATCH_SKEW_RESTRICTION.md`.
+
+---
+
+# R224 newer actual network evidence — 2026-11-23 16:39:06 UTC
+
+Original VM4707 **actual live two-layer R141 capture** (pinned source
+`b02465bd6352bb87ae0f3109768a86aeed304141`): chain31340, correct
+execution genesis **and Beacon validators genesis root**, EL head17783,
+Beacon head slot19394, 2 native EL peers, 2 native CL peers, all
+syncing/optimistic/offline flags false. **Finalized epoch602** with
+root `0x9d140067a9049103fc482221713f2f0c46cf7d0a89593bef4d6e19fb0dddecd7`.
+This is real live **VM4707-only** EL+CL health. VM4709 has NOT YET
+been freshly checked at epoch602, and no contemporaneous two-host
+finality match is claimed. Physical independent operators, global
+Internet-native admission and V2 on-chain economics remain unverified.
+Full observed report and restrictions:
+`docs/R224_VM4707_LIVE_EL_CL_FINALITY_EPOCH602.md`.
+
+---
+
+# Current verified checkpoint — R223, 2026-11-23 (supersedes earlier 2026-11-21 source status)
+
+On **real VM4707**, exact pinned source `9a216518b3ea8c265f5186f6113987eb537d7949`
+was successfully compiled with Forge v1.9.0 / Solidity 0.8.24:
+**68 Solidity sources; new adaptive V2 marketplace tests 16/16 PASS;**
+full `forge test -q` returned exit 0 (full suite count not printed);
+R201 mocked policy tests 5/5 PASS and R206 mocked audit policy tests
+6/6 PASS. Observed operator gate ended with
+`R222_SOURCE_AND_READONLY_GATES_COMPLETED=true`.
+V2 runtime sizes: market 18,087 bytes; ledger 10,668 bytes.
+Compiler/lint warnings remain and are **not** a security clearance.
+
+The same VM4707 command independently queried the *original*
+chain ID 31340 execution genesis and finalized EL block via localhost
+JSON-RPC: EL latest **17751**, finalized **17621**, original genesis
+`0x5f7cbcd4f1ddfbbedbdd2b180b83d9eff49d4b7263643858d7be2e9c243936bf`.
+Original EOA `0x13fb73aace8A11Be2899D047635A757a224Ce00B`
+at finalized state: **1,000,005.544827172 native TEST ETH, nonce 0**.
+R201 did **not** read live Beacon root/peers and did **not** inspect V2
+deployment addresses/code; do not construe its hardcoded
+`marketV2Deployed:false` status as a chain-wide contract absence scan.
+
+Historical real **VM4707+VM4709** cross-host EL/CL finality match
+epoch571/root `0x48c1976b872c24b9fc00d8b7fd3c08e1b82a44534e3eb4034292c2621e25db63`
+remains separately documented by R192. The later R223 EL-only probe
+does not by itself refresh that cross-host proof.
+
+**NOT YET VERIFIED:** current cross-VM CL finalized agreement after the
+R223 time point; a new private application-only deployer EOA; funding
+transactions; V2 market+ledger deployment receipts/runtime; live
+provider/consumer/monitor SLA and payments; multiple independent
+validator operators; outside-overlay globally permissionless admission.
+No new genesis/validator, wallet import, broadcast or Docker changes
+were performed by the R223 tests. Read
+`docs/R223_VM4707_V2_SOURCE_GREEN_AND_LIVE_CHAIN_READONLY.md`.
+
+---
+
+# Verified state and gaps — updated 2026-11-21
+
+## CURRENT chain31340 live evidence — supersedes older dated status entries below
+
+**Live operator observations, 2026-11-21:** VM4706 runs original
+Besu execution + Lighthouse Beacon and ONE original signing validator.
+VM4707 runs separate real nonsigning Besu+Lighthouse peers.
+On owner head slot 6549 (epoch 204) and observer head slot 6550
+(epoch 204), both independently reported **previous justified epoch 201**,
+**current justified epoch 202**, **finalized epoch 200**, identical
+finalized root
+`0x0e870e8687dd93737daf777c0a9c690a9ddc73bca03ac6b62fa44b3579a0a467`.
+VM4707 Beacon `/eth/v1/node/syncing`: `is_syncing=false`,
+`is_optimistic=false`, `el_offline=false`, sync distance 0.
+Owner Beacon logs reported one native consensus peer, verified execution
+payload hashes and advancing blocks. This is **REAL PoS FINALITY**;
+historical entries stating that chain31340 has not launched are now stale.
+
+**Limits of this milestone:** one BLS signing key/operator and two
+same-cloud VMs, not multiple independent validator owners.
+Dynamic Internet-wide P2P onboarding, outside-provider independent
+connectivity, real third-party validator deposit/activation, authenticated
+real cross-host resource leasing, monitor quorum and conservative SLA
+settlement remain **NOT VERIFIED**. ZeroTier ad-hoc IPv6 is a public
+controllerless overlay but still depends on ZeroTier underlay/root/relay
+services; a VM overlay IP is not proof of ISP or physical independence.
+
+**GitHub verification, 2026-11-21:** VM4707 tested R136/R137
+targeted suites (6+7), corrected R54/R69 suites (11+6).
+At integration revision `bb7d3db455231771a2b4eb5390aa185b77656070`
+using isolated `.venv-tests`, full Python discovery ran
+**920 tests, 1 failure, 0 errors, 3 skipped**. The sole failure was a
+source-tree integrity conflict: obsolete `services/role-agent` existed
+from a prior research restoration. New GitHub-only remediation moves
+the legitimate non-signing monitor snapshot console to
+`services/node-console`, updates its behavioral test and deletes
+the obsolete `services/role-agent` path. **That remediation has not
+yet been VM retested.**
+
+**R140 current source-only:** finalized-chain31340 read-only marketplace
+runtime/contract-binding audit tool and tests. No actual chain31340
+marketplace contracts, bonds, leases or withdrawals are claimed.
+The old `script/DeploySSEPos.s.sol` is explicitly chain31339;
+`OpenMonitorCommittee` and `SSESettlement` still have fixed 4/3
+committees. Adaptive and evidence-sound contract migration is a blocker
+before the research-marketplace deployment.
+
+Older entries below are retained as historical evidence of earlier stages
+and MUST NOT be interpreted as current deployment status.
+
+---
+
 
 ## Latest ACTUAL VM4706 checkpoint — 2026-11-20 Step40
 

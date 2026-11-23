@@ -5,12 +5,10 @@ import {EIP712} from "@openzeppelin/contracts/utils/cryptography/EIP712.sol";
 import {ECDSA} from "@openzeppelin/contracts/utils/cryptography/ECDSA.sol";
 import {AdaptiveMonitorQuorum} from "./AdaptiveMonitorQuorum.sol";
 
-/// @notice R22 REAL on-chain variable-size monitor vote ledger for future SSE V2.
-/// @dev NOT integrated with V1 SSESettlement or an independently verified
-/// election mechanism yet. Only a future immutable settlement contract can
-/// register committees and authenticate actual provider responses. The chosen
-/// monitors, eligible pool, fault-domain assumptions, and snapshot root MUST
-/// be validated by that external settlement before registration.
+/// @notice Adaptive monitor vote ledger integrated with SSEAdaptiveMarketV2.
+/// @dev The market freezes bonded candidates and registers committees, but
+/// physical fault-domain independence and unbiased selection are NOT proven.
+/// This ledger is not wired to the legacy V1 SSESettlement.
 contract SSEAdaptiveVoteLedger is EIP712 {
     enum Outcome { None, Success, Failure }
 
@@ -233,7 +231,7 @@ contract SSEAdaptiveVoteLedger is EIP712 {
     {
         Epoch storage e = epochs[leaseId][epochId];
         if (!e.exists || e.monitoringSealed || responseHash == bytes32(0) ||
-            e.responseAuthenticated || block.timestamp > e.monitoringClose)
+            e.responseAuthenticated || block.timestamp > e.responseDeadline)
             revert InvalidPhase();
         e.responseHash = responseHash;
         e.responseAuthenticated = true;

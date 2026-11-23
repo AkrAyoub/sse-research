@@ -1,0 +1,71 @@
+name: SSE public role-onboarding regressions
+on:
+  push:
+    branches:
+      - feature/r136-independent-observer-preflight
+  pull_request:
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  public-install-and-first-peer:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 15
+    steps:
+      - name: Fetch tracked source
+        uses: actions/checkout@v4
+        with:
+          persist-credentials: false
+      - name: Compile all checked-in Python sources and tests
+        run: |
+          python3 - <<'PY'
+          import ast
+          from pathlib import Path
+          sources = [
+              p for folder in ("tools", "scripts", "tests")
+              for p in Path(folder).rglob("*.py")
+          ]
+          for source in sorted(sources):
+              ast.parse(source.read_text("utf-8"), filename=str(source))
+          print("Python modules syntax verified:", len(sources))
+          PY
+      - name: Validate Python installer syntax
+        run: |
+          python3 -m py_compile scripts/sse_install.py tools/sse_join_phase.py
+      - name: Validate shell syntax of retired R145
+        run: bash -n scripts/sse_fresh_vm_source_bootstrap.sh
+      - name: R147 public installer security tests
+        run: python3 -B -m unittest discover -s tests -p 'test_sse_pos_r147_public_install.py' -v
+      - name: R148 no-hardcoded-peer first-node semantics
+        run: python3 -B -m unittest discover -s tests -p 'test_sse_join_phase.py' -v
+      - name: R149 original public-genesis release verification
+        run: python3 -B -m unittest discover -s tests -p 'test_sse_public_genesis.py' -v
+      - name: R150 exact original genesis public-only export
+        run: python3 -B -m unittest discover -s tests -p 'test_sse_pos_r150_verified_genesis_release.py' -v
+      - name: R151 local-role-authorized unattended real EL CL runtime tests
+        run: python3 -B -m unittest discover -s tests -p 'test_sse_pos_r151_unattended_full_node.py' -v
+      - name: R152 verified unattended host dependencies
+        run: python3 -B -m unittest discover -s tests -p 'test_sse_pos_r152_unattended_host_dependencies.py' -v
+      - name: R153 independent live-local finality evidence and timer tests
+        run: python3 -B -m unittest discover -s tests -p 'test_sse_pos_r153_local_node_evidence.py' -v
+      - name: R156 real local public EL CL identities and stale ENR guard
+        run: python3 -B -m unittest discover -s tests -p 'test_sse_pos_r156_local_native_peer_identity.py' -v
+      - name: R157 real first-peer directory compilation and 1-peer rendezvous
+        run: python3 -B -m unittest discover -s tests -p 'test_sse_pos_r157_public_peer_directory.py' -v
+      - name: R158 open permissionless discovery relay with bounded record TTL
+        run: python3 -B -m unittest discover -s tests -p 'test_sse_pos_r158_open_directory_service.py' -v
+      - name: R159 unattended announcements to interchangeable mirrors
+        run: python3 -B -m unittest discover -s tests -p 'test_sse_pos_r159_native_peer_announce.py' -v
+      - name: R163 verified public binary genesis release publication guards
+        run: python3 -B -m unittest discover -s tests -p 'test_sse_pos_r163_publish_verified_genesis.py' -v
+      - name: R164 fail closed on missing public genesis or unsupported roles
+        run: python3 -B -m unittest discover -s tests -p 'test_sse_pos_r164_no_source_only_pseudoinstall.py' -v
+      - name: R168 anonymous research rendezvous and genuine local native announcement guards
+        run: python3 -B -m unittest discover -s tests -p 'test_sse_pos_r168_github_rendezvous.py' -v
+      - name: All relevant unified/VM onboarding guard tests
+        run: |
+          python3 -B -m unittest discover -s tests -p 'test_sse_join.py' -v
+          python3 -B -m unittest discover -s tests -p 'test_sse_pos_r143_new_vm_readiness.py' -v
+          python3 -B -m unittest discover -s tests -p 'test_sse_pos_r145_fresh_vm_source_bootstrap.py' -v

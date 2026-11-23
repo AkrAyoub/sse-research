@@ -12,11 +12,11 @@ class ZeroTierAdhocChain31340Tests(unittest.TestCase):
     def test_exact_public_controllerless_port_range_encoding(self):
         self.assertEqual(m.NETWORK_ID,"ff2328775f000000")
         self.assertEqual(int(m.NETWORK_ID[2:6],16),9000)
-        self.assertEqual(int(m.NETWORK_ID[6:10],16),30303)
+        self.assertEqual(int(m.NETWORK_ID[6:10],16),30559)
         self.assertTrue(m.protocol_guard()["ipv6UnicastOnly"])
 
     def test_ethereum_native_tcp_udp_ports_available(self):
-        self.assertTrue(all(9000 <= p <= 30303 for p in (9000,9001,30303)))
+        self.assertTrue(all(9000 <= p <= 30559 for p in (9000,9001,30303,30404)))
         self.assertTrue(m.protocol_guard()["ethereumP2pTcpUdpPortsInRange"])
 
     def test_ssh_and_engine_ports_excluded(self):

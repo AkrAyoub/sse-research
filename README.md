@@ -1,3 +1,322 @@
+## R196–R215 — New adaptive SSE V2 implementation (SOURCE ONLY, not yet live deployed)
+
+The **original** real chain31340 native Besu/Lighthouse network is empirically
+synchronized across VM4707 and VM4709 (R192, exact common finalized epoch571).
+Actual original test-ETH funding was read-only verified at address
+`0x13fb73aace8A11Be2899D047635A757a224Ce00B`
+(1,000,005.319709155 test ETH, nonce0, finalized execution block16822).
+No wallet key was shared or copied, and no contract deployment transaction was sent.
+
+The new proposed **adaptive integrated** application is
+[`SSEAdaptiveMarketV2.sol`](contracts/SSEAdaptiveMarketV2.sol), with
+versioned [chain31340 deployment script](script/DeploySSEAdaptive31340.s.sol),
+[Foundry adversarial tests](foundry/test/SSEAdaptiveMarketV2.t.sol),
+[read-only original-chain funding gate](tools/sse_pos_r201_v2_readonly_live_chain_gate.py)
+and [finalized postdeployment audit](tools/sse_pos_r206_adaptive_v2_deployment_audit.py).
+It integrates the existing `SSEAdaptiveVoteLedger`/quorum calculator with
+market requests, bids, native test-ETH escrow, bounded rotating bonded candidate
+selection, frozen pre-entropy bonds, dynamic k/q and report rewards, EIP712
+provider authentication, conservative inconclusive settlement and bilateral
+allocation. **No V2 source compilation or full Foundry test run on a VM is
+verified yet**. The old static `DeploySSE31340` script is NOT the final
+adaptive application, must not be broadcast as final work.
+
+This candidate does NOT prove physical monitor/operator independence,
+unbiased randomness (future blockhash is proposer-biasable), uniform global
+sampling, real Docker delivery, real physical SLA adjudication, public-Internet
+admission outside overlay or permissionless validator economics. All real
+acceptance remains gated on independent evidence, not code claims.
+See [R210 exact test steps for operator return](docs/R210_V2_RETURN_VERIFICATION_RUNBOOK.md).
+**Never use `--broadcast` or fund a new EOA until the source tests, security
+reviews, original-genesis check, and owner authorization have passed.**
+
+## R192/R193 — Two real VMs proved identical finalized epoch 571; marketplace chain31340 script added
+
+Actual VM4707/VM4709 R141 observations taken 5.83 seconds apart
+both report original execution/Beacon genesis, 2 real native EL
+peers and 2 real native CL peers per node, EL/CL not syncing,
+non-optimistic, **identical finalized epoch 571 and exact root
+`0x48c1976b872c24b9fc00d8b7fd3c08e1b82a44534e3eb4034292c2621e25db63`**.
+This is the first empirical cross-node native PoS consensus
+agreement for this fresh external VM, not merely local finality.
+See [R192 real two-VM agreement](docs/R192_REAL_VM4707_VM4709_MATCHED_FINALIZED_CHECKPOINT.md).
+
+Existing `script/DeploySSEPos.s.sol` explicitly enforces chain31339
+and must NOT be broadcast on the new original live chain31340.
+The source-identical deployment order and contracts now have
+a separately chain31340-pinned script
+`script/DeploySSE31340.s.sol`, not yet tested on or deployed to
+live chain31340. See
+[R193 marketplace deployment readiness](docs/R193_LIVE_CHAIN31340_MARKETPLACE_DEPLOYMENT_GATE.md).
+Live marketplace contracts, funded real leases, measured SLAs,
+Internet-wide unpermissioned admission and actual independent
+validators/rewards remain separate unverified milestones.
+
+## R191 — Real VM4709 native EL/CL peering and local finality VERIFIED
+
+At 2026-11-23T13:18:40Z actual VM4709 R153/R141 localhost
+client evidence reached `ACTUAL_LOCAL_CHAIN_FINALITY_VERIFIED`
+on the original chain31340: original EL and Beacon genesis,
+healthy Besu EL, live Lighthouse CL, **2 actual native EL peers
+and 2 actual native CL peers**, both client head-sync flags
+false, `is_optimistic=false`, `el_offline=false`,
+finalized **epoch 570** and root
+`0x7d34c66101291c4939a42bfe21a13a3c9700bd8cecfe0422959c3a1e9865cc73`.
+Real Besu imported PoS execution payloads through
+EngineNewPayloadV4 / FCU(VALID), while Lighthouse received
+new blocks. This is actual node evidence, not a test mock.
+
+Original invalid VM4709 clients and populated Beacon database
+were preserved, and e565 public owner SSZ checkpoint imported
+into a new Beacon DB. Historical blocks are still backfilling,
+so head synchronization does not prove archival completion.
+**Independent VM4707/VM4709 simultaneous checkpoint agreement,
+public Internet admission outside the overlay and the full SSE
+marketplace are NOT YET verified.** See
+[R191 actual running node finality evidence](docs/R191_ACTUAL_VM4709_NATIVE_EL_CL_FINALITY_VERIFIED.md).
+
+## R188 — Actual e565 checkpoint received and existing VM4709 client repair prepared
+
+The real VM4709 R187 receiver verified both e565 public owner
+checkpoint SSZ assets against independently observed SHA256
+hashes and original genesis. **Existing VM4709 Besu/Lighthouse
+containers are still restarting**, and no real peer handshake,
+sync or finality is proven there. R188 adds exact-name,
+pinned-image, cap-drop, immutable genesis/JWT and loopback RPC
+preflight and explicit, separately authorized recovery of the
+existing observer. The old containers and populated Beacon
+DB are preserved under dedicated backup names; a separate
+fresh Beacon database uses the trusted public SSZ checkpoint.
+No `--ignore-ws-check` or deletion. Do not run R147/R151/R137
+create-once installation again. See
+[R188 guarded existing-client recovery runbook](docs/R188_EXISTING_VM4709_REVERSIBLE_BESU_LIGHTHOUSE_CHECKPOINT_RECOVERY.md).
+
+## R183 — Actual VM4709→VM4707 native TCP reachability verified, P2P still blocked by client restarts
+
+Real VM4709 `zerotier-cli` reported `ONLINE` on the dynamic
+public research overlay and TCP connections succeeded to VM4707's
+current native Besu P2P (30404) and Lighthouse P2P (9000) ports.
+Both VM4709 client containers remain restarting due documented
+separate entrypoint and weak-subjectivity issues. TCP alone is
+**not Ethereum-native handshake, finality or public Internet
+reachability**. The recovery must preserve the original chain31340
+genesis, VM4709 populated Beacon databases/identity, and JWT,
+and use authenticated recent checkpoint SSZ without globally
+exposing owner APIs. See
+[R183 native TCP evidence and recovery gates](docs/R183_NATIVE_CROSS_VM_TCP_AND_EXISTING_CLIENT_RECOVERY.md).
+
+## R181 — Actual hardened native Besu version check passed; Beacon DB recovery gate
+
+VM4709 actually executed the pinned image's `/opt/besu/bin/besu`
+with a writable `/tmp` and the original read-only and cap-drop
+security restrictions, printing
+`besu/v26.11.1/linux-x86_64/openjdk-java-25`.
+A Log4j hostname-resolution warning under disposable `--network none`
+did not prevent this version check; it is **not native peering proof**.
+The existing EL and CL containers still restart.
+
+R181 adds a metadata-only bounded inventory of the *existing*
+VM4709 Lighthouse database. It never reads file contents, follows
+symlinks, changes Docker or resets an old genesis/Engine JWT.
+Checkpoint sync from the real owner VM4707 must not overwrite a
+partially initialized Beacon database. See
+[real Besu outcome and checkpoint prerequisites](docs/R181_VM4709_BESU_VERSION_AND_BEACON_DB_INVENTORY.md).
+
+## R179 — Real owner finality, Besu native entrypoint and guarded trusted-checkpoint diagnosis
+
+VM4707's original running Lighthouse reports a **real finalized epoch 558**
+and root `0xde30135baa11178dc5e539c690d1ba1092337890e2ff81a55b718f389e47c3d1`.
+VM4709's two pinned native clients are still restarting (Besu Docker
+wrapper chmod/chown/setgroups versus hardened readonly mounts; Lighthouse
+original-genesis weak-subjectivity rejection). We have **not** yet
+verified native peers, syncing or cross-host finality.
+
+R179 changes future fresh-node Besu launches to the pinned native
+`/opt/besu/bin/besu` binary without removing original Docker
+capability restrictions or genesis read-only mounts, but does not
+change any already-created VM4709 containers. An owner-only read-only
+Lighthouse checkpoint probe validates the real original Beacon genesis,
+finalized checkpoint and finalized block header. See
+[actual owner finality and client recovery](docs/R179_OWNER_FINALITY_AND_PINNED_CLIENT_ENTRYPOINT_RECOVERY.md).
+
+## R178 — Actual VM4709 EL/CL startup blockers and reproducible node-onboarding incident log
+
+On the real fresh Ubuntu VM4709, R177 signed ZeroTier package
+provisioning succeeded and created two genuine pinned Docker
+Besu+Lighthouse containers using the original verified chain31340
+genesis and a local independently generated Engine JWT.
+**Neither is healthy yet**. User's read-only logs show Besu's
+image entrypoint requires permissions/chown/setgroups incompatible
+with the deliberately read-only, cap-drop container, while
+Lighthouse v8.3.3 rejects starting from the old original genesis
+as outside the weak-subjectivity period. Never claim native
+handshakes or finalized checkpoints from successful Docker creation.
+
+[R178 full operational incident timeline and onboarding runbook](docs/R178_REAL_VM4709_EL_CL_RESTART_BLOCKERS_AND_ONBOARDING_RUNBOOK.md)
+records each actual failed deployment step, root cause, safety
+decisions and the remaining permissionless PoS / real SSE
+integration work. Read-only `tools/sse_pos_r178_existing_vm4709_startup_diagnostic.py`
+inspects only exact existing VM4709 Docker names, entrypoints,
+security flags and safe mount TARGETS; it never emits environment
+variables, JWT secret or wallet contents, and never changes
+containers. Recovery must preserve original state and use a
+trusted owner-finalized checkpoint or explicitly reviewed
+research-chain-only weak-subjectivity policy.
+
+## R175 — Official signed ZeroTier package route after VM4709 HTTP 403
+
+VM4709's actual R174 safe probe identified **signing key available
+(3175 bytes)** but the official vendor shell installer HTTPS endpoint
+returned **HTTP 403**. R175 removes reliance on that blocked script;
+it installs `zerotier-one` via the official Ubuntu 24.04 `noble`
+HTTPS APT repository, after verifying the exact pinned vendor primary
+GPG fingerprint and requiring scoped APT `signed-by` package index
+verification. It checks signed repository metadata BEFORE any
+repository file mutation and never installs untrusted root shell
+scripts. See [R175 fail-closed recovery](docs/R175_SIGNED_ZEROTIER_NOBLE_APT_NO_SCRIPT_403.md).
+
+This new runtime path still needs genuine VM4709 execution. Original
+genesis and private observer selection remain preserved. Do NOT
+rerun R147; continue the gated R151 only after repository
+metadata and source-level regressions pass. No native EL/CL
+peer handshake or finalized root has yet been proven.
+
+## R173 — Preserve original VM4709 source and continue the existing observer runtime
+
+Read-only VM4709 evidence proved the real public R170 source checkout
+and private 0600 observer selection were **already installed**;
+Docker daemon is active, but no SSE EL/CL clients have been started,
+and ZeroTier is inactive. **Do not rerun R147 or remove the checkout.**
+
+[R173 protected recovery](docs/R173_VM4709_PRESERVED_RUNTIME_RECOVERY.md)
+adds a strict **read-only gate** that validates the existing source,
+selected observer role, original public genesis SHA256 and absence
+of any conflicting SSE Docker containers before attempting any
+native runtime continuation. R152 now reports exact redacted
+APT/Docker/ZeroTier provisioning stage identifiers instead of
+a generic failed prerequisite. The resumed R151 code can use
+the already-selected local role and exact original genesis
+without repeating R147 first-time installation.
+
+**R173 source tests are not yet independently VM verified**.
+Do not claim native P2P or finality before R141/R155 evidence.
+
+## R172 — First real VM4709 installation attempt needs staged diagnostics
+
+The independent Ubuntu VM4709 successfully retrieved one *current*
+original chain31340 Besu/Lighthouse public native peer record,
+selected the observer role, and then failed its R170 privileged
+installer with a generic host-command message. **No new native
+EL/CL synchronization or finalized checkpoint has been proven.**
+
+[R172 source and incident evidence](docs/R172_VM4709_FIRST_INSTALL_FAILURE_STAGE_DIAGNOSTICS.md)
+add SAFE fixed-stage error labels for APT/Git/role-plan/runtime
+commands, and a read-only `--inspect-failed-host` command that
+checks whether this first attempt left selected-role or release
+state. **Never blindly retry an unknown partial state or remove
+existing signer/client resources.** Latest confirmed VM4707
+suite is R170: 1131 tests OK (3 skipped). R172 remains untested
+on the real VM.
+
+## R170 — Temporary native join source after stale GitHub readback
+
+VM4707 verified **1127 tests OK (3 skipped)** at R169 and
+successfully PATCHed its genuine original-chain EL/CL native
+identity into GitHub Issue #42, but immediate public discovery
+still rejected a stale/invalid one-comment view.
+
+[R170 implementation and live acceptance gates](docs/R170_LIVE_COMMENT_READBACK_AND_REAL_JOIN_GATE.md)
+now retrieve each marked public native comment by its **dynamic
+comment ID**, not a potentially stale GitHub collection body.
+R151's actual fresh-host execution path may now use this
+**explicitly experimental single-GitHub rendezvous** to pass real
+dynamic native EL/CL hints to Besu/Lighthouse. On missing/expired
+public discovery, installation **refuses before package/Docker
+mutations**, not a false zero-peer joined node.
+
+No actual fresh VM4709 join, native P2P or independently hosted
+discovery has been proven. GitHub is one temporary centralized
+availability provider, not the final permissionless
+multi-operator discovery architecture. R170 needs pinned VM tests.
+
+## R169 — Actual GitHub peer comment published; anonymous first readback pending
+
+VM4707 verified R168 **1125 tests OK (3 skipped)** and
+successfully published one genuine R156 public EL/CL identity
+to [Issue #42](https://github.com/AkrAyoub/sse-research/issues/42).
+The immediate anonymous `--discover` call did **not** yet
+retrieve it, although the GitHub public issue API subsequently
+returned that comment and its original chain roots/expiry matched.
+Do not claim VM4709 has joined based on publication alone.
+
+[R169 diagnostics](docs/R169_REAL_GITHUB_NATIVE_PEER_READBACK_DIAGNOSIS.md)
+adds the read-only `--diagnose-public` mode and no-cache request
+headers to distinguish a genuinely empty API page from stale or
+invalid native records. The record has a 10-minute TTL;
+a fresh LIVE reannouncement is necessary if the old record expires.
+GitHub remains a temporary centralized rendezvous, not the final
+independent permissionless discovery infrastructure.
+
+## R168 — Real temporary, public, expiring peer rendezvous experiment
+
+VM4707 has now verified **1111 Python tests (OK, 3 skipped)**
+at R167 and produced a genuine EL/CL public-identity discovery
+directory for original chain31340. That local file alone is
+not Internet-reachable.
+
+[R168 source](tools/sse_pos_r168_github_rendezvous.py) and
+[limits and verification](docs/R168_OPTIONAL_PUBLIC_GITHUB_NATIVE_RENDEZVOUS.md)
+introduce **experimental** public
+[Issue #42](https://github.com/AkrAyoub/sse-research/issues/42):
+an operator can publish fresh REAL public Besu/Lighthouse enode+ENR
+metadata using its own GitHub CLI session, while any other machine
+may retrieve short-lived records **anonymously**. No static VM IP
+or signed validator secret is published. The first peer's
+native identity is still unverified as an externally reachable
+public record until the owner actually publishes it and a separate
+machine retrieves it.
+
+**Important:** GitHub is a SINGLE centralized discovery provider:
+this is an interim third-node integration test, **NOT** an
+independently operated final permissionless network discovery
+substrate. No discovered hints are consensus membership lists,
+native handshake proofs, peer reachability attestations, or
+independent operator identity. Public fallback registries/native
+P2P rendezvous remain mandatory.
+
+## R166 — Actual VM4707 EL/CL public identity captured; local feed integration fix
+
+VM4707 verified R165 at SHA
+`0a108e90ee316dcdd629dcb973de69e2597989ee`:
+**1,108 tests, OK (3 skipped)**, independently downloaded and checked
+the public original genesis, and captured an actual Besu/Lighthouse
+public-native identity with R156. The identity was **NOT**
+published to an externally reachable discovery endpoint.
+
+[The R166 integration status](docs/R166_LIVE_NATIVE_IDENTITY_PIPELINE_AND_ROLE_SAFETY.md)
+records a real defect in R156's `--out` JSON writer and its fix,
+along with a new R156→R157→R159 source-level interoperability test.
+R147 also refuses unsupported *mixed* validator/marketplace role
+selections before host mutations rather than falsely claiming a
+partial role install. **R166 still awaits VM test verification.**
+
+## R165 — Original chain31340 public genesis RELEASED and verified
+
+The actual ORIGINAL PUBLIC-only genesis archive is now available through
+[GitHub Release chain31340-genesis-v1](https://github.com/AkrAyoub/sse-research/releases/tag/chain31340-genesis-v1).
+The operator's R163 tool verified the public download byte-for-byte;
+GitHub's public release metadata confirms the uploaded asset's SHA256
+`1d21e6bfb7609d1797edd9d36561b1dc47a520153d1c6f698f807c29266c2ce7`.
+The [R165 public artifact manifest](release/chain31340-public-release.json)
+now includes the **real publicly accessible URL** for automatic genesis
+download on new nodes; it is NOT a bootnode address or membership approval.
+
+**Still NOT a completed network join:** dynamic published EL enodes /
+CL ENRs and independent HTTPS peer directories have not yet been
+verified; `replaceablePeerDirectorySources` remains empty.
+Starting an isolated nonsigning node does not prove live PoS finality.
+See [the R165 real evidence and next gates](docs/R165_PUBLISHED_ORIGINAL_GENESIS_AND_DYNAMIC_PEER_NEXT_GATE.md).
+
 # SSE — permissionless Ethereum PoS resource marketplace
 
 SSE is a research implementation for leasing **actual HTTP and Docker-backed
@@ -14,6 +333,155 @@ network using valueless TEST ETH**.
 > verified yet**. Do not advertise them as working. The existing
 > chain31339 on VM4705 has known exposed genesis validator keys and is
 > **not safe to expose publicly**.
+
+## R164 — real publisher authorization blocker and clean install retries
+
+The owner VM4707 confirmed the full R163 regression:
+**1,103 tests in 17.231s; OK (3 skipped)** at
+`ca3a9e1ef747f56f99220f5b1bafa7f0a06e9969`.
+The public R150 archive remains byte-for-byte verified, but
+`R163_PUBLIC_RELEASE_BLOCKED=GITHUB_CLI_AUTH_UNAVAILABLE`
+means **the binary release was NOT uploaded**.
+
+[R164 status and fixes](docs/R164_PUBLIC_GENESIS_AUTH_AND_INSTALLER_FAIL_CLOSED.md):
+R147 now refuses missing-original-genesis installation before
+creating permanent local installed state, and refuses unsupported
+market-only role installation before package/filesystem mutation.
+R163 has a new **anonymous read-only `--verify-public`** mode to
+check GitHub-hosted original asset after its one-time authorized
+upload; no repeat publishing, GitHub login or credentials needed
+to verify the public bytes. No original VM/validator state changed.
+
+## R163 — First genuine public chain31340 genesis release
+
+VM4707 has now VERIFIED AND STAGED the original public-only
+chain31340 R59 archive, matching original SHA256
+`1d21e6bfb7609d1797edd9d36561b1dc47a520153d1c6f698f807c29266c2ce7`
+and all four member hashes, without creating a new genesis or
+copying validator secrets.
+
+[The R163 release publisher](tools/sse_pos_r163_publish_verified_genesis.py)
+and [release documentation](docs/R163_REAL_PUBLIC_GENESIS_RELEASE_PUBLISHING.md)
+provide a one-time authorized GitHub Release binary upload from the
+already staged R150 public asset, followed by an **anonymous**
+public release download/byte-for-byte SHA256 and member verification.
+The R149 public artifact downloader now narrowly permits GitHub's
+own HTTPS release CDN redirects while rejecting unrelated mirror
+redirects and non-HTTPS targets.
+
+**Historical R163 status (superseded by R165):** The asset was
+not uploaded when R163 code was initially committed. R165 records
+the successful publication and verified public URL.
+GitHub source commits alone cannot read the already staged VM4707
+binary file. The release operation is one-time maintainer work,
+**never** a requirement for future joining nodes.
+
+## R155–R159 — verified local native identity and optional open rendezvous
+
+The latest development increments close a first-to-second-node discovery
+deadlock: **one actual first online peer is sufficient to bootstrap a
+second node**, even though two distinct HTTPS sources are desirable to
+reduce mirror availability risk. A peer population threshold is NOT
+a blockchain membership rule.
+
+- [R155–R156](docs/R156_REAL_PEER_IDENTITY_AND_FALSE_FINALITY_GUARDS.md):
+  require exact original execution and Beacon genesis and actual native EL/CL
+  peers before declaring local finality. Collect real Besu `net_enode`,
+  Lighthouse Beacon ENR and observed dynamic IPv6 into an expiring,
+  nonsecret peer record (never copy a private signing key).
+- [R157](docs/R157_FIRST_PEER_DISCOVERY_AND_ROTATING_PUBLIC_HINTS.md):
+  atomically prepare refreshed, short-TTL R142 native peer discovery hints
+  from the current live node identities, without fixed VM IPs/bootnodes.
+- [R158–R159](docs/R159_OPEN_DIRECTORY_AND_UNATTENDED_ANNOUNCEMENT.md):
+  experimental, loopback-only open-registration discovery hint server and
+  no-credential periodic HTTPS announcement client; neither has
+  permission to enroll validators, control EVM consensus or decide
+  marketplace outcomes. Requires independent real HTTPS hosting and
+  abuse/security hardening before public deployment.
+
+ZeroTier controllerless ad-hoc networks are IPv6 **unicast-only**;
+multicast discovery is not a working fallback on the original VM
+configuration. The current genesis release source list and public
+directory URLs remain empty pending actual independently verified
+hosting. The new R155–R159 tests have not yet been operator-verified.
+
+## R147 — Public repository source onboarding (one role prompt)
+
+GitHub now lists this repository as **public**. Fresh Ubuntu 24.04 VMs can
+download a *pinned* public bootstrap directly: see
+[the R147 one-command installer and first-peer semantics](docs/R147_PUBLIC_ONE_COMMAND_INSTALL_AND_FIRST_PEER.md).
+`scripts/sse_install.py` asks once for role choices, installs basic
+signed Ubuntu source prerequisites and clones this exact GitHub release;
+it explicitly **does not claim a live node or activated marketplace
+role** until the original chain31340 genesis archive, dynamically
+discoverable real native EL/CL peers, verified client images and
+economic-role infrastructure are genuinely published and available.
+No GitHub SSH deploy key or preselected VM IP is needed.
+
+The original-chain identity and empty-yet-honest public source lists live
+in [the chain31340 release manifest](release/chain31340-public-release.json).
+[The R149 verifier](tools/sse_public_genesis.py) fetches the original
+archive only from HTTPS sources declared in the immutable release and
+requires its R59-pinned SHA256 before storing it. **At present those
+public sources are empty**, so public source acquisition is possible
+but a real external full-node install remains gated. No installer
+should invent new genesis bytes or use old 31339 assets.
+
+**First online peer:** zero bootstrap peers is allowed, with correct
+original genesis and no fabricated consensus/finality. First host of
+a **new chain** needs a real genesis ceremony and active signing
+validators; the existing original chain31340 must never be
+reinitialized. Source release metadata may name replaceable discovery
+mechanisms; it may not establish an owner-managed admission gate.
+**No fixed VM addresses or privileged permanent bootstrap operator.**
+
+## R146 correction — manual bootstrap is not the required installer
+
+**Operator requirement: NO per-VM interaction.** Earlier R145 SSH deploy-key
+and typed-prompt instructions have been **withdrawn**; its `--apply`
+is now intentionally disabled. Do **not** ask the operator to run
+R145, generate a deploy key, configure Docker/ZeroTier or manually select
+roles on the six already-provisioned VMs.
+
+The [R146 corrective source/VM-log audit](docs/R146_ZERO_INTERACTION_CORRECTIVE_ARCHITECTURE_AUDIT.md)
+identifies the actual historical network, Docker, genesis, client-image,
+port, validator custody, peer-discovery and public release dependencies.
+True zero-interaction first boot requires a preauthorized provider
+cloud-init/remote-execution channel and publishable audited release.
+Existing fresh VMs will not start installing merely because GitHub
+source changed. The private repository has not been cleared for
+public exposure, including possible historical secret-bearing records.
+
+## Unified fresh-node onboarding and role selection (R144)
+
+**ONE repository and entry point:** after obtaining this verified source
+on a NEW Ubuntu host, run
+`python3 -B tools/sse_join.py --node-id <local-unique-id> --plan`
+for an interactive role selection menu, or add
+`--roles full_node,monitor` (for example).
+A participant may combine full node, observer, validator, provider,
+consumer and monitor subject to protocol-specific funding,
+eligibility and conflicts of interest. User selection is a
+**configuration preference**, not consensus membership, active
+validator status or on-chain role authority.
+
+The current unified command does *read-only planning*, and can
+delegate to the guarded R137 nonsigning full-node **plan** after
+the original verified chain31340 archive, image pins and real public
+peer directories are available. It does NOT yet perform zero-touch
+first-boot packages, new validator BLS staking deposits, public mirror
+publication, marketplace smart contract deployments or real on-chain
+role activation. Source distribution from this PRIVATE repository
+requires development-only read access until public authenticated
+release mirrors exist; do not confuse that with a permissionless
+network join.
+
+Detailed role/scale reference:
+[complete architecture and all roles](docs/SSE_COMPLETE_ROLES_PERMISSIONLESS_SCALING_AND_VM_EXPERIMENTS.md).
+[Unified installer specification and honest gates](docs/R144_UNIFIED_ROLE_SELECTING_INSTALLER.md).
+The [R145 historical manual bootstrap](docs/R145_FRESH_VM_SOURCE_BOOTSTRAP.md) is superseded and its apply mode is disabled; see R146 for the unattended architecture and actual blocker inventory.
+
+[Fresh-VM sizing](docs/R143_NEW_VM_INVENTORY_AND_FIRST_BOOT_GATE.md).
 
 ## Canonical architecture
 

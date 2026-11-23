@@ -1,0 +1,41 @@
+name: SSE adaptive V2 source regression (no deployment)
+on:
+  pull_request:
+    paths:
+      - "contracts/SSEAdaptiveMarketV2.sol"
+      - "contracts/SSEAdaptiveVoteLedger.sol"
+      - "contracts/AdaptiveMonitorQuorum.sol"
+      - "foundry/test/SSEAdaptiveMarketV2.t.sol"
+      - "script/DeploySSEAdaptive31340.s.sol"
+      - "tools/sse_pos_r201_v2_readonly_live_chain_gate.py"
+      - "tools/sse_pos_r206_adaptive_v2_deployment_audit.py"
+      - "tests/test_sse_pos_r201_v2_readonly_live_chain_gate.py"
+      - "tests/test_sse_pos_r206_adaptive_v2_deployment_audit.py"
+      - ".github/workflows/sse-adaptive-v2-source.yml"
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  adaptive-source-only:
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          persist-credentials: false
+          submodules: recursive
+      - uses: foundry-rs/foundry-toolchain@v1
+        with:
+          version: v1.9.0
+      - name: Compile and report contract size
+        run: forge build --sizes
+      - name: Adversarial adaptive-marketplace EVM tests
+        run: forge test --match-contract SSEAdaptiveMarketV2Test -vv
+      - name: Read-only chain-gate policy tests (mock transport only)
+        run: python3 -B -m unittest discover -s tests -p 'test_sse_pos_r201_v2_readonly_live_chain_gate.py' -v
+      - name: Read-only deployment-audit policy tests (mock transport only)
+        run: python3 -B -m unittest discover -s tests -p 'test_sse_pos_r206_adaptive_v2_deployment_audit.py' -v
+      - name: Full Foundry regression
+        run: forge test -q
