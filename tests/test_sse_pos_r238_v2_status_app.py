@@ -62,7 +62,7 @@ class TestR238RealNodeConsole(unittest.TestCase):
         html=mod.status_html(sample).decode("utf-8")
         self.assertNotIn("<script>",html)
         self.assertIn("&lt;script&gt;",html)
-        self.assertIn("Real",html if "Real" in html else "Real")
+        self.assertIn("Read-only observed original-chain node health.",html)
 
     def test_real_http_endpoint_is_loopback_only_and_readonly(self):
         server=mod.make_server(CONFIG,0,capture=observed)
