@@ -24,6 +24,17 @@ MANIFEST={
     "deploymentTxHash":"0x"+"ff"*32,
 }
 
+FINISHED_PROVENANCE={
+    "lease":{"provider":E0A,"consumer":"0x"+"55"*20,
+             "phase":4,"providerAccepted":True},
+    "epoch":{"market":{"exists":True,"requestHash":HASH,"feeWei":3,
+                       "nonce":0,"resolved":False},
+             "ledger":{"responseAuthenticated":False,
+                       "monitoringSealed":False,"outcome":0,"responseHash":HASH}},
+    "committee":{"ready":True},
+    "selectedMonitors":[E0A],
+}
+
 class TestR237ApprovedSigningGate(unittest.TestCase):
     def test_dry_run_has_only_public_intent_no_encrypted_wallet(self):
         intent=m.public_intent("provider-response",PAYLOAD,MARKET,LEDGER,E0A,"provider")
@@ -79,12 +90,33 @@ class TestR237ApprovedSigningGate(unittest.TestCase):
         intent=m.public_intent("provider-response",PAYLOAD,MARKET,LEDGER,E0A,"provider")
         with patch.object(m,"verify",return_value={
             "deploymentReceiptSuccessfulAndFinalized":True
-        }), patch.object(m,"safe_keystore",return_value={"version":3}):
+        }), patch.object(m,"inspect_finalized_lease",
+                         return_value=FINISHED_PROVENANCE), patch.object(
+                         m,"safe_keystore",return_value={"version":3}):
             with self.assertRaises(m.Refused):
                 m.sign_authorized(intent,Path("/private/not-read"),MANIFEST,
                                   "http://127.0.0.1:28545",
                                   confirm=lambda p:"NO",get_password=lambda p:"",
                                   expected_tty=False)
+
+    def test_actual_finalized_public_role_gate_blocks_forged_eoa(self):
+        intent=m.public_intent("provider-response",PAYLOAD,MARKET,LEDGER,E0A,"provider")
+        self.assertTrue(m.verify_public_role_state(intent,FINISHED_PROVENANCE))
+        with self.assertRaises(m.Refused):
+            m.verify_public_role_state(intent,{
+                **FINISHED_PROVENANCE,"lease":{
+                    **FINISHED_PROVENANCE["lease"],"provider":"0x"+"66"*20}})
+        with self.assertRaises(m.Refused):
+            m.verify_public_role_state(intent,{
+                **FINISHED_PROVENANCE,"epoch":{
+                    **FINISHED_PROVENANCE["epoch"],
+                    "market":{"exists":True,"requestHash":"0x"+"ff"*32}}})
+        with self.assertRaises(m.Refused):
+            m.verify_public_role_state(intent,{
+                **FINISHED_PROVENANCE,"epoch":{
+                    **FINISHED_PROVENANCE["epoch"],
+                    "ledger":{**FINISHED_PROVENANCE["epoch"]["ledger"],
+                              "responseAuthenticated":True}}})
 
     def test_offline_cli_cannot_use_keys_unless_sign_flag(self):
         import io
