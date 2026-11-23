@@ -30,19 +30,42 @@ NETWORK = r59.NETWORK
 class Refused(ValueError):
     pass
 
+def stage_of(argv):
+    """Public fixed labels only; never log arguments, scripts or tokens."""
+    if argv[:2]==["apt-get","update"]:
+        return "APT_UPDATE"
+    if argv[:2]==["apt-get","install"]:
+        return "APT_DOCKER_GNUPG"
+    if argv[:3]==["systemctl","enable","--now"]:
+        return ("DOCKER_DAEMON" if argv[-1]=="docker"
+                else "ZEROTIER_DAEMON" if argv[-1]=="zerotier-one"
+                else "SYSTEMD_UNIT")
+    if argv and argv[0]=="gpg":
+        return "ZEROTIER_GPG_VERIFY"
+    if argv and argv[0]=="bash":
+        return "ZEROTIER_VENDOR_INSTALL"
+    if argv[:2]==["zerotier-cli","join"]:
+        return "ZEROTIER_JOIN"
+    if argv[:2]==["docker","pull"]:
+        return "PINNED_CLIENT_IMAGE_PULL"
+    return "HOST_DEPENDENCY"
+
 def call(argv, *, timeout=240):
     if type(argv) is not list or any(type(s) is not str for s in argv):
         raise Refused("invalid command")
+    stage=stage_of(argv)
     try:
         p=subprocess.run(argv,capture_output=True,text=True,check=False,
                          timeout=timeout,env={
                              **os.environ,"DEBIAN_FRONTEND":"noninteractive",
                              "NEEDRESTART_MODE":"a","GIT_TERMINAL_PROMPT":"0",
                              "APT_LISTCHANGES_FRONTEND":"none"})
-    except (OSError,subprocess.TimeoutExpired) as exc:
-        raise Refused("local system prerequisite unavailable") from exc
+    except subprocess.TimeoutExpired as exc:
+        raise Refused("R152_"+stage+"_TIMED_OUT") from exc
+    except OSError as exc:
+        raise Refused("R152_"+stage+"_UNAVAILABLE") from exc
     if p.returncode:
-        raise Refused("local prerequisite operation failed; inspect unattended host logs")
+        raise Refused(f"R152_{stage}_EXIT_{p.returncode}")
     return p.stdout
 
 def fetch_https(url):
