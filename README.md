@@ -1,3 +1,24 @@
+## R170 — Temporary native join source after stale GitHub readback
+
+VM4707 verified **1127 tests OK (3 skipped)** at R169 and
+successfully PATCHed its genuine original-chain EL/CL native
+identity into GitHub Issue #42, but immediate public discovery
+still rejected a stale/invalid one-comment view.
+
+[R170 implementation and live acceptance gates](docs/R170_LIVE_COMMENT_READBACK_AND_REAL_JOIN_GATE.md)
+now retrieve each marked public native comment by its **dynamic
+comment ID**, not a potentially stale GitHub collection body.
+R151's actual fresh-host execution path may now use this
+**explicitly experimental single-GitHub rendezvous** to pass real
+dynamic native EL/CL hints to Besu/Lighthouse. On missing/expired
+public discovery, installation **refuses before package/Docker
+mutations**, not a false zero-peer joined node.
+
+No actual fresh VM4709 join, native P2P or independently hosted
+discovery has been proven. GitHub is one temporary centralized
+availability provider, not the final permissionless
+multi-operator discovery architecture. R170 needs pinned VM tests.
+
 ## R169 — Actual GitHub peer comment published; anonymous first readback pending
 
 VM4707 verified R168 **1125 tests OK (3 skipped)** and
