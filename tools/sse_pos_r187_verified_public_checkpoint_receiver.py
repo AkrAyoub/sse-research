@@ -85,9 +85,12 @@ def stage(out,*,getter=download):
     # and readable even when owned by the non-root joining account.
     # Do not apply these modes to ANY wallet/JWT/Beacon DB or parent dir.
     out.mkdir(mode=0o755)
+    # Caller umask may be 077: set exact public mode on this new dir.
+    out.chmod(0o755)
     for name,blob in [("checkpoint-manifest.json",manifest),*blobs.items()]:
         fd=os.open(out/name,os.O_WRONLY|os.O_CREAT|os.O_EXCL|os.O_NOFOLLOW,0o644)
         with os.fdopen(fd,"wb") as f:
+            os.fchmod(f.fileno(),0o644)
             f.write(blob)
             f.flush()
             os.fsync(f.fileno())
