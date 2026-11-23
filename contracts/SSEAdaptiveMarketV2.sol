@@ -125,7 +125,11 @@ contract SSEAdaptiveMarketV2 is EIP712 {
     event Withdrawal(address indexed account, uint256 amount);
 
     constructor(uint256 bondWei) EIP712("SSEAdaptiveMarketV2", "1") {
-        if (bondWei == 0 || block.chainid == 1) revert InvalidInput();
+        // The actual original research chain is 31340. The deployment
+        // script ALSO checks this, but a direct constructor call must never
+        // silently deploy an apparently valid marketplace on Mainnet or a
+        // different network with no original chain genesis provenance.
+        if (bondWei == 0 || block.chainid != 31340) revert InvalidInput();
         minimumBond = bondWei;
         votes = new SSEAdaptiveVoteLedger(address(this));
     }
