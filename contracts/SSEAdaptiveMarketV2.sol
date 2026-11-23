@@ -84,6 +84,8 @@ contract SSEAdaptiveMarketV2 is EIP712 {
     uint256 public nextSnapshotCursor;
     uint256 public nextLeaseId = 1;
     uint256 public totalServiceEscrow;
+    // Native TEST ETH for funded leases awaiting their future-block draw.
+    uint256 public totalPendingMonitorFunding;
     uint256 public totalMonitorBonds;
     uint256 public totalWithdrawable;
     mapping(uint256 => Request) public requests;
@@ -276,6 +278,7 @@ contract SSEAdaptiveMarketV2 is EIP712 {
             r.consumer, bid.provider, r.profileHash, r.policyHash, eligible
         ));
         totalServiceEscrow += service;
+        totalPendingMonitorFunding += t.monitorBudget;
         emit EligibilityFrozen(leaseId, l.snapshotRoot, eligible.length, l.entropyBlock);
     }
 
@@ -309,6 +312,7 @@ contract SSEAdaptiveMarketV2 is EIP712 {
             --monitors[roster[i]].locked;
         }
         l.phase = Phase.Assigned;
+        totalPendingMonitorFunding -= l.monitorBudget;
         SSEAdaptiveVoteLedger.FreezeTerms memory p = SSEAdaptiveVoteLedger.FreezeTerms({
             leaseId: leaseId, consumer: l.consumer, provider: l.provider,
             snapshotRoot: l.snapshotRoot, eligibleCount: l.eligibleCount,
@@ -329,6 +333,7 @@ contract SSEAdaptiveMarketV2 is EIP712 {
             revert InvalidPhase();
         l.phase = Phase.Cancelled;
         _releaseFrozenSnapshot(leaseId);
+        totalPendingMonitorFunding -= l.monitorBudget;
         totalServiceEscrow -= l.serviceRemaining;
         _credit(l.consumer, l.serviceRemaining + l.monitorBudget);
         l.serviceRemaining = 0;
@@ -523,5 +528,17 @@ contract SSEAdaptiveMarketV2 is EIP712 {
     function eligibleAt(uint256 leaseId, uint256 index) external view returns (address) {
         return eligibilitySnapshots[leaseId][index];
     }
+    /// @notice Public inspectable market-side native-test-ETH conservation;
+    /// vote ledger maintains separate reserve/credit accounting.
+    /// Forced ETH can create surplus, so only coverage (>=) is asserted.
+    function escrowAccounting() external view
+        returns (uint256 marketBalance, uint256 outstanding, bool fullyCovered)
+    {
+        marketBalance = address(this).balance;
+        outstanding = totalServiceEscrow + totalPendingMonitorFunding +
+                      totalMonitorBonds + totalWithdrawable;
+        fullyCovered = marketBalance >= outstanding;
+    }
+
     function domainSeparator() external view returns (bytes32) { return _domainSeparatorV4(); }
 }
