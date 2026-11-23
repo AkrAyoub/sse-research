@@ -95,16 +95,46 @@ def build_plan(commit, roles, node_id):
     }
 
 def command(args, timeout=120):
+    # Report only a known operation label and exit class, NEVER arbitrary
+    # subprocess stderr/stdout that could contain a credential, URL token,
+    # private path, or package post-install prompt.
+    if type(args) is not list or not args or any(type(x) is not str for x in args):
+        raise Refused("malformed local command")
+    if args[:2]==["apt-get","update"]:
+        stage="APT_UPDATE"
+    elif args[:2]==["apt-get","install"]:
+        stage="APT_INSTALL"
+    elif args[0]=="git":
+        if "clone" in args:
+            stage="PUBLIC_GIT_CLONE"
+        elif "cat-file" in args:
+            stage="PINNED_COMMIT_PRESENT"
+        elif "switch" in args:
+            stage="PINNED_COMMIT_CHECKOUT"
+        elif "rev-parse" in args:
+            stage="PINNED_COMMIT_HASH"
+        else:
+            stage="OTHER_GIT_READONLY"
+    elif args[0]=="python3":
+        if any(v.endswith("/tools/sse_join.py") for v in args):
+            stage="UNIFIED_ROLE_PLAN"
+        elif any(v.endswith("/tools/sse_pos_r151_unattended_full_node.py") for v in args):
+            stage="REAL_EL_CL_HOST_AND_CONTAINER_INSTALL"
+        else:
+            stage="PYTHON_SOURCE_OPERATION"
+    else:
+        stage="HOST_COMMAND"
     try:
-        result = subprocess.run(args, check=False, text=True,
-                                capture_output=True, timeout=timeout,
-                                env={**os.environ,"DEBIAN_FRONTEND":"noninteractive",
-                                     "NEEDRESTART_MODE":"a",
-                                     "GIT_TERMINAL_PROMPT":"0"})
-    except (OSError, subprocess.TimeoutExpired) as exc:
-        raise Refused("host command unavailable") from exc
+        result=subprocess.run(
+            args,check=False,text=True,capture_output=True,timeout=timeout,
+            env={**os.environ,"DEBIAN_FRONTEND":"noninteractive",
+                 "NEEDRESTART_MODE":"a","GIT_TERMINAL_PROMPT":"0"})
+    except subprocess.TimeoutExpired as exc:
+        raise Refused(f"STAGE_{stage}_TIMED_OUT") from exc
+    except OSError as exc:
+        raise Refused(f"STAGE_{stage}_UNAVAILABLE") from exc
     if result.returncode:
-        raise Refused("host prerequisite or GitHub command failed")
+        raise Refused(f"STAGE_{stage}_FAILED_EXIT_{result.returncode}")
     return result.stdout.strip()
 
 def install_source(commit, plan, root=TARGET_ROOT, state=STATE):
@@ -194,13 +224,34 @@ def install_source(commit, plan, root=TARGET_ROOT, state=STATE):
         data["nativeP2pAndFinalityVerified"] = False
     return data
 
+def inspect_failed_host(*, root=Path("/")):
+    """Read only: never attempt automatic repair of partial install state."""
+    release=root/"opt/sse/releases"
+    selection=root/"var/lib/sse/selection.json"
+    return {
+        "schema":"SSE_R172_FAILED_FRESH_HOST_READONLY_INSPECTION_V1",
+        "selectedRoleStatePresent":selection.exists() or selection.is_symlink(),
+        "releaseDirectoryPresent":release.exists() or release.is_symlink(),
+        "releaseEntriesCount":(
+            len(list(release.iterdir())) if release.is_dir()
+            and not release.is_symlink() else None),
+        "operatorHomeOrChainStateInspected":False,
+        "dockerOrSystemServicesMutated":False,
+        "safeToBlindlyRetry":False,
+    }
+
 def main(argv=None):
     p=argparse.ArgumentParser(description=__doc__)
     p.add_argument("--commit",required=True)
     p.add_argument("--roles",help="comma-separated roles; omit for one menu")
     p.add_argument("--plan",action="store_true",help="zero mutation")
+    p.add_argument("--inspect-failed-host",action="store_true",
+                   help="read-only status of first attempt, never retries")
     args=p.parse_args(argv)
     try:
+        if args.inspect_failed_host:
+            print(json.dumps(inspect_failed_host(),sort_keys=True,indent=2))
+            return 0
         commit=identity(args.commit)
         selected=check_roles(args.roles.split(",")) if args.roles is not None else select_roles()
         machine=Path("/etc/machine-id")
