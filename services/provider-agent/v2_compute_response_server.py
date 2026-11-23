@@ -125,8 +125,8 @@ def make_docker_executor(profile,endpoint,container_name):
 
 
 def make_server(port,context,signed_payload,profile,executor):
-    if type(port) is not int or not 1024<=port<=65535:
-        raise Refused("provider port requires unprivileged range")
+    if type(port) is not int or not (port==0 or 1024<=port<=65535):
+        raise Refused("provider port must be unprivileged; 0 is test-only auto-bind")
     if type(executor).__name__ not in ("function","method"):
         raise Refused("actual Docker compute function required")
     expected={
@@ -226,8 +226,8 @@ def main(argv=None):
         if not a.serve:
             print(json.dumps(report,sort_keys=True,indent=2))
             return 0
-        if not a.container:
-            raise Refused("--serve requires actual bounded Docker container")
+        if not a.container or not 1024<=a.port<=65535:
+            raise Refused("--serve requires actual Docker worker and explicit unprivileged port")
         executor=make_docker_executor(profile,a.worker_endpoint,a.container)
         context={
             **report,"profileHash":snapshot["lease"]["profileHash"],
