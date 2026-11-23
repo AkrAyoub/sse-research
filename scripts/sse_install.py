@@ -242,7 +242,7 @@ def inspect_failed_host(*, root=Path("/")):
 
 def main(argv=None):
     p=argparse.ArgumentParser(description=__doc__)
-    p.add_argument("--commit",required=True)
+    p.add_argument("--commit")
     p.add_argument("--roles",help="comma-separated roles; omit for one menu")
     p.add_argument("--plan",action="store_true",help="zero mutation")
     p.add_argument("--inspect-failed-host",action="store_true",
@@ -252,6 +252,8 @@ def main(argv=None):
         if args.inspect_failed_host:
             print(json.dumps(inspect_failed_host(),sort_keys=True,indent=2))
             return 0
+        if args.commit is None:
+            raise Refused("exact --commit required for normal installation")
         commit=identity(args.commit)
         selected=check_roles(args.roles.split(",")) if args.roles is not None else select_roles()
         machine=Path("/etc/machine-id")
