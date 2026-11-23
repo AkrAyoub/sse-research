@@ -1,3 +1,27 @@
+## R178 — Actual VM4709 EL/CL startup blockers and reproducible node-onboarding incident log
+
+On the real fresh Ubuntu VM4709, R177 signed ZeroTier package
+provisioning succeeded and created two genuine pinned Docker
+Besu+Lighthouse containers using the original verified chain31340
+genesis and a local independently generated Engine JWT.
+**Neither is healthy yet**. User's read-only logs show Besu's
+image entrypoint requires permissions/chown/setgroups incompatible
+with the deliberately read-only, cap-drop container, while
+Lighthouse v8.3.3 rejects starting from the old original genesis
+as outside the weak-subjectivity period. Never claim native
+handshakes or finalized checkpoints from successful Docker creation.
+
+[R178 full operational incident timeline and onboarding runbook](docs/R178_REAL_VM4709_EL_CL_RESTART_BLOCKERS_AND_ONBOARDING_RUNBOOK.md)
+records each actual failed deployment step, root cause, safety
+decisions and the remaining permissionless PoS / real SSE
+integration work. Read-only `tools/sse_pos_r178_existing_vm4709_startup_diagnostic.py`
+inspects only exact existing VM4709 Docker names, entrypoints,
+security flags and safe mount TARGETS; it never emits environment
+variables, JWT secret or wallet contents, and never changes
+containers. Recovery must preserve original state and use a
+trusted owner-finalized checkpoint or explicitly reviewed
+research-chain-only weak-subjectivity policy.
+
 ## R175 — Official signed ZeroTier package route after VM4709 HTTP 403
 
 VM4709's actual R174 safe probe identified **signing key available
