@@ -46,6 +46,62 @@ class HostDependencies(unittest.TestCase):
                         m.fetch_https(url)
                     self.assertNotIn("private diagnostic",str(failure.exception))
 
+    def test_upstream_noble_repo_is_https_and_scoped_signature(self):
+        self.assertEqual(m.ZEROTIER_APT_URL,
+                         "https://download.zerotier.com/debian/noble")
+        self.assertIn("signed-by=/usr/share/keyrings/sse-zerotier.gpg",
+                      m.ZEROTIER_APT_LINE)
+        self.assertIn(" noble main",m.ZEROTIER_APT_LINE)
+        self.assertNotIn("trusted=yes",m.ZEROTIER_APT_LINE)
+        self.assertEqual(m.stage_of(["apt-get","install","-y","zerotier-one"]),
+                         "ZEROTIER_SIGNED_APT_INSTALL")
+
+    def test_verified_apt_repo_install_uses_pinned_primary_key_and_apt(self):
+        calls=[]
+        with tempfile.TemporaryDirectory() as td:
+            root=Path(td)
+            keyring=root/"keyring.gpg"
+            source=root/"zerotier.list"
+            def runner(argv,**kw):
+                calls.append(argv)
+                if "--fingerprint" in argv:
+                    return "pub::::::::::\\n"+"fpr:::::::::"+m.VENDOR_FINGERPRINT+":\\n"
+                if "--dearmor" in argv:
+                    Path(argv[argv.index("--output")+1]).write_bytes(b"DEARMORED_TEST_FIXTURE")
+                return ""
+            with (patch.object(m.os,"geteuid",return_value=0),
+                  patch.object(m.Path,"is_file",autospec=True,
+                               side_effect=lambda obj:(
+                                   True if str(obj)=="/usr/sbin/zerotier-one"
+                                   else Path.exists(obj) and not Path.is_dir(obj)))):
+                self.assertTrue(m.install_verified_zerotier_apt(
+                    runner=runner,fetcher=lambda url:b"PUBLIC_GPG_TEST_FIXTURE",
+                    keyring=keyring,source=source))
+            self.assertEqual(keyring.read_bytes(),b"DEARMORED_TEST_FIXTURE")
+            self.assertEqual(source.read_text(),m.ZEROTIER_APT_LINE)
+            self.assertIn(["apt-get","update","-qq"],calls)
+            self.assertTrue(any(argv[:2]==["apt-get","install"]
+                                and "zerotier-one" in argv for argv in calls))
+            self.assertFalse(any("install.zerotier.com" in " ".join(argv)
+                                 for argv in calls))
+
+    def test_verified_apt_requires_pinned_primary_key_and_never_writes_on_failure(self):
+        with tempfile.TemporaryDirectory() as td:
+            root=Path(td)
+            keyring=root/"keyring.gpg"
+            source=root/"zt.list"
+            def runner(argv,**kw):
+                if "--fingerprint" in argv:
+                    return "pub::::::::::\\nfpr:::::::::DEADBEEF:\\n"
+                return ""
+            with (patch.object(m.os,"geteuid",return_value=0),
+                  self.assertRaises(m.Refused)):
+                m.install_verified_zerotier_apt(
+                    runner=runner,fetcher=lambda url:b"UNTRUSTED_GPG",
+                    keyring=keyring,source=source)
+            self.assertFalse(keyring.exists())
+            self.assertFalse(source.exists())
+
     def test_plan_no_system_change(self):
         with patch.object(m.os,"geteuid",return_value=0):
             result=m.setup()
