@@ -262,6 +262,39 @@ contract SSEAdaptiveMarketV2Test is Test {
         assertEq(votes.epoch(leaseId, 0).responseAuthenticated, false);
     }
 
+    function testSnapshotLocksBondUntilCommitteeDrawAndReleasesUnselected() public {
+        uint256 leaseId = _fund(4);
+        address frozen = market.eligibleAt(leaseId, 0);
+        (uint256 bond, uint256 locked, bool active) = market.monitors(frozen);
+        assertEq(bond, BOND);
+        assertEq(locked, 1);
+        assertTrue(active);
+        vm.prank(frozen);
+        vm.expectRevert(SSEAdaptiveMarketV2.InvalidPhase.selector);
+        market.exitMonitor();
+        _draw(leaseId);
+        address[] memory selected = votes.selected(leaseId);
+        bool inCommittee;
+        for (uint256 i; i < selected.length; ++i)
+            if (selected[i] == frozen) inCommittee = true;
+        (, locked,) = market.monitors(frozen);
+        assertEq(locked, inCommittee ? 1 : 0);
+    }
+
+    function testExpiredEntropyReleasesEveryFrozenBond() public {
+        uint256 leaseId = _fund(4);
+        address frozen = market.eligibleAt(leaseId, 0);
+        (, uint256 beforeLock,) = market.monitors(frozen);
+        assertEq(beforeLock, 1);
+        SSEAdaptiveMarketV2.Lease memory l = market.lease(leaseId);
+        vm.roll(l.entropyBlock + 257);
+        market.cancelExpiredDraw(leaseId);
+        (, uint256 afterLock,) = market.monitors(frozen);
+        assertEq(afterLock, 0);
+        vm.prank(frozen);
+        market.exitMonitor();
+    }
+
     function testRegistrationNotLimitedTo64LifetimeOrActiveEOAs() public {
         for (uint256 i; i < 70; ++i) {
             address addr = address(uint160(0xD000 + i));
