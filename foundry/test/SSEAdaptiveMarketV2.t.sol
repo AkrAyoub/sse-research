@@ -199,6 +199,69 @@ contract SSEAdaptiveMarketV2Test is Test {
         assertEq(votes.withdrawable(consumer), 4 * REWARD);
     }
 
+    function testInconclusiveRequiresBothBilateralSignatures() public {
+        uint256 consumerKey = 0xC0A10001;
+        address consumerSigner = vm.addr(consumerKey);
+        vm.deal(consumerSigner, 10 ether);
+        // Consumer signer cannot retroactively take the previous consumer's
+        // lease. Create an independent real lease with this test's signer.
+        vm.prank(consumerSigner);
+        uint256 requestId = market.requestResource(PROFILE, POLICY, FEE, uint64(block.timestamp + 20));
+        vm.prank(provider);
+        market.placeBid(requestId, FEE);
+        vm.warp(block.timestamp + 21);
+        vm.prank(consumerSigner);
+        uint256 leaseId = market.chooseBidAndFund{value: FEE + 4 * REWARD}(
+            requestId, 0, _terms(4)
+        );
+        _draw(leaseId);
+        _confirm(leaseId);
+        vm.prank(provider);
+        market.acceptLease(leaseId);
+        vm.prank(consumerSigner);
+        market.startEpoch(leaseId, keccak256("unsigned-real-request"));
+        SSEAdaptiveVoteLedger.Epoch memory ep = votes.epoch(leaseId, 0);
+        vm.warp(uint256(ep.monitoringClose) + 1);
+        assertEq(uint8(market.finalizeEpoch(leaseId, 0)), uint8(SSEAdaptiveVoteLedger.Outcome.None));
+
+        uint256 consumerShare = 2e15;
+        uint256 providerShare = 1e15;
+        uint256 nonce = 0;
+        uint256 expiry = block.timestamp + 1000;
+        bytes32 typeHash = keccak256(
+            "ResidualAllocation(uint256 leaseId,uint256 epochId,uint256 consumerShare,uint256 providerShare,uint256 nonce,uint256 expiry)"
+        );
+        bytes32 digest = keccak256(abi.encodePacked(
+            "\\x19\\x01", market.domainSeparator(),
+            keccak256(abi.encode(typeHash, leaseId, uint256(0),
+                                 consumerShare, providerShare, nonce, expiry))
+        ));
+        (uint8 cv, bytes32 cr, bytes32 cs) = vm.sign(consumerKey, digest);
+        (uint8 pv, bytes32 pr, bytes32 ps) = vm.sign(providerKey, digest);
+        bytes memory consumerSig = abi.encodePacked(cr, cs, cv);
+        bytes memory providerSig = abi.encodePacked(pr, ps, pv);
+        vm.expectRevert(SSEAdaptiveMarketV2.InvalidSignature.selector);
+        market.resolveInconclusive(leaseId, 0, consumerShare, providerShare,
+                                   nonce, expiry, providerSig, providerSig);
+        market.resolveInconclusive(leaseId, 0, consumerShare, providerShare,
+                                   nonce, expiry, consumerSig, providerSig);
+        assertEq(market.withdrawable(consumerSigner), consumerShare);
+        assertEq(market.withdrawable(provider), providerShare);
+        assertEq(market.totalServiceEscrow(), 0);
+        vm.expectRevert(SSEAdaptiveMarketV2.InvalidPhase.selector);
+        market.resolveInconclusive(leaseId, 0, consumerShare, providerShare,
+                                   nonce, expiry, consumerSig, providerSig);
+    }
+
+    function testConsumerCannotForceProviderResponseWithoutSignature() public {
+        uint256 leaseId = _open(4);
+        vm.prank(consumer);
+        vm.expectRevert();
+        market.authenticateProviderResponse(leaseId, 0, keccak256("claim"),
+                                             new bytes(65));
+        assertEq(votes.epoch(leaseId, 0).responseAuthenticated, false);
+    }
+
     function testRegistrationNotLimitedTo64LifetimeOrActiveEOAs() public {
         for (uint256 i; i < 70; ++i) {
             address addr = address(uint160(0xD000 + i));
