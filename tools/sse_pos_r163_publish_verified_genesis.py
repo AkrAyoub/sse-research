@@ -122,14 +122,38 @@ def upload(path,commit,*,runner=run,downloader=public_release.download):
         "releaseTargetGitSha":commit,
     }
 
+def verify_public_download(*, downloader=public_release.download):
+    """Read-only, anonymous release check; safe after partial upload failure."""
+    public_bytes=downloader(PUBLIC_URL)
+    verified=original.verify(public_bytes)
+    return {
+        "schema":"SSE_R164_PUBLIC_GENESIS_READBACK_V1",
+        "publicDownloadUrl":PUBLIC_URL,
+        "originalArchiveSha256":original.ARCHIVE_SHA,
+        "publicOriginalArchiveVerified":True,
+        "originalPublicMembersVerified":verified["memberDigestsVerified"],
+        "onChainStateOrGithubReleaseChanged":False,
+        "validatorSecretRead":False,
+    }
+
 def main(argv=None):
     p=argparse.ArgumentParser(description=__doc__)
-    p.add_argument("--asset",type=Path,required=True)
-    p.add_argument("--commit",required=True)
+    p.add_argument("--asset",type=Path)
+    p.add_argument("--commit")
+    p.add_argument("--verify-public",action="store_true",
+                   help="read-only verify anonymous public download; no auth required")
     p.add_argument("--publish",action="store_true",
                    help="perform one-time authorized PUBLIC GitHub release")
     args=p.parse_args(argv)
     try:
+        if args.verify_public:
+            if args.publish or args.asset is not None or args.commit is not None:
+                raise Refused("public readback accepts no auth or local asset flags")
+            result=verify_public_download()
+            print(json.dumps(result,sort_keys=True,indent=2))
+            return 0
+        if args.asset is None:
+            raise Refused("local verified R150 original-genesis asset required")
         summary=candidate(args.asset)
         if type(args.commit) is not str or not SHA40.fullmatch(args.commit):
             raise Refused("requires full pinned Git source SHA")
