@@ -15,6 +15,24 @@ network using valueless TEST ETH**.
 > chain31339 on VM4705 has known exposed genesis validator keys and is
 > **not safe to expose publicly**.
 
+## R164 — real publisher authorization blocker and clean install retries
+
+The owner VM4707 confirmed the full R163 regression:
+**1,103 tests in 17.231s; OK (3 skipped)** at
+`ca3a9e1ef747f56f99220f5b1bafa7f0a06e9969`.
+The public R150 archive remains byte-for-byte verified, but
+`R163_PUBLIC_RELEASE_BLOCKED=GITHUB_CLI_AUTH_UNAVAILABLE`
+means **the binary release was NOT uploaded**.
+
+[R164 status and fixes](docs/R164_PUBLIC_GENESIS_AUTH_AND_INSTALLER_FAIL_CLOSED.md):
+R147 now refuses missing-original-genesis installation before
+creating permanent local installed state, and refuses unsupported
+market-only role installation before package/filesystem mutation.
+R163 has a new **anonymous read-only `--verify-public`** mode to
+check GitHub-hosted original asset after its one-time authorized
+upload; no repeat publishing, GitHub login or credentials needed
+to verify the public bytes. No original VM/validator state changed.
+
 ## R163 — First genuine public chain31340 genesis release
 
 VM4707 has now VERIFIED AND STAGED the original public-only
