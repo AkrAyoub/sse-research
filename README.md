@@ -1,3 +1,35 @@
+## R196–R215 — New adaptive SSE V2 implementation (SOURCE ONLY, not yet live deployed)
+
+The **original** real chain31340 native Besu/Lighthouse network is empirically
+synchronized across VM4707 and VM4709 (R192, exact common finalized epoch571).
+Actual original test-ETH funding was read-only verified at address
+`0x13fb73aace8A11Be2899D047635A757a224Ce00B`
+(1,000,005.319709155 test ETH, nonce0, finalized execution block16822).
+No wallet key was shared or copied, and no contract deployment transaction was sent.
+
+The new proposed **adaptive integrated** application is
+[`SSEAdaptiveMarketV2.sol`](contracts/SSEAdaptiveMarketV2.sol), with
+versioned [chain31340 deployment script](script/DeploySSEAdaptive31340.s.sol),
+[Foundry adversarial tests](foundry/test/SSEAdaptiveMarketV2.t.sol),
+[read-only original-chain funding gate](tools/sse_pos_r201_v2_readonly_live_chain_gate.py)
+and [finalized postdeployment audit](tools/sse_pos_r206_adaptive_v2_deployment_audit.py).
+It integrates the existing `SSEAdaptiveVoteLedger`/quorum calculator with
+market requests, bids, native test-ETH escrow, bounded rotating bonded candidate
+selection, frozen pre-entropy bonds, dynamic k/q and report rewards, EIP712
+provider authentication, conservative inconclusive settlement and bilateral
+allocation. **No V2 source compilation or full Foundry test run on a VM is
+verified yet**. The old static `DeploySSE31340` script is NOT the final
+adaptive application, must not be broadcast as final work.
+
+This candidate does NOT prove physical monitor/operator independence,
+unbiased randomness (future blockhash is proposer-biasable), uniform global
+sampling, real Docker delivery, real physical SLA adjudication, public-Internet
+admission outside overlay or permissionless validator economics. All real
+acceptance remains gated on independent evidence, not code claims.
+See [R210 exact test steps for operator return](docs/R210_V2_RETURN_VERIFICATION_RUNBOOK.md).
+**Never use `--broadcast` or fund a new EOA until the source tests, security
+reviews, original-genesis check, and owner authorization have passed.**
+
 ## R192/R193 — Two real VMs proved identical finalized epoch 571; marketplace chain31340 script added
 
 Actual VM4707/VM4709 R141 observations taken 5.83 seconds apart
