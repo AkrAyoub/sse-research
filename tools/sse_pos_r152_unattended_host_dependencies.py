@@ -18,6 +18,7 @@ import re
 import subprocess
 import tempfile
 import time
+import urllib.error
 import urllib.request
 
 import sse_pos_r59_native_ipv6_observer as r59
@@ -71,11 +72,22 @@ def call(argv, *, timeout=240):
 def fetch_https(url):
     if url not in (VENDOR_KEY,VENDOR_SCRIPT):
         raise Refused("unapproved third-party download URL")
+    stage=("ZEROTIER_SIGNING_KEY_DOWNLOAD" if url==VENDOR_KEY
+           else "ZEROTIER_SIGNED_INSTALLER_DOWNLOAD")
     try:
         with urllib.request.urlopen(url,timeout=20) as r:
+            if r.status!=200:
+                raise Refused("R152_"+stage+"_UNEXPECTED_HTTP_STATUS")
             data=r.read(200001)
-    except OSError as exc:
-        raise Refused("official signed vendor artifact unavailable") from exc
+    except urllib.error.HTTPError as exc:
+        # An explicit 404/403 pinpoints the missing external artifact.
+        # Never disclose complete URLs, proxy headers or remote bodies.
+        raise Refused(f"R152_{stage}_HTTP_{exc.code}") from exc
+    except urllib.error.URLError as exc:
+        # DNS, TLS, egress, and proxy failures differ from HTTP 4xx.
+        raise Refused("R152_"+stage+"_TRANSPORT_UNAVAILABLE") from exc
+    except (OSError,TimeoutError) as exc:
+        raise Refused("R152_"+stage+"_TRANSPORT_UNAVAILABLE") from exc
     if not 0<len(data)<=200000:
         raise Refused("oversized or empty vendor artifact")
     return data
