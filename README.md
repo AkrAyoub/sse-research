@@ -1,3 +1,20 @@
+## R181 — Actual hardened native Besu version check passed; Beacon DB recovery gate
+
+VM4709 actually executed the pinned image's `/opt/besu/bin/besu`
+with a writable `/tmp` and the original read-only and cap-drop
+security restrictions, printing
+`besu/v26.11.1/linux-x86_64/openjdk-java-25`.
+A Log4j hostname-resolution warning under disposable `--network none`
+did not prevent this version check; it is **not native peering proof**.
+The existing EL and CL containers still restart.
+
+R181 adds a metadata-only bounded inventory of the *existing*
+VM4709 Lighthouse database. It never reads file contents, follows
+symlinks, changes Docker or resets an old genesis/Engine JWT.
+Checkpoint sync from the real owner VM4707 must not overwrite a
+partially initialized Beacon database. See
+[real Besu outcome and checkpoint prerequisites](docs/R181_VM4709_BESU_VERSION_AND_BEACON_DB_INVENTORY.md).
+
 ## R179 — Real owner finality, Besu native entrypoint and guarded trusted-checkpoint diagnosis
 
 VM4707's original running Lighthouse reports a **real finalized epoch 558**
