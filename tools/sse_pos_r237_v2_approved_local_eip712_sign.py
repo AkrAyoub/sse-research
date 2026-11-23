@@ -66,8 +66,16 @@ def safe_keystore(path):
         raise Refused("keystore is not a valid encrypted JSON object") from exc
     if (type(document) is not dict or
         type(document.get("version")) is not int or document["version"]!=3 or
-        ("crypto" in document)==("Crypto" in document)):
+        ("crypto" in document)==("Crypto" in document) or
+        not {"id","version"} <= set(document) or
+        set(document) - {"id","version","address","crypto","Crypto"}):
         raise Refused("expected encrypted Ethereum UTC-V3 keystore")
+    envelope=document.get("crypto",document.get("Crypto"))
+    if (type(envelope) is not dict or not all(k in envelope for k in (
+            "cipher","ciphertext","cipherparams","kdf","kdfparams","mac"
+    )) or type(envelope["ciphertext"]) is not str or
+        not envelope["ciphertext"]):
+        raise Refused("missing encrypted UTC-V3 envelope fields")
     return document
 
 
