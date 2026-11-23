@@ -21,6 +21,7 @@ import sse_pos_r59_native_ipv6_observer as r59
 import sse_pos_r136_independent_observer_preflight as r136
 import sse_pos_r137_independent_observer_create_once as r137
 import sse_pos_r142_public_peer_discovery as r142
+import sse_pos_r168_github_rendezvous as r168
 import sse_public_genesis as public_genesis
 import sse_pos_r152_unattended_host_dependencies as host_packages
 import sse_pos_r153_local_node_evidence as local_evidence
@@ -119,25 +120,37 @@ def prepare_original_archive(source):
         os.fsync(out.fileno())
     return target
 
-def peer_hints(release, *, lookup=r142.discover):
+def peer_hints(release, *, lookup=r142.discover, provisional=None):
     urls=release["replaceablePeerDirectorySources"]
     if not urls:
-        # This is an isolated first-online peer (or a disconnected peer).
-        # No admin permission or invented enodes; no syncing claims.
-        return None,None,"ZERO_PUBLISHED_BOOTSTRAPS_WAIT_FOR_DISCOVERY"
-    found=lookup(urls)
+        if provisional is None:
+            # Pure source planning/testing may represent first-online nodes.
+            return None,None,"ZERO_PUBLISHED_BOOTSTRAPS_WAIT_FOR_DISCOVERY"
+        # TEMPORARY research-only public rendezvous for external VM joins.
+        # No GitHub account or fixed enode/IP on the joining host. GitHub
+        # remains a SINGLE centralized discovery availability dependency.
+        try:
+            found=provisional()
+        except (r168.Refused,OSError,ValueError) as exc:
+            raise Refused("PUBLIC_PROVISIONAL_PEER_DISCOVERY_UNAVAILABLE") from exc
+        mode="EXPERIMENTAL_SINGLE_GITHUB_PUBLIC_RENDEZVOUS"
+    else:
+        found=lookup(urls)
+        mode="PUBLIC_MULTISOURCE_NATIVE_HINTS"
     els=found["executionBootnodes"]
     bns=found["beaconBootnodes"]
     if len(els)<1 or len(bns)<1 or len(els)!=len(bns):
         raise Refused("no actual native bootstrap peer hints")
-    return ",".join(els),",".join(bns),"PUBLIC_MULTISOURCE_NATIVE_HINTS"
+    for el,bn in zip(els,bns):
+        r59.bootnodes(el,bn)
+    return ",".join(els),",".join(bns),mode
 
 def plan(selection, release, archive, *, observe=None,
-         lookup=r142.discover):
+         lookup=r142.discover, provisional=None):
     safe_selection(selection)
     if not archive.is_file():
         raise Refused("original verified chain31340 archive missing")
-    el,bn,mode=peer_hints(release,lookup=lookup)
+    el,bn,mode=peer_hints(release,lookup=lookup,provisional=provisional)
     # Do not call preflight during a pure source-only unit test; it must
     # inspect LIVE Docker/ZeroTier/image state before claiming readiness.
     observed=None
@@ -173,16 +186,16 @@ def main(argv=None):
         ensure_fresh_host()
         selection=load_selection()
         release,descriptor,archive=verify_release(selection)
-        # Archive is verified before being staged in the previously tested
-        # R59 path (only for execute, never for plan).
+        # Discover REAL public EL/CL peer hints before ANY package, Docker
+        # or archive-state mutation. A failed/stale temporary rendezvous
+        # must never silently start an isolated "joined" new node.
+        ready=plan(selection,descriptor,archive,
+                   provisional=r168.discover if args.execute else None)
         if args.execute:
-            # Actual fresh-host dependencies, not the user's manual task:
-            # signed Ubuntu Docker, verified ZeroTier package installer,
-            # controllerless public overlay and immutable OCI image digests.
+            # The already verified public original archive is staged
+            # only after real dynamic discovery succeeds.
             host_packages.setup(execute=True)
             archive=prepare_original_archive(archive)
-        ready=plan(selection,descriptor,archive,
-                   observe=r137.preflight if args.execute else None)
         if not args.execute:
             ready.pop("peerExecutionHints")
             ready.pop("peerConsensusHints")
