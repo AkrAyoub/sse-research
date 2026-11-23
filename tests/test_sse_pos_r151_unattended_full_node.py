@@ -67,6 +67,30 @@ class R151Tests(unittest.TestCase):
             self.assertTrue(called[0][1]["allow_no_peers"])
             self.assertFalse(result["nativePeerHandshakeVerified"])
 
+    def test_experimental_public_single_github_source_is_explicit_not_independent(self):
+        enode="enode://"+"a"*128+"@[fca0:2328:7777:8888::99]:30404"
+        enr="enr:"+"A"*100
+        observed=[]
+        def temporary():
+            observed.append(True)
+            return {"executionBootnodes":[enode],
+                    "beaconBootnodes":[enr],
+                    "temporaryCentralizedRendezvous":True,
+                    "independentDiscoveryInfrastructureVerified":False}
+        result=m.peer_hints(release(),provisional=temporary)
+        self.assertEqual(result[0],enode)
+        self.assertEqual(result[1],enr)
+        self.assertEqual(result[2],
+            "EXPERIMENTAL_SINGLE_GITHUB_PUBLIC_RENDEZVOUS")
+        self.assertEqual(observed,[True])
+
+    def test_experimental_public_source_unavailable_refused_not_isolated(self):
+        def unavailable():
+            raise m.r168.Refused("expired stale API list")
+        with self.assertRaisesRegex(
+                m.Refused,"PUBLIC_PROVISIONAL_PEER_DISCOVERY_UNAVAILABLE"):
+            m.peer_hints(release(),provisional=unavailable)
+
     def test_dynamic_multiple_bootnodes_only_from_live_feed(self):
         el=["enode://"+str(i) for i in (1,2)]
         bn=["enr:"+str(i) for i in (1,2)]
