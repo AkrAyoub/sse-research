@@ -29,6 +29,23 @@ class HostDependencies(unittest.TestCase):
                 self.assertNotIn("PRIVATE_TOKEN",str(failure.exception))
 
 
+    def test_signed_vendor_fetch_failure_identifies_artifact_without_secrets(self):
+        import urllib.error
+        for url,stage in (
+            (m.VENDOR_KEY,"ZEROTIER_SIGNING_KEY_DOWNLOAD"),
+            (m.VENDOR_SCRIPT,"ZEROTIER_SIGNED_INSTALLER_DOWNLOAD"),
+        ):
+            for error,expected in (
+                (urllib.error.HTTPError(url,404,"missing",{},None),"HTTP_404"),
+                (urllib.error.URLError("private diagnostic"),"TRANSPORT_UNAVAILABLE"),
+            ):
+                with (self.subTest(stage=stage,expected=expected),
+                      patch.object(m.urllib.request,"urlopen",side_effect=error)):
+                    with self.assertRaisesRegex(
+                            m.Refused,"R152_"+stage+"_"+expected) as failure:
+                        m.fetch_https(url)
+                    self.assertNotIn("private diagnostic",str(failure.exception))
+
     def test_plan_no_system_change(self):
         with patch.object(m.os,"geteuid",return_value=0):
             result=m.setup()
