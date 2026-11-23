@@ -262,8 +262,15 @@ contract SSEAdaptiveMarketV2 is EIP712 {
         l.monitoringSeconds = t.monitoringSeconds;
         l.entropyBlock = block.number + 2;
         l.phase = Phase.PendingDraw;
-        for (uint256 i; i < eligible.length; ++i)
+        // Lock ALL frozen candidates' bonds before the future entropy is
+        // known. Otherwise a monitored address can exit after commitment but
+        // before lottery, and the resulting chosen seat would be unbonded.
+        // Each snapshot lock is released on draw/cancel; chosen seats stay
+        // locked until the corresponding lease is safely closed/cancelled.
+        for (uint256 i; i < eligible.length; ++i) {
             eligibilitySnapshots[leaseId].push(eligible[i]);
+            ++monitors[eligible[i]].locked;
+        }
         l.snapshotRoot = keccak256(abi.encode(
             block.chainid, address(this), leaseId, requestId,
             r.consumer, bid.provider, r.profileHash, r.policyHash, eligible
@@ -293,7 +300,13 @@ contract SSEAdaptiveMarketV2 is EIP712 {
             ))) % (roster.length - i));
             (roster[i], roster[pick]) = (roster[pick], roster[i]);
             selected[i] = roster[i];
-            ++monitors[selected[i]].locked;
+        }
+        // The in-memory shuffled roster contains each frozen candidate
+        // exactly once. Unselected addresses are the tail of the permutation
+        // and must be unlocked; selected addresses retain their original
+        // snapshot lock for the lease's entire lifetime.
+        for (uint256 i = d.seats; i < roster.length; ++i) {
+            --monitors[roster[i]].locked;
         }
         l.phase = Phase.Assigned;
         SSEAdaptiveVoteLedger.FreezeTerms memory p = SSEAdaptiveVoteLedger.FreezeTerms({
@@ -315,6 +328,7 @@ contract SSEAdaptiveMarketV2 is EIP712 {
         if (l.phase != Phase.PendingDraw || block.number <= l.entropyBlock + 256)
             revert InvalidPhase();
         l.phase = Phase.Cancelled;
+        _releaseFrozenSnapshot(leaseId);
         totalServiceEscrow -= l.serviceRemaining;
         _credit(l.consumer, l.serviceRemaining + l.monitorBudget);
         l.serviceRemaining = 0;
@@ -467,6 +481,15 @@ contract SSEAdaptiveMarketV2 is EIP712 {
         totalServiceEscrow -= refund;
         _credit(l.consumer, refund);
         emit LeaseClosed(leaseId, refund);
+    }
+
+    /// @dev Called only for a lease never drawn: every candidate still holds
+    /// exactly the pre-draw snapshot lock and can be released once.
+    function _releaseFrozenSnapshot(uint256 leaseId) private {
+        address[] storage candidates = eligibilitySnapshots[leaseId];
+        for (uint256 i; i < candidates.length; ++i) {
+            --monitors[candidates[i]].locked;
+        }
     }
 
     function _unlockSeats(uint256 leaseId) private {
