@@ -21,6 +21,31 @@ class TestReceiver(unittest.TestCase):
         a["finalizedBlockRoot"]="0x"+"00"*32
         with self.assertRaises(m.Refused):
             m.verify_manifest(json.dumps(a))
+    def test_public_checkpoint_staging_modes_are_container_readable(self):
+        from unittest.mock import patch
+        with tempfile.TemporaryDirectory() as td:
+            destination=Path(td)/"checkpoint"
+            original_files=m.FILES
+            blobs={"checkpoint-state.ssz":b"public-state-data",
+                   "checkpoint-block.ssz":b"public-block-data"}
+            pinned={name:(len(blob),hashlib.sha256(blob).hexdigest())
+                    for name,blob in blobs.items()}
+            with patch.object(m,"FILES",pinned):
+                manifest=self.sample()
+                for name,field in (
+                    ("checkpoint-state.ssz","checkpointState"),
+                    ("checkpoint-block.ssz","checkpointBlock")):
+                    manifest[field]={"filename":name,"bytes":pinned[name][0],
+                                    "sha256":pinned[name][1]}
+                data=json.dumps(manifest).encode()
+                def fetch(url,*,max_bytes):
+                    return data if url.endswith("checkpoint-manifest.json") else blobs[url.rsplit("/",1)[-1]]
+                result=m.stage(destination,getter=fetch)
+            self.assertTrue(result["stateAndBlockSha256Verified"])
+            self.assertEqual(destination.stat().st_mode & 0o005,0o005)
+            for name in ("checkpoint-manifest.json",*blobs):
+                self.assertEqual((destination/name).stat().st_mode & 0o004,0o004)
+
     def test_tampered_asset_refused_before_creating_output(self):
         manifest=json.dumps(self.sample()).encode()
         with tempfile.TemporaryDirectory() as td:
