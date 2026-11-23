@@ -57,6 +57,35 @@ class R137Tests(unittest.TestCase):
         self.assertNotIn("--privileged", argv)
         self.assertEqual(argv.count("--publish"), 2)
 
+    def test_r179_besu_direct_entrypoint_keeps_hardening(self):
+        calls=[]
+        with patch.object(m.r59,"docker",side_effect=lambda cmd,**kw:calls.append(cmd)), \
+             patch.object(m.os,"geteuid",return_value=0), \
+             patch.object(m.os,"getegid",return_value=0):
+            m.docker_run("pinned-digest","observer-el","new-bridge",
+                         Path("/root/test-nonsecret"),
+                         ["127.0.0.1:28545:8545/tcp"],
+                         ["--network-id=31340"])
+        argv=calls[0]
+        self.assertEqual(
+            argv[argv.index("--entrypoint")+1],"/opt/besu/bin/besu")
+        self.assertIn("--read-only",argv)
+        self.assertIn("ALL",argv)
+        self.assertIn("no-new-privileges",argv)
+        self.assertNotIn("--privileged",argv)
+        self.assertIn("type=bind,source=/root/test-nonsecret/testnet,target=/testnet,readonly",
+                      argv)
+
+    def test_r179_lighthouse_entrypoint_remains_original(self):
+        calls=[]
+        with patch.object(m.r59,"docker",side_effect=lambda cmd,**kw:calls.append(cmd)):
+            m.docker_run("pinned-digest","observer-bn","new-bridge",
+                         Path("/root/test-nonsecret"),[],
+                         ["bn","--testnet-dir=/testnet"],beacon=True)
+        argv=calls[0]
+        self.assertEqual(argv[argv.index("--entrypoint")+1],"lighthouse")
+        self.assertNotIn("--ignore-ws-check",argv)
+
     def test_refuses_noninteractive_apply_without_mutation(self):
         plan = {"resources": m.names("third-party"), "root": Path("/tmp/unused"),
                 "ip": "fca0:2328:7777:8888:9999::1"}
