@@ -46,6 +46,19 @@ class HostDependencies(unittest.TestCase):
                         m.fetch_https(url)
                     self.assertNotIn("private diagnostic",str(failure.exception))
 
+    def test_apt_metadata_preflight_is_readonly_and_requires_clearsign(self):
+        valid=b"-----BEGIN PGP SIGNED MESSAGE-----\\nHash: SHA256\\n"
+        observed=m.verify_vendor_repo_metadata(getter=lambda url:valid)
+        self.assertTrue(observed["officialNobleRepoMetadataReachable"])
+        self.assertFalse(observed["aptOrServiceStateModified"])
+        with self.assertRaisesRegex(m.Refused,"NOT_CLEAR_SIGNED"):
+            m.verify_vendor_repo_metadata(getter=lambda url:b"HTML blocked page")
+        import urllib.error
+        with self.assertRaisesRegex(m.Refused,"METADATA_HTTP_403"):
+            m.verify_vendor_repo_metadata(getter=lambda url:(
+                (_ for _ in ()).throw(
+                    urllib.error.HTTPError(url,403,"blocked",{},None))))
+
     def test_upstream_noble_repo_is_https_and_scoped_signature(self):
         self.assertEqual(m.ZEROTIER_APT_URL,
                          "https://download.zerotier.com/debian/noble")
@@ -70,6 +83,8 @@ class HostDependencies(unittest.TestCase):
                     Path(argv[argv.index("--output")+1]).write_bytes(b"DEARMORED_TEST_FIXTURE")
                 return ""
             with (patch.object(m.os,"geteuid",return_value=0),
+                  patch.object(m,"verify_vendor_repo_metadata",
+                               return_value={"officialNobleRepoMetadataReachable":True}),
                   patch.object(m.Path,"is_file",autospec=True,
                                side_effect=lambda obj:(
                                    True if str(obj)=="/usr/sbin/zerotier-one"
@@ -95,6 +110,8 @@ class HostDependencies(unittest.TestCase):
                     return "pub::::::::::\\nfpr:::::::::DEADBEEF:\\n"
                 return ""
             with (patch.object(m.os,"geteuid",return_value=0),
+                  patch.object(m,"verify_vendor_repo_metadata",
+                               return_value={"officialNobleRepoMetadataReachable":True}),
                   self.assertRaises(m.Refused)):
                 m.install_verified_zerotier_apt(
                     runner=runner,fetcher=lambda url:b"UNTRUSTED_GPG",
