@@ -39,10 +39,18 @@ class TestR226V2UnsignedPlanner(unittest.TestCase):
     def test_every_canonical_action_has_unique_selector(self):
         selectors=[mod.keccak256(item[2].encode("ascii"))[:4]
                    for item in mod.METHODS.values()]
-        self.assertEqual(len(selectors),20)
+        self.assertEqual(len(selectors),21)
         self.assertEqual(len(set(selectors)),len(selectors))
         self.assertEqual(plan("market-withdraw","observer",{}).calldata,"0x3ccfd60b")
         self.assertEqual(plan("ledger-withdraw","monitor",{}).calldata,"0x3ccfd60b")
+
+    def test_permissionless_idle_close_no_private_keys_or_value(self):
+        p=plan("expire-idle","observer",{"leaseId":7})
+        self.assertEqual(p.target,MARKET)
+        self.assertEqual(p.value_wei,0)
+        self.assertEqual(p.calldata,"0x"+mod.keccak256(
+            b"forceCloseIdle(uint256)")[:4].hex()+(7).to_bytes(32,"big").hex())
+        self.assertFalse(p.public()["transactionSignedOrSubmitted"])
 
     def test_role_scope_fail_closed(self):
         with self.assertRaises(mod.Refused):
