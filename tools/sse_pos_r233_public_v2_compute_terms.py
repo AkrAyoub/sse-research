@@ -15,7 +15,7 @@ from pathlib import Path
 import sys
 
 from sse_challenge import keccak256
-from sse_pos_r232_v2_monitor_probe import canonical_origin
+from sse_pos_r232_v2_monitor_probe import canonical_origin, Refused as OriginRefused
 from sse_pos_r228_v2_typed_data import checked_addr,checked_hash
 
 RESOURCE_SCHEMA="SSE_V2_PUBLIC_COMPUTE_PROFILE_V1"
@@ -52,7 +52,10 @@ def validate_profile(profile):
         raise Refused("unknown/altered public V2 compute resource manifest")
     if profile["serviceKind"]!="deterministic_compute" or profile["workloadSpec"]!=WORKLOAD:
         raise Refused("unsupported physical workload")
-    origin=canonical_origin(profile["origin"])
+    try:
+        canonical_origin(profile["origin"])
+    except OriginRefused as exc:
+        raise Refused("unapproved V2 compute origin") from exc
     if type(profile["dockerImageId"]) is not str or not IMAGE.fullmatch(profile["dockerImageId"]):
         raise Refused("must pin exact Docker image ID")
     u(profile["cpuMilli"],"cpuMilli",1,64000)
