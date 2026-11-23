@@ -38,11 +38,11 @@ class R164FailClosedTests(unittest.TestCase):
             ["full_node","consumer","monitor"],
         ]
         for roles in combinations:
-            with self.subTest(roles=roles), \\
-                 tempfile.TemporaryDirectory() as tmp, \\
-                 patch.object(m.os,"geteuid",return_value=0), \\
-                 patch.object(m,"guard_existing"), \\
-                 patch.object(m,"command") as runner:
+            with (self.subTest(roles=roles),
+                  tempfile.TemporaryDirectory() as tmp,
+                  patch.object(m.os,"geteuid",return_value=0),
+                  patch.object(m,"guard_existing"),
+                  patch.object(m,"command") as runner):
                 root=Path(tmp)/"releases"
                 state=Path(tmp)/"selection.json"
                 with self.assertRaisesRegex(
