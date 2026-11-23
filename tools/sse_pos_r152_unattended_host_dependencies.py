@@ -158,6 +158,30 @@ def verify_official_install_script(key, signed, *, runner=call):
             raise Refused("verified vendor script unavailable")
         return plain.read_bytes()
 
+def verify_vendor_repo_metadata(*,getter=None):
+    """Read-only HTTPS transport check; apt separately verifies GPG signature."""
+    url=ZEROTIER_APT_URL+"/dists/noble/InRelease"
+    if getter is None:
+        def getter(target):
+            request=urllib.request.Request(
+                target,headers={"User-Agent":"SSE-chain31340-zerotier-apt-check"})
+            with urllib.request.urlopen(request,timeout=15) as response:
+                if response.status!=200:
+                    raise Refused("R175_ZEROTIER_APT_METADATA_BAD_STATUS")
+                return response.read(131073)
+    try:
+        data=getter(url)
+    except urllib.error.HTTPError as exc:
+        raise Refused(f"R175_ZEROTIER_APT_METADATA_HTTP_{exc.code}") from exc
+    except (urllib.error.URLError,OSError,TimeoutError) as exc:
+        raise Refused("R175_ZEROTIER_APT_METADATA_TRANSPORT_UNAVAILABLE") from exc
+    if (type(data) is not bytes or not 0<len(data)<=131072 or
+            not data.startswith(b"-----BEGIN PGP SIGNED MESSAGE-----")):
+        raise Refused("R175_ZEROTIER_APT_METADATA_NOT_CLEAR_SIGNED")
+    return {"officialNobleRepoMetadataReachable":True,
+            "aptSignatureVerificationStillRequired":True,
+            "aptOrServiceStateModified":False}
+
 def install_verified_zerotier_apt(*, runner=call, fetcher=fetch_https,
                                   keyring=ZEROTIER_KEYRING,
                                   source=ZEROTIER_APT_SOURCE):
@@ -170,6 +194,7 @@ def install_verified_zerotier_apt(*, runner=call, fetcher=fetch_https,
     """
     if os.geteuid()!=0:
         raise Refused("root required for verified ZeroTier apt source")
+    verify_vendor_repo_metadata()
     key=fetcher(VENDOR_KEY)
     if type(key) is not bytes or not 0<len(key)<=200000:
         raise Refused("R175_ZEROTIER_SIGNING_KEY_UNAVAILABLE")
