@@ -1,3 +1,21 @@
+## R169 — Actual GitHub peer comment published; anonymous first readback pending
+
+VM4707 verified R168 **1125 tests OK (3 skipped)** and
+successfully published one genuine R156 public EL/CL identity
+to [Issue #42](https://github.com/AkrAyoub/sse-research/issues/42).
+The immediate anonymous `--discover` call did **not** yet
+retrieve it, although the GitHub public issue API subsequently
+returned that comment and its original chain roots/expiry matched.
+Do not claim VM4709 has joined based on publication alone.
+
+[R169 diagnostics](docs/R169_REAL_GITHUB_NATIVE_PEER_READBACK_DIAGNOSIS.md)
+adds the read-only `--diagnose-public` mode and no-cache request
+headers to distinguish a genuinely empty API page from stale or
+invalid native records. The record has a 10-minute TTL;
+a fresh LIVE reannouncement is necessary if the old record expires.
+GitHub remains a temporary centralized rendezvous, not the final
+independent permissionless discovery infrastructure.
+
 ## R168 — Real temporary, public, expiring peer rendezvous experiment
 
 VM4707 has now verified **1111 Python tests (OK, 3 skipped)**
