@@ -1,3 +1,23 @@
+## R173 — Preserve original VM4709 source and continue the existing observer runtime
+
+Read-only VM4709 evidence proved the real public R170 source checkout
+and private 0600 observer selection were **already installed**;
+Docker daemon is active, but no SSE EL/CL clients have been started,
+and ZeroTier is inactive. **Do not rerun R147 or remove the checkout.**
+
+[R173 protected recovery](docs/R173_VM4709_PRESERVED_RUNTIME_RECOVERY.md)
+adds a strict **read-only gate** that validates the existing source,
+selected observer role, original public genesis SHA256 and absence
+of any conflicting SSE Docker containers before attempting any
+native runtime continuation. R152 now reports exact redacted
+APT/Docker/ZeroTier provisioning stage identifiers instead of
+a generic failed prerequisite. The resumed R151 code can use
+the already-selected local role and exact original genesis
+without repeating R147 first-time installation.
+
+**R173 source tests are not yet independently VM verified**.
+Do not claim native P2P or finality before R141/R155 evidence.
+
 ## R172 — First real VM4709 installation attempt needs staged diagnostics
 
 The independent Ubuntu VM4709 successfully retrieved one *current*
