@@ -1,3 +1,17 @@
+## R183 — Actual VM4709→VM4707 native TCP reachability verified, P2P still blocked by client restarts
+
+Real VM4709 `zerotier-cli` reported `ONLINE` on the dynamic
+public research overlay and TCP connections succeeded to VM4707's
+current native Besu P2P (30404) and Lighthouse P2P (9000) ports.
+Both VM4709 client containers remain restarting due documented
+separate entrypoint and weak-subjectivity issues. TCP alone is
+**not Ethereum-native handshake, finality or public Internet
+reachability**. The recovery must preserve the original chain31340
+genesis, VM4709 populated Beacon databases/identity, and JWT,
+and use authenticated recent checkpoint SSZ without globally
+exposing owner APIs. See
+[R183 native TCP evidence and recovery gates](docs/R183_NATIVE_CROSS_VM_TCP_AND_EXISTING_CLIENT_RECOVERY.md).
+
 ## R181 — Actual hardened native Besu version check passed; Beacon DB recovery gate
 
 VM4709 actually executed the pinned image's `/opt/besu/bin/besu`
