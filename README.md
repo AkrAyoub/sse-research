@@ -1,3 +1,25 @@
+## R192/R193 — Two real VMs proved identical finalized epoch 571; marketplace chain31340 script added
+
+Actual VM4707/VM4709 R141 observations taken 5.83 seconds apart
+both report original execution/Beacon genesis, 2 real native EL
+peers and 2 real native CL peers per node, EL/CL not syncing,
+non-optimistic, **identical finalized epoch 571 and exact root
+`0x48c1976b872c24b9fc00d8b7fd3c08e1b82a44534e3eb4034292c2621e25db63`**.
+This is the first empirical cross-node native PoS consensus
+agreement for this fresh external VM, not merely local finality.
+See [R192 real two-VM agreement](docs/R192_REAL_VM4707_VM4709_MATCHED_FINALIZED_CHECKPOINT.md).
+
+Existing `script/DeploySSEPos.s.sol` explicitly enforces chain31339
+and must NOT be broadcast on the new original live chain31340.
+The source-identical deployment order and contracts now have
+a separately chain31340-pinned script
+`script/DeploySSE31340.s.sol`, not yet tested on or deployed to
+live chain31340. See
+[R193 marketplace deployment readiness](docs/R193_LIVE_CHAIN31340_MARKETPLACE_DEPLOYMENT_GATE.md).
+Live marketplace contracts, funded real leases, measured SLAs,
+Internet-wide unpermissioned admission and actual independent
+validators/rewards remain separate unverified milestones.
+
 ## R191 — Real VM4709 native EL/CL peering and local finality VERIFIED
 
 At 2026-11-23T13:18:40Z actual VM4709 R153/R141 localhost
