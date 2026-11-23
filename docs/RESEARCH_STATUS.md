@@ -1,3 +1,20 @@
+# R224 newer actual network evidence — 2026-11-23 16:39:06 UTC
+
+Original VM4707 **actual live two-layer R141 capture** (pinned source
+`b02465bd6352bb87ae0f3109768a86aeed304141`): chain31340, correct
+execution genesis **and Beacon validators genesis root**, EL head17783,
+Beacon head slot19394, 2 native EL peers, 2 native CL peers, all
+syncing/optimistic/offline flags false. **Finalized epoch602** with
+root `0x9d140067a9049103fc482221713f2f0c46cf7d0a89593bef4d6e19fb0dddecd7`.
+This is real live **VM4707-only** EL+CL health. VM4709 has NOT YET
+been freshly checked at epoch602, and no contemporaneous two-host
+finality match is claimed. Physical independent operators, global
+Internet-native admission and V2 on-chain economics remain unverified.
+Full observed report and restrictions:
+`docs/R224_VM4707_LIVE_EL_CL_FINALITY_EPOCH602.md`.
+
+---
+
 # Current verified checkpoint — R223, 2026-11-23 (supersedes earlier 2026-11-21 source status)
 
 On **real VM4707**, exact pinned source `9a216518b3ea8c265f5186f6113987eb537d7949`
