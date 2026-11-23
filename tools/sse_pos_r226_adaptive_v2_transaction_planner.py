@@ -72,6 +72,8 @@ METHODS = {
                              ("consumerShareWei","uint256"),("providerShareWei","uint256"),
                              ("nonce","uint256"),("expiry","uint256"),
                              ("consumerSig","bytes"),("providerSig","bytes"))),
+    "expire-idle": ("*", "market", "forceCloseIdle(uint256)",
+                    (("leaseId","uint256"),)),
     "close-lease": ("consumer", "market", "closeLease(uint256)",
                     (("leaseId","uint256"),)),
     "market-withdraw": ("*", "market", "withdraw()", ()),
