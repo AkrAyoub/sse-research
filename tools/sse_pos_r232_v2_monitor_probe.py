@@ -188,11 +188,22 @@ def inspect_response(observation,snapshot,prepared):
         raise Refused("signed response message changed")
     now=datetime.now(timezone.utc).isoformat()
     raw_digest=hashlib.sha256(raw).hexdigest()
+    observed_record={
+        "observedAtUtc":now,"origin":prepared["origin"],
+        "leaseId":prepared["leaseId"],"epochId":prepared["epochId"],
+        "httpStatus":observation["httpStatus"],
+        "elapsedMs":observation["elapsedMs"],
+        "responseBodySha256":raw_digest,
+        "providerPublicSignatureVerified":True,
+    }
+    observation_digest=hashlib.sha256(json.dumps(
+        observed_record,sort_keys=True,separators=(",",":"),
+        ensure_ascii=True,allow_nan=False).encode("ascii")).hexdigest()
     evidence={
         "leaseId":prepared["leaseId"],"epochId":prepared["epochId"],
         "monitor":prepared["monitor"],"observedAtUtc":now,
         "endpoint":prepared["origin"],"method":"POST",
-        "responseSha256":raw_digest,"rawObservationSha256":raw_digest,
+        "responseSha256":raw_digest,"rawObservationSha256":observation_digest,
         "latencyMs":observation["elapsedMs"],"httpStatus":200,
         "source":"R232_REAL_HTTP_POST_AND_V2_PROVIDER_SIGNATURE",
     }
@@ -205,6 +216,8 @@ def inspect_response(observation,snapshot,prepared):
         "elapsedMs":observation["elapsedMs"],
         "signedResponseHash":actual["responseHash"],
         "rawHttpBodySha256":raw_digest,
+        "rawObservation":observed_record,
+        "rawObservationSha256":observation_digest,
         "provisionalMonitorEvidenceHash":commitment,
         "providerSignatureVerified":True,
         "realFinalizedLeaseScopeVerified":True,
@@ -215,7 +228,9 @@ def inspect_response(observation,snapshot,prepared):
     }
 
 
-def write_create_only(output,report):
+def write_bytes_create_only(output,data):
+    if type(data) is not bytes or not 0<len(data)<=65536:
+        raise Refused("invalid bounded evidence bytes")
     path=Path(output)
     if not path.is_absolute() or path.is_symlink() or path.exists() or ".." in path.parts:
         raise Refused("evidence path must be new absolute non-symlink file")
@@ -227,11 +242,15 @@ def write_create_only(output,report):
     if hasattr(os,"O_NOFOLLOW"):
         flags|=os.O_NOFOLLOW
     fd=os.open(path,flags,0o600)
-    with os.fdopen(fd,"w",encoding="utf-8") as out:
-        json.dump(report,out,sort_keys=True,indent=2)
-        out.write("\n")
+    with os.fdopen(fd,"wb") as out:
+        out.write(data)
         out.flush()
         os.fsync(out.fileno())
+
+
+def write_create_only(output,report):
+    raw=(json.dumps(report,sort_keys=True,indent=2)+"\n").encode("utf-8")
+    return write_bytes_create_only(output,raw)
 
 
 def main(argv=None):
@@ -246,10 +265,11 @@ def main(argv=None):
     p.add_argument("--probe",action="store_true",
                    help="make ONE real provider HTTP request; no blockchain write")
     p.add_argument("--output",help="create-once private evidence JSON for --probe")
+    p.add_argument("--raw-response-output",help="optional create-once private verbatim signed HTTP reply")
     a=p.parse_args(argv)
     try:
-        if a.output and not a.probe:
-            raise Refused("output requires explicit --probe")
+        if (a.output or a.raw_response_output) and not a.probe:
+            raise Refused("evidence archival requires explicit --probe")
         snapshot=inspect_lease(load_manifest(a.manifest),a.rpc,
                                a.lease_id,a.epoch_id)
         context=prepared_monitor(snapshot,a.monitor,a.origin,
@@ -263,8 +283,12 @@ def main(argv=None):
             },indent=2,sort_keys=True))
             return 0
         payload={k:context[k] for k in ("leaseId","epochId","requestHash")}
-        result=inspect_response(http_probe(context["origin"],payload,a.timeout),
-                                snapshot,context)
+        observation=http_probe(context["origin"],payload,a.timeout)
+        result=inspect_response(observation,snapshot,context)
+        if a.raw_response_output:
+            if observation["body"] is None:
+                raise Refused("cannot archive missing HTTP response")
+            write_bytes_create_only(a.raw_response_output,observation["body"])
         if a.output:
             write_create_only(a.output,result)
         print(json.dumps(result,indent=2,sort_keys=True))
