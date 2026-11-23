@@ -27,6 +27,17 @@ VENDOR_KEY = "https://raw.githubusercontent.com/zerotier/ZeroTierOne/master/doc/
 VENDOR_SCRIPT = "https://install.zerotier.com/"
 VENDOR_FINGERPRINT = "74A5E9C458E1A431F1DA57A71657198823E52A61"
 NETWORK = r59.NETWORK
+# ZeroTier upstream installer source maps Ubuntu 24.04 -> noble, and
+# points apt at download.zerotier.com/debian/noble. Use HTTPS and a
+# fingerprint-verified scoped signing key instead of the HTTP403 script.
+ZEROTIER_APT_URL="https://download.zerotier.com/debian/noble"
+ZEROTIER_APT_LINE=(
+    "deb [arch=amd64 signed-by=/usr/share/keyrings/sse-zerotier.gpg] "
+    +ZEROTIER_APT_URL+" noble main\\n"
+)
+ZEROTIER_KEYRING=Path("/usr/share/keyrings/sse-zerotier.gpg")
+ZEROTIER_APT_SOURCE=Path("/etc/apt/sources.list.d/sse-zerotier.list")
+
 
 class Refused(ValueError):
     pass
@@ -36,7 +47,8 @@ def stage_of(argv):
     if argv[:2]==["apt-get","update"]:
         return "APT_UPDATE"
     if argv[:2]==["apt-get","install"]:
-        return "APT_DOCKER_GNUPG"
+        return ("ZEROTIER_SIGNED_APT_INSTALL" if "zerotier-one" in argv
+                else "APT_DOCKER_GNUPG")
     if argv[:3]==["systemctl","enable","--now"]:
         return ("DOCKER_DAEMON" if argv[-1]=="docker"
                 else "ZEROTIER_DAEMON" if argv[-1]=="zerotier-one"
@@ -146,6 +158,59 @@ def verify_official_install_script(key, signed, *, runner=call):
             raise Refused("verified vendor script unavailable")
         return plain.read_bytes()
 
+def install_verified_zerotier_apt(*, runner=call, fetcher=fetch_https,
+                                  keyring=ZEROTIER_KEYRING,
+                                  source=ZEROTIER_APT_SOURCE):
+    """Root-only install via upstream Noble apt packages, not installer script.
+
+    The exact ZeroTier primary signing key is pinned, and APT must validate
+    the vendor-signed Release metadata through signed-by. Never invoke
+    apt with AllowUnauthenticated / trusted=yes or run unreviewed scripts.
+    Existing nonmatching files are refused, never overwritten.
+    """
+    if os.geteuid()!=0:
+        raise Refused("root required for verified ZeroTier apt source")
+    key=fetcher(VENDOR_KEY)
+    if type(key) is not bytes or not 0<len(key)<=200000:
+        raise Refused("R175_ZEROTIER_SIGNING_KEY_UNAVAILABLE")
+    with tempfile.TemporaryDirectory(prefix="sse-zt-apt-") as td:
+        tmp=Path(td)
+        tmp.chmod(0o700)
+        original=tmp/"upstream-public-key.gpg"
+        prepared=tmp/"verified-zerotier.gpg"
+        original.write_bytes(key)
+        runner(["gpg","--batch","--homedir",str(tmp),
+                "--import",str(original)])
+        report=runner(["gpg","--batch","--homedir",str(tmp),
+                       "--with-colons","--fingerprint"])
+        verify_primary_vendor_key_fingerprint(report)
+        runner(["gpg","--batch","--yes","--dearmor","--output",
+                str(prepared),str(original)])
+        converted=prepared.read_bytes()
+        if not 0<len(converted)<=200000:
+            raise Refused("R175_ZEROTIER_VERIFIED_KEYRING_EMPTY")
+    for location,body in (
+        (keyring,converted),
+        (source,ZEROTIER_APT_LINE.encode("ascii")),
+    ):
+        if location.is_symlink():
+            raise Refused("R175_ZEROTIER_APT_CONFIG_SYMLINK_REFUSED")
+        if location.exists():
+            if not location.is_file() or location.read_bytes()!=body:
+                raise Refused("R175_ZEROTIER_APT_CONFIG_CONFLICT")
+        else:
+            fd=os.open(location,os.O_WRONLY|os.O_CREAT|os.O_EXCL|os.O_NOFOLLOW,0o644)
+            with os.fdopen(fd,"wb") as out:
+                out.write(body)
+                out.flush()
+                os.fsync(out.fileno())
+    runner(["apt-get","update","-qq"],timeout=180)
+    runner(["apt-get","install","-y","-qq","--no-install-recommends",
+            "zerotier-one"],timeout=180)
+    if not Path("/usr/sbin/zerotier-one").is_file():
+        raise Refused("R175_ZEROTIER_APT_PACKAGE_NOT_INSTALLED")
+    return True
+
 def setup(*, execute=False, runner=call, fetcher=fetch_https):
     if os.geteuid()!=0:
         raise Refused("root required for reviewed host provisioning")
@@ -161,14 +226,7 @@ def setup(*, execute=False, runner=call, fetcher=fetch_https):
             "docker.io","sudo","gnupg","ca-certificates","iproute2"],timeout=180)
     runner(["systemctl","enable","--now","docker"],timeout=80)
     if not Path("/usr/sbin/zerotier-one").exists():
-        script=verify_official_install_script(
-            fetcher(VENDOR_KEY),fetcher(VENDOR_SCRIPT),runner=runner)
-        with tempfile.TemporaryDirectory(prefix="sse-zt-script-") as temp:
-            path=Path(temp)/"verified-zerotier-install.sh"
-            fd=os.open(path,os.O_CREAT|os.O_EXCL|os.O_WRONLY|os.O_NOFOLLOW,0o600)
-            with os.fdopen(fd,"wb") as out:
-                out.write(script)
-            runner(["bash",str(path)],timeout=180)
+        install_verified_zerotier_apt(runner=runner,fetcher=fetcher)
     runner(["systemctl","enable","--now","zerotier-one"],timeout=80)
     # Fixed immutable *overlay identity for the original experimental
     # chain*, not a bootstrap peer, static endpoint or admission list.
