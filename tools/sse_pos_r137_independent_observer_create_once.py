@@ -86,8 +86,12 @@ def docker_run(image, name, network, root, bindings, args, *, beacon=False):
                "--mount", f"type=bind,source={root / ('beacon' if beacon else 'el')},target=/data"]
     for binding in bindings:
         command += ["--publish", binding]
-    if beacon:
-        command += ["--entrypoint", "lighthouse"]
+    # The upstream Besu image's besu-entry.sh first calls su/chown/chmod,
+    # incompatible with our deliberately rootless-in-capabilities,
+    # read-only rootfs and readonly genesis mounts. Launch its native
+    # pinned binary directly without granting CAP_CHOWN/SETGID, removing
+    # no-new-privileges or allowing mutation of the genesis.
+    command += ["--entrypoint", "lighthouse" if beacon else "/opt/besu/bin/besu"]
     command += [image, *args]
     r59.docker(command, timeout=60)
 
