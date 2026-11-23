@@ -62,6 +62,35 @@ class R168Tests(unittest.TestCase):
                 {"body":"general GitHub discussion","user":{"login":"anyone"}},
                 comment(expired)],now=NOW)
 
+    def test_live_comment_detail_overrides_stale_cached_collection_body(self):
+        # The actual R169 run saw 1 marked comment but no fresh peer after
+        # an acknowledged PATCH. Fetch its dynamic ID to avoid cached list.
+        stale=record(expiry=NOW-1,now=NOW-400)
+        fresh=record(expiry=NOW+300,now=NOW)
+        observed=[]
+        def github_get(url,*,allowed_path):
+            observed.append((url,allowed_path))
+            if url==m.API:
+                return [comment(stale,comment_id=345)]
+            if url.endswith("/issues/comments/345"):
+                return comment(fresh,comment_id=345)
+            raise AssertionError(url)
+        with patch.object(m,"_github_get",side_effect=github_get):
+            comments=m.fetch_public()
+        live=m.discover(getter=lambda:comments,now=NOW)
+        self.assertEqual(live["candidateNodeCount"],1)
+        self.assertEqual(len(observed),2)
+        self.assertEqual(observed[1][1],
+                         "/repos/AkrAyoub/sse-research/issues/comments/345")
+        self.assertEqual(json.loads(comments[0]["body"][len(m.MARKER):])["expiresAt"],NOW+300)
+
+    def test_comment_detail_must_match_public_collection_id(self):
+        with patch.object(m,"_github_get",side_effect=[
+            [comment(comment_id=345)],
+            comment(comment_id=999)]):
+            with self.assertRaises(m.Refused):
+                m.fetch_public()
+
     def test_no_wallet_secret_or_wrong_genesis_is_accepted(self):
         for key,value in (
             ("validatorSigningKey","PRIVATE"),
