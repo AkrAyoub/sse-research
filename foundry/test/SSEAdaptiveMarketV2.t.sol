@@ -295,6 +295,44 @@ contract SSEAdaptiveMarketV2Test is Test {
         market.exitMonitor();
     }
 
+    function testLateProviderSignatureCannotTurnMissedDeadlineIntoSuccess() public {
+        uint256 leaseId = _open(4);
+        bytes32 responseHash = keccak256("late-provider-response");
+        bytes32 typeHash = keccak256(
+            "ProviderResponse(uint256 leaseId,uint256 epochId,bytes32 requestHash,bytes32 responseHash)"
+        );
+        bytes32 digest = keccak256(abi.encodePacked(
+            "\\x19\\x01", market.domainSeparator(),
+            keccak256(abi.encode(typeHash, leaseId, uint256(0),
+                                 keccak256("real-request-content"), responseHash))
+        ));
+        (uint8 v, bytes32 r, bytes32 sigS) = vm.sign(providerKey, digest);
+        SSEAdaptiveVoteLedger.Epoch memory ep = votes.epoch(leaseId, 0);
+        vm.warp(uint256(ep.responseDeadline) + 1);
+        vm.expectRevert(SSEAdaptiveVoteLedger.InvalidPhase.selector);
+        market.authenticateProviderResponse(leaseId, 0, responseHash,
+                                            abi.encodePacked(r, sigS, v));
+        assertFalse(votes.epoch(leaseId, 0).responseAuthenticated);
+        address[] memory selected = votes.selected(leaseId);
+        vm.prank(selected[0]);
+        vm.expectRevert(SSEAdaptiveVoteLedger.InvalidPhase.selector);
+        votes.submitVoteDirect(leaseId, 0, SSEAdaptiveVoteLedger.Outcome.Success,
+                               keccak256("late-success-claim"));
+    }
+
+    function testProviderCannotAcceptAfterFrozenDeadline() public {
+        uint256 leaseId = _fund(4);
+        _draw(leaseId);
+        SSEAdaptiveVoteLedger.Committee memory c = votes.committee(leaseId);
+        vm.warp(uint256(c.confirmationDeadline) + 1);
+        vm.prank(provider);
+        vm.expectRevert(SSEAdaptiveMarketV2.InvalidPhase.selector);
+        market.acceptLease(leaseId);
+        market.cancelUnaccepted(leaseId);
+        assertEq(market.withdrawable(consumer), FEE);
+        assertEq(votes.withdrawable(consumer), 4 * REWARD);
+    }
+
     function testConstructorRefusesMainnetOrAnotherResearchChain() public {
         vm.chainId(1);
         vm.expectRevert(SSEAdaptiveMarketV2.InvalidInput.selector);
