@@ -81,6 +81,7 @@ contract SSEAdaptiveMarketV2 is EIP712 {
     SSEAdaptiveVoteLedger public immutable votes;
     uint256 public immutable minimumBond;
     uint256 public nextRequestId = 1;
+    uint256 public nextSnapshotCursor;
     uint256 public nextLeaseId = 1;
     uint256 public totalServiceEscrow;
     uint256 public totalMonitorBonds;
@@ -130,7 +131,6 @@ contract SSEAdaptiveMarketV2 is EIP712 {
     function registerMonitor() external payable {
         Monitor storage m = monitors[msg.sender];
         if (m.active || m.locked != 0 || msg.value < minimumBond) revert InvalidInput();
-        if (activeMonitors.length >= MAX_ELIGIBLE) revert InvalidPhase();
         m.active = true;
         m.bond += msg.value;
         totalMonitorBonds += msg.value;
@@ -204,12 +204,20 @@ contract SSEAdaptiveMarketV2 is EIP712 {
         if (msg.value != service + t.monitorBudget) revert InsufficientFunding();
         // Freeze ALL currently available non-party bonded candidates, rather
         // than a caller-provided shortlist. No joining later can change this set.
-        address[] memory eligible = new address[](activeMonitors.length);
+        uint256 totalActive = activeMonitors.length;
+        uint256 scan = totalActive > MAX_ELIGIBLE ? MAX_ELIGIBLE : totalActive;
+        address[] memory scanned = new address[](scan);
         uint256 n;
-        for (uint256 i; i < activeMonitors.length; ++i) {
-            address candidate = activeMonitors[i];
-            if (candidate != msg.sender && candidate != bid.provider) eligible[n++] = candidate;
+        // Bounded rotating window is an explicit per-lease GAS limit,
+        // NEVER a global membership limit. Not a uniform global sample.
+        uint256 cursor = totalActive == 0 ? 0 : nextSnapshotCursor % totalActive;
+        for (uint256 i; i < scan; ++i) {
+            address candidate = activeMonitors[(cursor + i) % totalActive];
+            if (candidate != msg.sender && candidate != bid.provider) scanned[n++] = candidate;
         }
+        if (totalActive != 0) nextSnapshotCursor = (cursor + scan) % totalActive;
+        address[] memory eligible = new address[](n);
+        for (uint256 i; i < n; ++i) eligible[i] = scanned[i];
         AdaptiveMonitorQuorum.Decision memory d = AdaptiveMonitorQuorum.decide(
             n, t.requiredFaultTolerance, t.gasBoundSeats,
             t.monitorBudget, t.epochs, t.perMonitorEpochReward
@@ -305,7 +313,27 @@ contract SSEAdaptiveMarketV2 is EIP712 {
     function cancelUnconfirmed(uint256 leaseId) external {
         Lease storage l = leases[leaseId];
         if (l.phase != Phase.Assigned) revert InvalidPhase();
-        votes.expireUnconfirmed(leaseId);
+        SSEAdaptiveVoteLedger.Committee memory c = votes.committee(leaseId);
+        if (c.ready) revert InvalidPhase();
+        if (!c.confirmationExpired) votes.expireUnconfirmed(leaseId);
+        _unlockSeats(leaseId);
+        l.phase = Phase.Cancelled;
+        totalServiceEscrow -= l.serviceRemaining;
+        _credit(l.consumer, l.serviceRemaining);
+        l.serviceRemaining = 0;
+        emit LeaseCancelled(leaseId);
+    }
+
+    /// @notice Non-accepting provider cannot strand consumer escrow forever.
+    /// Only after the monitor confirmation deadline; releases bonds and both
+    /// reserved pools safely, even if no selected monitor has confirmed.
+    function cancelUnaccepted(uint256 leaseId) external {
+        Lease storage l = leases[leaseId];
+        if (l.phase != Phase.Assigned || l.providerAccepted) revert InvalidPhase();
+        SSEAdaptiveVoteLedger.Committee memory c = votes.committee(leaseId);
+        if (block.timestamp <= c.confirmationDeadline) revert InvalidPhase();
+        if (c.ready) votes.closeReporting(leaseId);
+        else if (!c.confirmationExpired) votes.expireUnconfirmed(leaseId);
         _unlockSeats(leaseId);
         l.phase = Phase.Cancelled;
         totalServiceEscrow -= l.serviceRemaining;
