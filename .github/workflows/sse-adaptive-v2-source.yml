@@ -19,6 +19,14 @@ on:
       - "tests/test_sse_pos_r227_v2_finalized_event_audit.py"
       - "tests/test_sse_pos_r228_v2_typed_data.py"
       - "tests/test_sse_pos_r229_v2_finalized_lease_snapshot.py"
+      - "tools/sse_pos_r231_v2_compute_wire.py"
+      - "tools/sse_pos_r232_v2_monitor_probe.py"
+      - "tools/sse_pos_r233_public_v2_compute_terms.py"
+      - "services/provider-agent/v2_compute_response_server.py"
+      - "tests/test_sse_pos_r231_v2_compute_wire.py"
+      - "tests/test_sse_pos_r232_v2_monitor_probe.py"
+      - "tests/test_sse_pos_r233_public_v2_compute_terms.py"
+      - "tests/test_sse_pos_r234_v2_compute_response_server.py"
       - ".github/workflows/sse-adaptive-v2-source.yml"
   workflow_dispatch:
 
@@ -43,6 +51,10 @@ jobs:
         run: python3 -m compileall -q tools/sse_pos_r22*.py tests/test_sse_pos_r22*.py
       - name: Test V2 role planner, finalized event log and typed evidence APIs
         run: python3 -B -m unittest discover -s tests -p 'test_sse_pos_r22*.py' -v
+      - name: Compile R231-R234 provider and monitor modules
+        run: python3 -m compileall -q tools/sse_pos_r23*.py services/provider-agent/v2_compute_response_server.py tests/test_sse_pos_r23*.py
+      - name: Test actual-provider-wire transport policies and local Docker/HTTP adapters
+        run: python3 -B -m unittest discover -s tests -p 'test_sse_pos_r23*.py' -v
       - name: Compile and report contract size
         run: forge build --sizes
       - name: Adversarial adaptive-marketplace EVM tests
