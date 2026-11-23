@@ -111,11 +111,14 @@ def install_source(commit, plan, root=TARGET_ROOT, state=STATE):
     if os.geteuid() != 0:
         raise Refused("run with sudo/root; no repeated privilege prompts")
     guard_existing()
-    full_roles = {"full_node", "observer", "validator"}
-    if not full_roles.intersection(plan["selectedRoles"]):
-        # Do not create source/state before actual marketplace agents
-        # exist. A future installer will implement these roles honestly.
-        raise Refused("MARKETPLACE_ROLE_INSTALLER_NOT_YET_IMPLEMENTED")
+    supported_nonsigning_roles = {"full_node", "observer"}
+    requested = set(plan["selectedRoles"])
+    if requested.difference(supported_nonsigning_roles):
+        # No "successful" partial installs: selecting validator or a
+        # marketplace role must not silently skip missing activation.
+        raise Refused("SELECTED_ROLE_IMPLEMENTATION_NOT_READY")
+    if not requested:
+        raise Refused("empty local role selection")
     release = root / commit
     if release.exists() or release.is_symlink():
         raise Refused("release checkout already exists; never overwrite")
@@ -181,8 +184,7 @@ def install_source(commit, plan, root=TARGET_ROOT, state=STATE):
     # the genuine reviewed R137 Docker/Besu/Lighthouse installation.
     # Never do this unless the exact original PUBLIC genesis was acquired
     # and verified. No new genesis or validator key is ever generated.
-    if (full_roles.intersection(data["selectedRoles"])
-            and (release/"original-chain31340.tar.gz").is_file()):
+    if (release/"original-chain31340.tar.gz").is_file():
         command(["python3","-B",str(release/"tools/sse_pos_r151_unattended_full_node.py"),
                  "--execute"],timeout=900)
         data["realNonsigningClientsSubmitted"] = True
