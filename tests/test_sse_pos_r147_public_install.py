@@ -88,9 +88,10 @@ class R147Tests(unittest.TestCase):
             (["python3","-B","/opt/release/tools/sse_pos_r151_unattended_full_node.py",
               "--execute"],"STAGE_REAL_EL_CL_HOST_AND_CONTAINER_INSTALL_FAILED_EXIT_100"),
         ):
-            with self.subTest(args=args), \\
-                 patch.object(r.subprocess,"run",return_value=subprocess.CompletedProcess(
-                     args,100,"sensitive output","PRIVATE_SECRET_VALUE")):
+            with (self.subTest(args=args),
+                  patch.object(r.subprocess,"run",
+                               return_value=subprocess.CompletedProcess(
+                                   args,100,"sensitive output","PRIVATE_SECRET_VALUE"))):
                 with self.assertRaisesRegex(r.Refused,expected) as failure:
                     r.command(args)
                 self.assertNotIn("PRIVATE_SECRET_VALUE",str(failure.exception))
@@ -103,8 +104,8 @@ class R147Tests(unittest.TestCase):
                 r.command(["apt-get","update","-qq"],timeout=180)
 
     def test_readonly_partial_first_attempt_inventory_never_mutates(self):
-        with tempfile.TemporaryDirectory() as home, \\
-             patch.object(r.subprocess,"run") as runner:
+        with (tempfile.TemporaryDirectory() as home,
+              patch.object(r.subprocess,"run") as runner):
             base=Path(home)
             report=r.inspect_failed_host(root=base)
             self.assertFalse(report["selectedRoleStatePresent"])
