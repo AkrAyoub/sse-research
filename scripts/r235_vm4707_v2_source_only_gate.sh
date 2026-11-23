@@ -24,6 +24,8 @@ echo "== R226-R229 PYTHON ABI / FINALITY / EIP-712 SOURCE REGRESSIONS =="
 python3 -B -m unittest discover -s tests -p 'test_sse_pos_r22*.py' -v
 echo "== R231-R234 TRUE HTTP-SOCKET TESTS (LOCAL ONLY; NOT REMOTE SLA) =="
 python3 -B -m unittest discover -s tests -p 'test_sse_pos_r23*.py' -v
+echo "== R242 OWNER-APPROVED TX POLICY TESTS (MOCKED, NEVER BROADCAST) =="
+python3 -B -m unittest discover -s tests -p 'test_sse_pos_r242_v2_owner_local_send.py' -v
 echo "== R201 ORIGINAL GENESIS READ-ONLY POLICY MOCK TESTS =="
 python3 -B -m unittest discover -s tests -p 'test_sse_pos_r201_v2_readonly_live_chain_gate.py' -v
 echo "== R206 MANIFEST AUDIT POLICY MOCK TESTS =="
