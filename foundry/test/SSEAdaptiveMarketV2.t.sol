@@ -434,7 +434,7 @@ contract SSEAdaptiveMarketV2Test is Test {
         assertEq(market.withdrawable(consumer), 0);
         assertEq(market.withdrawable(provider), 0);
         assertEq(votes.withdrawable(consumer), 4 * REWARD);
-        assertEq(market.lease(leaseId).phase, SSEAdaptiveMarketV2.Phase.Closed);
+        assertEq(uint8(market.lease(leaseId).phase), uint8(SSEAdaptiveMarketV2.Phase.Closed));
         (, uint256 locked,) = market.monitors(selected[0]);
         assertEq(locked, 0);
         vm.prank(consumer);
