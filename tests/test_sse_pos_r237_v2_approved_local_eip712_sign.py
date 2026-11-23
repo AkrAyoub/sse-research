@@ -59,7 +59,9 @@ class TestR237ApprovedSigningGate(unittest.TestCase):
     def test_keystore_requires_nonroot_private_directory_and_encryption(self):
         with tempfile.TemporaryDirectory() as td:
             path=Path(td)/"wallet.json"
-            raw={"crypto":{"cipher":"aes-128-ctr","ciphertext":"a"*240},"id":"id","version":3}
+            raw={"crypto":{"cipher":"aes-128-ctr","ciphertext":"a"*240,
+                            "cipherparams":{},"kdf":"scrypt","kdfparams":{},"mac":"a"*64},
+                 "id":"id","version":3}
             path.write_text(json.dumps(raw))
             os.chmod(td,0o700)
             os.chmod(path,0o600)
