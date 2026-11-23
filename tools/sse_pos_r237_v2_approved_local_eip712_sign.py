@@ -114,6 +114,13 @@ def verify_public_role_state(intent,snapshot):
     epoch=snapshot["epoch"]
     if type(epoch) is not dict or not epoch["market"]["exists"]:
         raise Refused("no actual finalized target epoch to sign")
+    typed_message=intent["typedData"]["message"]
+    if (kind in ("provider-response","monitor-vote") and
+        typed_message["requestHash"]!=epoch["market"]["requestHash"]):
+        raise Refused("EIP712 request commitment differs from finalized epoch")
+    if (kind=="monitor-vote" and typed_message["outcome"]==1 and
+        typed_message["responseHash"]!=epoch["ledger"]["responseHash"]):
+        raise Refused("Success EIP712 signed response is not the authenticated provider hash")
     if kind=="provider-response":
         if (role!="provider" or signer!=lease["provider"] or
             lease["phase"]!=4 or lease["providerAccepted"] is not True or
