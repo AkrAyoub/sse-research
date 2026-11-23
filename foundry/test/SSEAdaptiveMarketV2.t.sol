@@ -395,6 +395,22 @@ contract SSEAdaptiveMarketV2Test is Test {
         assertEq(address(votes).balance, 4 * REWARD);
     }
 
+    function testExpiredIdleCannotBeRevivedByLateConsumerEpoch() public {
+        uint256 leaseId = _fund(4);
+        _draw(leaseId);
+        _confirm(leaseId);
+        vm.prank(provider);
+        market.acceptLease(leaseId);
+        SSEAdaptiveMarketV2.Lease memory l = market.lease(leaseId);
+        vm.warp(uint256(l.lastProgressAt) + l.confirmationSeconds + 1);
+        vm.prank(consumer);
+        vm.expectRevert(SSEAdaptiveMarketV2.InvalidPhase.selector);
+        market.startEpoch(leaseId, keccak256("malicious-late-request"));
+        market.forceCloseIdle(leaseId);
+        assertEq(market.withdrawable(consumer), FEE);
+        assertEq(market.totalServiceEscrow(), 0);
+    }
+
     function testIdleAcceptedLeaseOutsiderUnlocksMonitorsAndRefundsConsumer() public {
         uint256 leaseId = _fund(4);
         _draw(leaseId);
