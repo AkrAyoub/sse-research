@@ -295,6 +295,22 @@ contract SSEAdaptiveMarketV2Test is Test {
         market.exitMonitor();
     }
 
+    function testMarketBalanceCoversBondServiceAndPendingMonitorLiabilities() public {
+        uint256 leaseId = _fund(4);
+        (uint256 held, uint256 owed, bool covered) = market.escrowAccounting();
+        assertTrue(covered);
+        assertEq(held, owed);
+        assertEq(market.totalPendingMonitorFunding(), 4 * REWARD);
+        assertEq(market.totalServiceEscrow(), FEE);
+        assertEq(market.totalMonitorBonds(), 9 * BOND);
+        _draw(leaseId);
+        (held, owed, covered) = market.escrowAccounting();
+        assertTrue(covered);
+        assertEq(held, owed);
+        assertEq(market.totalPendingMonitorFunding(), 0);
+        assertEq(address(votes).balance, 4 * REWARD);
+    }
+
     function testRegistrationNotLimitedTo64LifetimeOrActiveEOAs() public {
         for (uint256 i; i < 70; ++i) {
             address addr = address(uint160(0xD000 + i));
