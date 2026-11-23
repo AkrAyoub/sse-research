@@ -50,7 +50,7 @@ class TestR237ApprovedSigningGate(unittest.TestCase):
             m.sign_authorized(intent,Path("/no/wallet"),bad,"http://127.0.0.1:28545",
                               confirm=lambda p:"",get_password=lambda p:"",
                               expected_tty=False)
-        with patch.object(m.sys.stdin,"isatty",return_value=False):
+        with patch.object(m.sys,"stdin",new=type("NonTty",(),{"isatty":lambda self:False})()):
             with self.assertRaises(m.Refused):
                 m.sign_authorized(intent,Path("/no/wallet"),MANIFEST,
                                   "http://127.0.0.1:28545",
@@ -59,7 +59,7 @@ class TestR237ApprovedSigningGate(unittest.TestCase):
     def test_keystore_requires_nonroot_private_directory_and_encryption(self):
         with tempfile.TemporaryDirectory() as td:
             path=Path(td)/"wallet.json"
-            raw={"crypto":{"cipher":"aes-128-ctr"},"id":"id","version":3}
+            raw={"crypto":{"cipher":"aes-128-ctr","ciphertext":"a"*240},"id":"id","version":3}
             path.write_text(json.dumps(raw))
             os.chmod(td,0o700)
             os.chmod(path,0o600)
