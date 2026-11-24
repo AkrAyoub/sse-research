@@ -128,6 +128,31 @@ class TestR291ExistingVendorSignedAptOnly(unittest.TestCase):
         self.assertNotIn("ssh-keygen",body)
         self.assertNotIn("10.50.56.",body)
 
+    def test_signed_package_only_never_auto_restarts_other_vm_services(self):
+        observed=[]
+        def fake_run(argv,**kwargs):
+            observed.append((argv,kwargs))
+            return subprocess.CompletedProcess(argv,0,"OK","")
+        result=m.signed_package_command(
+            ["apt-get","install","-y","-qq",
+             "--no-install-recommends","zerotier-one"],run=fake_run)
+        self.assertEqual(result,"OK")
+        self.assertEqual(observed[0][1]["env"]["NEEDRESTART_MODE"],"l")
+        self.assertEqual(observed[0][1]["env"]["DEBIAN_FRONTEND"],"noninteractive")
+        self.assertFalse(observed[0][1]["shell"])
+
+    def test_signed_package_runner_rejects_docker_or_unreviewed_apt(self):
+        for argv in (
+            ["docker","restart","sse-compute-vm4714"],
+            ["apt-get","install","-y","docker.io"],
+            ["systemctl","restart","docker"],
+            ["bash","https://install.zerotier.com"],
+        ):
+            with self.subTest(argv=argv),self.assertRaisesRegex(
+                m.Refused,"only official signed ZeroTier"):
+                m.signed_package_command(argv,run=lambda *args,**kwargs:
+                    self.fail("unreviewed command must not execute"))
+
     def test_cli_requires_install_mode_and_explicit_revision(self):
         with contextlib.redirect_stderr(io.StringIO()):
             with self.assertRaises(SystemExit) as exc:
