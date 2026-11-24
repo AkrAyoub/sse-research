@@ -1,3 +1,36 @@
+# R274 — consumer funding canonical but still short of native finality; source-only nonprivileged VM4709 rootless worker readiness
+
+Owner retried R267 Monitor1 --send on actual VM4707; safety gate
+again returned `R267_EARLIER_ROLE_FUNDING_PENDING_FINALITY_DO_NOT_RESEND`.
+Canonical successful consumer funding TX
+`0x9f3a13cb295b5ba2f642804a30c391b9cce266784a83dd293d0dd7fb7d1f9fdd`
+was in block25564; previous exact R271 last observed EL finalized25556
+(**8 blocks remaining AS OF THAT PREVIOUS SNAPSHOT only**);
+new R267 refusal provides NO new finalized height.
+No Monitor1 nonce2 or Monitor2 nonce3 transaction signed/sent;
+never replay consumer or bypass predecessor finalized gate.
+Do not repeatedly run `--send` as a finality check;
+use R271 read-only single-shot diagnostic when needed.
+
+VM4709 real provider app EOA
+`0xBbd4F07be80E1f4c40A1b470A180C0F38352bEaf`
+is encrypted and created, but remains unfunded.
+Both original real EL+CL containers remain running
+as verified at the earlier sudo read-only Docker check.
+Unprivileged Docker Unix socket access denied; existing
+R234 strict per-request Docker inspector would therefore fail
+on VM4709. NO permission/grant/restart shortcut.
+NEW `tools/sse_pos_r274_vm4709_rootless_compute_readiness.py`
+and 7 mock offline tests inspect only public current
+owner-local rootless daemon prerequisites:
+binaries, subordinate ID mappings, private runtime
+directory and owner-owned rootless Unix socket.
+NO sudo/install/start/stop/network/key/tx functionality.
+**New R274 tests and actual VM4709 prereq have not yet run**.
+Evidence `docs/R274_VM4709_ROOTLESS_WORKER_NONMUTATING_READINESS_AND_R267_UNFINALIZED_CONSUMER.md`.
+
+---
+
 # R273 — Actual provider application EOA CREATED on VM4709, native PoS Docker containers verified; consumer nonce1 only 8 blocks short of finality
 
 Owner VM4707 actual R271: five targeted tests PASS; real
