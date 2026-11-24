@@ -4,6 +4,7 @@ import os
 from pathlib import Path
 import subprocess
 import sys
+import tempfile
 import unittest
 from types import SimpleNamespace
 from unittest.mock import patch
@@ -136,10 +137,32 @@ class TestR283OwnerVm4714ExplicitSudoOnly(unittest.TestCase):
         p=ROOT/"scripts"/"r281_vm4714_real_compute_worker.sh"
         result=subprocess.run(["bash","-n",str(p)],capture_output=True,text=True)
         self.assertEqual(result.returncode,0,result.stderr)
-        with patch.dict(os.environ,{"R283_DO_NOT_USE":"1"}):
-            # Existing owner-mocked R281 test suite independently verifies
-            # the non-TTY rejection, pinned SHA and preview no effects.
-            self.assertTrue(p.is_file())
+        with tempfile.TemporaryDirectory() as d:
+            fake=Path(d)
+            (fake/"id").write_text(
+                '#!/bin/sh\\n'
+                'case "$1" in -u) echo 1001 ;; -un) echo ayoubakrvm4714 ;; esac\\n'
+            )
+            (fake/"git").write_text(
+                '#!/bin/sh\\n'
+                'case "$1" in rev-parse) echo "'+('a'*40)+
+                '" ;; status) exit 0 ;; esac\\n'
+            )
+            (fake/"sudo").write_text(
+                '#!/bin/sh\\n'
+                'echo SUDO_SHOULD_NOT_HAVE_BEEN_CALLED >&2\\n'
+                'exit 99\\n'
+            )
+            for cmd in ("id","git","sudo"):
+                (fake/cmd).chmod(0o700)
+            env=dict(os.environ,PATH=str(fake)+os.pathsep+os.environ.get("PATH",""))
+            run=subprocess.run(
+                ["bash",str(p),'a'*40,"--run-sudo"],
+                input="\\n",capture_output=True,text=True,timeout=15,env=env
+            )
+            self.assertNotEqual(run.returncode,0)
+            self.assertIn("real owner TTY required",run.stderr)
+            self.assertNotIn("SUDO_SHOULD_NOT_HAVE_BEEN_CALLED",run.stderr)
 
 
 if __name__=="__main__":
