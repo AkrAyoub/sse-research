@@ -154,7 +154,7 @@ env -u ETH_PASSWORD -u ETH_KEYSTORE -u ETH_KEYSTORE_ACCOUNT \
     -u HTTP_PROXY -u HTTPS_PROXY -u ALL_PROXY -u http_proxy -u https_proxy -u all_proxy \
     "$CAST" send "$DEST" \
        --value 1ether \
-       --legacy --gas-limit 21000 --gas-price 1000wei \
+       --legacy --gas-limit 21000 --gas-price 1000 \
        --nonce 0 --chain 31340 --from "$SOURCE" \
        --keystore "$KEY" --rpc-url "$RPC" --async
 
