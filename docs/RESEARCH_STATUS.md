@@ -1,3 +1,30 @@
+# R254 — Owner approved exactly one bounded funding transaction; GitHub script staged, NOT broadcast
+
+Owner explicitly authorized ONE native original chain31340
+transaction transferring **1 TEST ETH** from existing
+VM4706 encrypted Genesis execution EOA
+`0x13fb73aace8A11Be2899D047635A757a224Ce00B`
+to new VM4707 app-only V2 deployer
+`0xED0ED5E0526898c6E0e3C83140efcA12672E7ff0`,
+with **at most 21,000 gas and 1,000 wei/gas**.
+VM4706 `cast estimate` actually returned 21,000
+and `cast gas-price` 1,000 wei; public owner EOA
+balance was 1,000,007.984391109 TEST ETH, nonce0.
+
+New `scripts/r254_vm4706_authorized_one_time_v2_deployer_funding.sh`
+performs strict live original genesis/chain/wallet/address
+and cap checks, requires an explicit local TTY phrase,
+prompts encrypted wallet password privately, pins nonce0
+and performs **only ONE** controlled Cast transmission.
+It also creates an owner-private one-shot attempt marker.
+**No transaction has yet been signed or broadcast by
+GitHub or this assistant; new script is not VM-proven.**
+See `docs/R254_VM4706_OWNER_APPROVED_SINGLE_ONE_TEST_ETH_FUNDING.md`.
+Only after actual canonical/finalized receipt and VM4707
+balance should separately authorized V2 deployment proceed.
+
+---
+
 # R253 — 0 native TEST ETH at V2 deployer; VM4706 Genesis owner EOA previously UNLOCKED successfully
 
 Owner VM4707 read-only check: encrypted deployer file
