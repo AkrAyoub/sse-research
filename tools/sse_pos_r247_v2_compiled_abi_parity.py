@@ -117,14 +117,33 @@ def check_function(abi,signature_string,outputs=None):
                       "; expected "+repr(expected)+"; got "+repr(actual))
 
 
+# OpenZeppelin EIP712 implements IERC5267, so the actual compiled ABI
+# contains EIP712DomainChanged() even though neither SSE V2 contract defines
+# or emits this library event itself. It has NO event parameters, and is not
+# an application state transition decoded by R227. It must NOT be silently
+# treated as a new SSE event, nor must other third-party events be ignored.
+INHERITED_EIP712_DOMAIN_EVENT="EIP712DomainChanged()"
+
+
 def check_events(abi,definitions,role):
     actual=index(abi,"event")
     expect={d[0]:d for d in definitions}
-    if set(actual)!=set(expect):
+    expected_app=set(expect)
+    compiled=set(actual)
+    allowed_inherited={INHERITED_EIP712_DOMAIN_EVENT}
+    missing_app=expected_app-compiled
+    unexpected=compiled-expected_app-allowed_inherited
+    if missing_app or unexpected:
         raise Refused(role+" compiled events no longer match every Python decoder; "+
-                      "missing="+repr(sorted(set(actual)-set(expect)))+
-                      "; unexpected="+repr(sorted(set(expect)-set(actual))))
+                      "missingApplicationEvents="+repr(sorted(missing_app))+
+                      "; unrecognizedCompiledEvents="+repr(sorted(unexpected)))
     for sig,entry in actual.items():
+        if sig==INHERITED_EIP712_DOMAIN_EVENT:
+            # Validate the complete imported EIP-5267 event shape, rather
+            # than allowing any event with the same name to bypass parity.
+            if entry.get("anonymous") is not False or entry.get("inputs")!=[]:
+                raise Refused(role+" malformed inherited EIP712 domain event")
+            continue
         _,indexed,fields=expect[sig]
         if entry.get("anonymous") not in (False,None):
             raise Refused("unexpected anonymous V2 event: "+sig)
