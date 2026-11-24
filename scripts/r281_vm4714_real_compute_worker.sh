@@ -13,8 +13,8 @@ if [[ ! "$PIN" =~ ^[0-9a-f]{40}$ ]]; then
   echo "R281_REFUSED: exact lowercase 40-hex pinned Git SHA required" >&2
   exit 2
 fi
-if [[ "$MODE" != "--preview" && "$MODE" != "--run" ]]; then
-  echo "R281_REFUSED: use --preview (no effects) or --run (one real worker)" >&2
+if [[ "$MODE" != "--preview" && "$MODE" != "--run" && "$MODE" != "--run-sudo" ]]; then
+  echo "R281_REFUSED: use --preview (no effects), --run (nonroot), or --run-sudo (dedicated VM only)" >&2
   exit 2
 fi
 if [[ "$(id -un)" != "ayoubakrvm4714" || "$(id -u)" == 0 ]]; then
@@ -58,14 +58,20 @@ if [[ ! -t 0 || ! -t 2 ]]; then
   exit 2
 fi
 
-read -r -p "Type START-ONE-R281-REAL-COMPUTE-VM4714 to BUILD and START one localhost-only real CPU worker: " CONFIRM
-if [[ "$CONFIRM" != "START-ONE-R281-REAL-COMPUTE-VM4714" ]]; then
+CONSENT="START-ONE-R281-REAL-COMPUTE-VM4714"
+if [[ "$MODE" == "--run-sudo" ]]; then
+  # Privileged Docker API is effectively root on THIS dedicated lab VM.
+  # The user must explicitly choose this mode; NO privilege fallback.
+  CONSENT="START-ONE-R283-DEDICATED-VM4714-SUDO-DOCKER-COMPUTE"
+fi
+read -r -p "Type $CONSENT to BUILD and START ONE localhost-only dedicated CPU worker: " CONFIRM
+if [[ "$CONFIRM" != "$CONSENT" ]]; then
   echo "R281_REFUSED: exact local authorization absent" >&2
   exit 2
 fi
 
-if [[ ! -S /var/run/docker.sock || ! -r /var/run/docker.sock || ! -w /var/run/docker.sock ]]; then
-  echo "R281_REFUSED: owner lacks local Docker Unix socket access; NO sudo/fallback" >&2
+if [[ ! -S /var/run/docker.sock || -L /var/run/docker.sock ]]; then
+  echo "R281_REFUSED: local Docker Unix socket missing or symlinked" >&2
   exit 2
 fi
 if ! command -v docker >/dev/null 2>&1; then
@@ -73,6 +79,17 @@ if ! command -v docker >/dev/null 2>&1; then
   exit 2
 fi
 DOCKER=(docker --host "$SOCKET")
+if [[ "$MODE" == "--run-sudo" ]]; then
+  if [[ "$(stat -c %u /var/run/docker.sock)" != "0" ]] ||
+    ! command -v sudo >/dev/null 2>&1; then
+    echo "R283_REFUSED: root-owned local socket and existing sudo binary required" >&2
+    exit 2
+  fi
+  DOCKER=(sudo -n docker --host "$SOCKET")
+elif [[ ! -r /var/run/docker.sock || ! -w /var/run/docker.sock ]]; then
+  echo "R281_REFUSED: owner lacks local Docker Unix socket access; NO automatic sudo fallback" >&2
+  exit 2
+fi
 # No Docker CLI environment variables, TLS endpoints or remote daemon.
 unset DOCKER_CONTEXT DOCKER_HOST DOCKER_TLS_VERIFY DOCKER_CERT_PATH
 
@@ -132,7 +149,7 @@ if [[ ! -x "$PY" ]]; then
   echo "R281_REFUSED: existing isolated app-only Python venv missing" >&2
   exit 2
 fi
-IMAGE_ID="$IMAGE_ID" PYTHONPATH="$ROOT/tools:$ROOT/services/provider-agent" "$PY" -B - <<'PY'
+IMAGE_ID="$IMAGE_ID" R283_EXPLICIT_VM4714_SUDO_DOCKER="$([[ "$MODE" == "--run-sudo" ]] && echo 1 || echo 0)" PYTHONPATH="$ROOT/tools:$ROOT/services/provider-agent" "$PY" -B - <<'PY'
 import json
 import os
 import secrets
@@ -145,7 +162,10 @@ profile={
     "memoryBytes":256*2**20
 }
 verified=inspect_container(profile,profile["endpoint"],"sse-compute-vm4714",
-                           strict_hardening=True)
+                           strict_hardening=True,
+                           dedicated_vm4714_sudo_docker=(
+                             os.environ.get("R283_EXPLICIT_VM4714_SUDO_DOCKER")=="1"
+                           ))
 if verified["runtimeReportedRunning"] is not True:
     raise SystemExit("R281_REAL_DOCKER_WORKER_NOT_RUNNING")
 challenge="0x"+secrets.token_hex(32)
@@ -165,11 +185,18 @@ print(json.dumps({
  "localhostOnlyWorker":True,
  "onChainLeaseOrSlaProven":False,
  "onChainTransactionSent":False,
- "nativeNodeOrWalletAccess":False
+ "nativeNodeOrWalletAccess":False,
+ "dedicatedOwnerAuthorizedSudoDocker":(
+   os.environ.get("R283_EXPLICIT_VM4714_SUDO_DOCKER")=="1"
+ )
 },sort_keys=True,indent=2))
 PY
 KEEP=true
 trap - EXIT
-echo "R281_VM4714_ACTUAL_ISOLATED_CPU_WORKER_RUNNING_AND_VERIFIED=true"
+if [[ "$MODE" == "--run-sudo" ]]; then
+  echo "R283_VM4714_ACTUAL_DEDICATED_SUDO_DOCKER_CPU_WORKER_VERIFIED=true"
+else
+  echo "R281_VM4714_ACTUAL_ISOLATED_CPU_WORKER_RUNNING_AND_VERIFIED=true"
+fi
 echo "R281_WORKER_CONTAINER_ID=$CID"
 echo "R281_REAL_WORKER_IMAGE_ID=$IMAGE_ID"
