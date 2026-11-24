@@ -1,3 +1,35 @@
+# R272 — real consumer transfer canonical and funded at latest, 40 execution blocks short of finality; VM4709 has available real resources but Docker access blocked
+
+Owner VM4707 R271 actual new 5/5 focused tests PASS,
+live read-only exact consumer funding tx
+`0x9f3a13cb295b5ba2f642804a30c391b9cce266784a83dd293d0dd7fb7d1f9fdd`
+canonical receipt SUCCESS at included block **25564**,
+consumer latest balance **0.01 TEST ETH**,
+consumer finalized balance **0**,
+execution head **25676**, finalized block **25524** (gap **40**).
+Original Beacon genesis matched, head epoch **852**,
+finalized epoch **848** (lag4); no R267 Monitor1
+nonce2 or Monitor2 nonce3 send yet. Do not replay the
+consumer nonce1 transfer or bypass real finality.
+
+New real VM4709 owner's HOST inventory: **4 CPUs,
+~10GiB available RAM, 92GiB free disk**, local Docker
+CLI `docker ps` permission DENIED, system Python
+`eth_account` absent. Existing Besu/Lighthouse node
+containers may be running regardless of socket access;
+not proven stopped. New `tools/sse_pos_r272_vm4709_provider_host_readonly_preflight.py`
+and 7 focused offline mocked tests stage owner-only
+read-only real Linux CPU/RAM/disk, nonroot Docker
+Unix-socket ownership/permission/ps checks, Python
+venv/eth_account detection, NEVER sudo, never start
+or stop native PoS client. **R272 not yet tested
+on actual VM4709.** Current owner host is a
+candidate resource provider, but no real Docker
+workload, provider EOA or WAN SLA yet.
+Source/command: `docs/R272_REAL_CONSUMER_TX_40_BLOCK_FINALITY_GAP_AND_VM4709_PROVIDER_HOST_GATE.md`.
+
+---
+
 # R271 — user REAL R267 confirms consumer receipt successful+canonical, still pending FINALITY; no monitor send
 
 User twice ran the owner-authorized R267 `--role monitor-1` checks
