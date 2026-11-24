@@ -32,7 +32,7 @@ if [[ -n "$(git status --porcelain --untracked-files=no)" ]]; then
   echo "R281_REFUSED: tracked source modifications present" >&2
   exit 2
 fi
-for p in Dockerfile.sse-compute tools/sse_compute_docker.py tools/compute_workload.py services/provider-agent/compute_http_service.py; do
+for p in Dockerfile.sse-compute tools/sse_compute_docker.py tools/compute_workload.py tools/sse_pos_r285_vm4714_preserve_existing_docker_readonly_gate.py services/provider-agent/compute_http_service.py; do
   if [[ ! -f "$p" || -L "$p" ]]; then
     echo "R281_REFUSED: required real source missing or symlinked: $p" >&2
     exit 2
@@ -97,10 +97,22 @@ if ! "${DOCKER[@]}" info --format '{{.ServerVersion}}' >/dev/null; then
   echo "R281_REFUSED: local Docker daemon inaccessible" >&2
   exit 2
 fi
-EXISTING="$("${DOCKER[@]}" ps -a -q)"
+EXISTING="$("${DOCKER[@]}" ps -a --no-trunc -q)"
 if [[ -n "$EXISTING" ]]; then
-  echo "R281_REFUSED: dedicated compute host has existing Docker containers; do not disturb them" >&2
-  exit 2
+  if [[ "$MODE" != "--run-sudo" ]]; then
+    echo "R281_REFUSED: dedicated compute host has existing Docker containers; do not disturb them" >&2
+    exit 2
+  fi
+  # The owner independently inspected EXACTLY three old exited hello-world
+  # containers on VM4714. Never delete/restart these old containers.
+  # If even one ID, image, name or running status changed, FAIL CLOSED.
+  GATE_PY="$HOME/.local/share/sse-v2-app-only/pyvenv/bin/python"
+  if [[ ! -x "$GATE_PY" ]]; then
+    echo "R285_REFUSED: existing isolated Python virtualenv unavailable" >&2
+    exit 2
+  fi
+  "$GATE_PY" -B tools/sse_pos_r285_vm4714_preserve_existing_docker_readonly_gate.py --audit
+  echo "R285_EXACT_THREE_EXISTING_EXITED_HELLOWORLD_ALLOWED_WITHOUT_MUTATION=true"
 fi
 
 # Real image build uses the repository's already-existing Dockerfile.
