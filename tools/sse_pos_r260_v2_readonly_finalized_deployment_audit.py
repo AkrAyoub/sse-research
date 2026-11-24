@@ -32,7 +32,14 @@ from sse_pos_r257_vm4707_one_time_v2_deployment import (
     APP, CHAIN, GENESIS, BOND_WEI, GAS_LIMIT, GAS_PRICE_WEI,
     MAX_FEE_WEI, create_address,
 )
-from sse_pos_r255_v2_funding_finalized_audit import verify as r255_verify
+from sse_pos_r255_v2_funding_finalized_audit import (
+    TX_HASH as FUNDING_TX_HASH,
+    SOURCE as ORIGINAL_FUNDING_SOURCE,
+    DESTINATION as ORIGINAL_FUNDING_DESTINATION,
+    VALUE_WEI as FUNDING_VALUE_WEI,
+    GAS_LIMIT as FUNDING_GAS_LIMIT,
+    GAS_PRICE_CAP_WEI as FUNDING_GAS_PRICE_CAP_WEI,
+)
 
 RPC = "http://127.0.0.1:28545"
 TX_HASH = "0xe9187bd24d72d2dec11fc6a2758802ddf6fa46a2941edd306329173fe132d6b6"
@@ -126,8 +133,56 @@ def require_slot_value(runtime, value, label):
         raise Refused(label+" not found in actual Solc immutable patch slots")
 
 
+def verify_original_funding_history(rpc_url, *,transport=rpc_transport):
+    """Original finalized 1 TEST ETH incoming transfer; no current balance test.
+
+    Recipient legitimately spends some of the 1 TEST ETH on deployment
+    gas. R255's original balance>=1e18 test is intentionally unsuitable
+    after that expenditure. Prove original transfer from its immutable
+    historical transaction, canonical receipt and finalized ancestry.
+    """
+    ask=lambda method,params:transport(rpc_url,method,params)
+    tx=ask("eth_getTransactionByHash",[FUNDING_TX_HASH])
+    receipt=ask("eth_getTransactionReceipt",[FUNDING_TX_HASH])
+    if type(tx) is not dict or type(receipt) is not dict:
+        raise Refused("original funding transaction/receipt missing from node")
+    if (hash32(tx.get("hash"),"funding tx hash") != FUNDING_TX_HASH or
+        require_address(tx.get("from"),"original source")!=ORIGINAL_FUNDING_SOURCE.lower() or
+        require_address(tx.get("to"),"funding destination")!=APP.lower() or
+        APP.lower()!=ORIGINAL_FUNDING_DESTINATION.lower() or
+        quantity(tx.get("value"),"funding value")!=FUNDING_VALUE_WEI or
+        quantity(tx.get("nonce"),"funding nonce")!=0 or
+        quantity(tx.get("gas"),"funding gas")!=FUNDING_GAS_LIMIT or
+        quantity(tx.get("gasPrice"),"funding gasPrice")>FUNDING_GAS_PRICE_CAP_WEI or
+        tx.get("input")!="0x" or
+        hash32(receipt.get("transactionHash"),"funding receipt hash")!=FUNDING_TX_HASH or
+        quantity(receipt.get("status"),"funding receipt status")!=1 or
+        quantity(receipt.get("gasUsed"),"funding gas used")!=FUNDING_GAS_LIMIT):
+        raise Refused("original authorized 1 TEST ETH funding was not actually transferred")
+    if (require_address(receipt.get("from"),"receipt funding source")!=
+        ORIGINAL_FUNDING_SOURCE.lower() or
+        require_address(receipt.get("to"),"receipt funding destination")!=APP.lower()):
+        raise Refused("original funding receipt counterparties mismatch")
+    inclusion=quantity(receipt.get("blockNumber"),"original funding block")
+    canonical=ask("eth_getBlockByNumber",[hex(inclusion),False])
+    if (inclusion<=0 or type(canonical) is not dict or
+        hash32(canonical.get("hash"),"original funding canonical hash")!=
+        hash32(receipt.get("blockHash"),"original funding receipt blockHash")):
+        raise Refused("original funding transaction is no longer canonical")
+    final=ask("eth_getBlockByNumber",["finalized",False])
+    if type(final) is not dict:
+        raise Refused("original funding cannot be finalized without finalized block")
+    final_number=quantity(final.get("number"),"funding finalization height")
+    if final_number<inclusion:
+        raise Pending("FUNDING_INCLUDED_BUT_NOT_FINALIZED_NO_RESENDS",
+                      includedFundingBlock=inclusion,finalizedExecutionBlock=final_number)
+    return {"fundingTransactionHash":FUNDING_TX_HASH,
+            "fundingIncludedBlock":inclusion,
+            "fundingTransferFinalized":True}
+
+
 def verify(rpc_url, market_artifact, ledger_artifact, *,transport=rpc_transport,
-           r206_fn=r206_verify, funding_fn=r255_verify):
+           r206_fn=r206_verify, funding_fn=verify_original_funding_history):
     if rpc_url != RPC:
         raise Refused("only approved local VM4707 native RPC allowed")
     initcode=pin_artifacts(market_artifact,ledger_artifact,BOND_WEI)
@@ -144,11 +199,11 @@ def verify(rpc_url, market_artifact, ledger_artifact, *,transport=rpc_transport,
     if type(genesis) is not dict or hash32(genesis.get("hash"),"genesis")!=GENESIS:
         raise Refused("original execution genesis mismatch")
 
-    # The previous funding must still be genuine, canonical and finalized.
+    # Funding stays valid even after the app EOA has paid deployment gas.
     funding=funding_fn(rpc_url,transport=transport)
-    if (funding.get("fundingTxCanonicalAndFinalizedVerified") is not True or
-        funding.get("destination","").lower()!=APP.lower()):
-        raise Refused("original funded app EOA source not fully proven")
+    if (funding.get("fundingTransferFinalized") is not True or
+        funding.get("fundingTransactionHash")!=FUNDING_TX_HASH):
+        raise Refused("original historical native funding not canonical and finalized")
 
     tx=ask("eth_getTransactionByHash",[TX_HASH])
     if tx is None:
@@ -249,6 +304,8 @@ def verify(rpc_url, market_artifact, ledger_artifact, *,transport=rpc_transport,
         "deploymentTransactionHash":TX_HASH,
         "chainId":CHAIN,
         "originalGenesisVerified":True,
+        "originalFundingTransactionHash":FUNDING_TX_HASH,
+        "originalFundingVerifiedAsCanonicalAndFinalizedAtHistoricalBlock":True,
         "approvedConstructorInitcodeSha256":APPROVED_INITCODE_SHA256,
         "deployerAppEOA":APP,
         "nonce":0,
