@@ -86,10 +86,17 @@ def inspect_container(profile: dict, endpoint: str, container_name: str,
         # Docker's default context or rootful PoS host socket in this mode.
         command += ['--host', require_local_owner_rootless_socket(docker_socket)]
     command += ['container', 'inspect', container_name]
+    env = None
+    if docker_socket is not None:
+        # Docker context/host environment must not override the explicit
+        # private Unix socket when other Docker CLIs share this shell.
+        env = dict(os.environ)
+        env.pop('DOCKER_CONTEXT', None)
+        env.pop('DOCKER_HOST', None)
     try:
         p = subprocess.run(command,
                            capture_output=True, text=True, check=False,
-                           timeout=8, shell=False)
+                           timeout=8, shell=False, env=env)
     except (FileNotFoundError, subprocess.TimeoutExpired, OSError) as exc:
         raise ComputeError('Docker CLI unavailable or timed out; start Docker Desktop') from exc
     if p.returncode != 0:
