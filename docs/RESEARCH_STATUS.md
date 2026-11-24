@@ -1,3 +1,31 @@
+# R255 — First actual one-time native TEST ETH funding tx submitted; receipt/finality NEXT
+
+VM4706 owner at exact reviewed SHA
+`c0e0d78f0be3f5816b146eb51cd07ee98c4d4c22`
+verified fixed original chain/genesis, existing private
+encrypted source EOA public signer, sender pending nonce0,
+recipient zero balance/no code, authorized 21,000 gas at
+fixed 1,000 wei/gas, then explicitly typed
+`SEND-ONE-CHAIN31340-1-TEST-ETH`.
+Owner ran exactly ONE signed `cast send --async` with local
+hidden password and obtained RPC-submitted public hash:
+`0x07e3ff069936936b3daf17efc5cb484c1712e93dc6bd6040c55a5fae1b8d2a90`.
+`R254_SINGLE_CAST_SEND_RETURNED=true` and
+the private one-shot attempt marker was consumed.
+**DO NOT RERUN R254 OR RESEND**.
+
+**Not yet proved:** actual mined receipt, canonical success,
+execution finality, net gas fee, or actual post-transfer
+VM4707 application EOA balance. New source
+`tools/sse_pos_r255_v2_funding_finalized_audit.py`
+performs ONLY read-only original-chain RPC verification
+from VM4706 or VM4707. Targeted tests are newly added but
+**not yet VM-tested**. R255 must show finalized receipt
+before any separate owner-authorized V2 deployment.
+Evidence `docs/R255_VM4706_ONE_NATIVE_TEST_ETH_SIGNED_SUBMISSION_AND_RECEIPT_GATE.md`.
+
+---
+
 # R254 — Owner approved exactly one bounded funding transaction; GitHub script staged, NOT broadcast
 
 Owner explicitly authorized ONE native original chain31340
