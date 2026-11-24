@@ -6,6 +6,7 @@ observation, NOT remote cloud or trusted-execution attestation.
 from __future__ import annotations
 import json
 import os
+import pwd
 from pathlib import Path
 import re
 import stat
@@ -66,7 +67,8 @@ def require_local_owner_rootless_socket(socket_path: str) -> str:
 
 def inspect_container(profile: dict, endpoint: str, container_name: str,
                       strict_hardening: bool = False, *,
-                      docker_socket: str | None = None) -> dict:
+                      docker_socket: str | None = None,
+                      dedicated_vm4714_sudo_docker: bool = False) -> dict:
     """Read local Docker config; verify exact image/CPU/memory/port.
 
     strict_hardening=True is mandatory for the new signed marketplace
@@ -81,18 +83,36 @@ def inspect_container(profile: dict, endpoint: str, container_name: str,
     if not isinstance(profile.get('imageId'), str) or not _IMAGE.fullmatch(profile['imageId']):
         raise ComputeError('profile requires an immutable image ID')
     command = ['docker']
-    if docker_socket is not None:
-        # An explicitly selected private nonroot daemon. Never inherit
-        # Docker's default context or rootful PoS host socket in this mode.
+    if dedicated_vm4714_sudo_docker:
+        if docker_socket is not None or not strict_hardening:
+            raise ComputeError('dedicated VM4714 sudo requires strict policy and no rootless socket')
+        uid=os.geteuid()
+        if uid==0 or pwd.getpwuid(uid).pw_name!='ayoubakrvm4714':
+            raise ComputeError('privileged local Docker inspection limited to nonroot VM4714 owner')
+        rootful=Path('/var/run/docker.sock')
+        if rootful.is_symlink() or not rootful.exists():
+            raise ComputeError('rootful Docker socket missing or symlinked')
+        st=rootful.stat()
+        if not stat.S_ISSOCK(st.st_mode) or st.st_uid!=0:
+            raise ComputeError('rootful Docker socket not a root-owned Unix socket')
+        if container_name!='sse-compute-vm4714' or endpoint!='http://127.0.0.1:8877':
+            raise ComputeError('only exact dedicated local compute container may be sudo-inspected')
+        # Explicit opt-in privileged read-only inspect, limited to dedicated
+        # VM4714, NEVER the blockchain Docker host VM4706/4707/4709.
+        command=['sudo','-n','docker','--host','unix:///var/run/docker.sock']
+    elif docker_socket is not None:
+        # Explicitly selected private nonroot daemon. Never inherit Docker
+        # default context or rootful PoS host socket in this mode.
         command += ['--host', require_local_owner_rootless_socket(docker_socket)]
     command += ['container', 'inspect', container_name]
     env = None
-    if docker_socket is not None:
-        # Docker context/host environment must not override the explicit
-        # private Unix socket when other Docker CLIs share this shell.
+    if docker_socket is not None or dedicated_vm4714_sudo_docker:
+        # Never allow a shared shell to override the explicit local socket.
         env = dict(os.environ)
         env.pop('DOCKER_CONTEXT', None)
         env.pop('DOCKER_HOST', None)
+        env.pop('DOCKER_TLS_VERIFY', None)
+        env.pop('DOCKER_CERT_PATH', None)
     try:
         p = subprocess.run(command,
                            capture_output=True, text=True, check=False,
@@ -168,9 +188,12 @@ def inspect_container(profile: dict, endpoint: str, container_name: str,
             'memoryBytes': profile['memoryBytes'], 'hostPort': port,
             'containerId': d['Id'], 'runtimeReportedRunning': True,
             'localDockerConfigurationInspected': True, 'trustedHardwareAttestation': False,
-            'dockerDaemonSelection': ('EXACT_OWNER_ROOTLESS_UNIX_SOCKET'
-                                      if docker_socket is not None
-                                      else 'LEGACY_DEFAULT_CONTEXT_NOT_ROOTLESS_ATTESTED')}
+            'dockerDaemonSelection': (
+                'DEDICATED_VM4714_EXPLICIT_SUDO_ROOTFUL_UNIX_SOCKET'
+                if dedicated_vm4714_sudo_docker else
+                'EXACT_OWNER_ROOTLESS_UNIX_SOCKET'
+                if docker_socket is not None else
+                'LEGACY_DEFAULT_CONTEXT_NOT_ROOTLESS_ATTESTED')}
 
 
 def run_compute_probe(endpoint: str, lease_id: int, epoch_id: int, request_hash: str) -> dict:
