@@ -97,6 +97,9 @@ def observe(*,user=None,probe=False,connect=socket.create_connection,
         tcp_probe(PROVIDER_IPV4,port,connect=connect) for port in (22,8877)
     ]
     result["privateProviderHostTcpChecked"]=True
+    result["unexpectedRawWorkerPrivateNetworkExposureObserved"]=(
+        result["actualNetworkProbes"][1]["tcpStatus"]=="TCP_HANDSHAKE_SUCCEEDED"
+    )
     # The data-plane is only local VM4714 localhost. Other VMs MUST
     # wait for authenticated TLS or explicitly owner-approved SSH forwarding.
     if user=="ayoubakrvm4714":
