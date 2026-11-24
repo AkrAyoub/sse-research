@@ -70,6 +70,10 @@ class TestR237ApprovedSigningGate(unittest.TestCase):
     def test_keystore_requires_nonroot_private_directory_and_encryption(self):
         with tempfile.TemporaryDirectory() as td:
             path=Path(td)/"wallet.json"
+            # pathlib.Path(...) returns the concrete OS subclass PosixPath
+            # on Linux; production owner-local keystores must be accepted.
+            self.assertIsInstance(path,Path)
+            self.assertIsNot(type(path),Path)
             raw={"crypto":{"cipher":"aes-128-ctr","ciphertext":"a"*240,
                             "cipherparams":{},"kdf":"scrypt","kdfparams":{},"mac":"a"*64},
                  "id":"id","version":3}
