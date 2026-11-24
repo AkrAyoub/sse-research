@@ -1,3 +1,9 @@
+# R268 — actual VM4707 R267 9/9 tests and finalized consumer nonce1 funding PREVIEW PASS; waiting for NEW owner funding consent
+
+At exact pinned Git SHA `8e10d74356fbfc33d493c103f7667d09d2f48c6f`, owner actually executed new R267 focused offline safety suite **9/9 PASS**, then actual VM4707 original-chain31340 read-only consumer native funding preview **PASS** with marker `R267_FUNDING_PREVIEW_ONLY_NO_SIGNING_NO_BROADCAST=true`. Actual latest finalized execution block **25396**, R206 native V2 finalized deployment verification **TRUE**. Already-funded separate app-only source `0xED0ED5E0526898c6E0e3C83140efcA12672E7ff0` latest balance **999999993383597000 wei**, latest/pending nonce **1**. Consumer `0xD74A2aBC5a906BaFe39471CEe222c48BDD62DE3f` real EOA zero balance/nonce/no-code. Actual Besu basic native transfer gas estimate **21000**. Exact proposed consumer nonce1 transfer **10000000000000000 wei =0.01 TEST ETH**, gasLimit21000 gasPrice1000wei/gas, max single debit **10000000021000000 wei**. Remaining intended stages monitor1 nonce2 **0.005**, monitor2 nonce3 **0.005** testETH, total proposed across stages **20000000063000000 wei**, but **NO new TEST ETH transfer has been approved, signed, broadcast or finalized**. Public evidence `evidence/r268_vm4707_r267_consumer_funding_readonly_preview.json`. Wait for explicit user approval before ever suggesting --send; R267 sender remains user-local interactive + marker-gated, no silent sends. Existing deployer R257/R254 approval is consumed.
+
+---
+
 # R267 — FIRST native V2 contract deployment is ACTUALLY FINALIZED; one-by-one real role funding implementation STAGED, NOT authorized
 
 Owner VM4707 REAL R265 focused regression **8/8 PASS**,
