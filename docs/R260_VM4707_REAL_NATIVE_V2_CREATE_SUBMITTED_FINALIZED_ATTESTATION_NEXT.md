@@ -60,7 +60,10 @@ R260 checks all of the following before returning success:
    native ABI source and the exact approved constructor
    bytecode SHA256, not merely contract name or ABI.
 2. Original execution chain ID31340 and original Genesis hash,
-   actual first funding R255 tx finality (retained as evidence).
+   the actual first native R254 funding transaction's original
+   sender/recipient/value/nonce/status and canonical finality
+   **at its historical inclusion block**. Do not require the
+   deployer to still hold the initial 1 ETH after spending gas.
 3. EXACT contract CREATE transaction hash, sender, nonce0,
    null recipient, 0 tx value, fixed signed legacy gasLimit
    8342601, gasPrice1000, original chainId, exact approved
@@ -108,10 +111,14 @@ R260 return markers:
 - Mismatch/refusal return code2,
   `R260_DEPLOYMENT_AUDIT_REFUSED`. Do NOT bypass.
 
-Nine new focused synthetic/mock regressions exist in
+Eleven new focused synthetic/mock regressions exist in
 `tests/test_sse_pos_r260_v2_readonly_finalized_deployment_audit.py`.
 **Neither focused tests nor R260 real RPC verification
-have been observed run on VM4707 yet.**
+have been observed run on VM4707 yet.** This verifier
+deliberately does not reuse R255's original requirement
+that the app deployer have >=1 ETH at the *current finalized*
+height; that would incorrectly fail as soon as the
+actual contract deployment has spent network gas.
 
 ## Owner next exact command
 
