@@ -1,6 +1,7 @@
 """R257 dry-run/one-shot owner deployment policy. ALL RPC/signers mocked; NO SEND."""
 from pathlib import Path
 import contextlib
+import hashlib
 import io
 import sys
 import tempfile
@@ -59,8 +60,11 @@ def transport(nonce="0x0",code="0x"):
 class TestR257ActualOwnerOneCreatePolicy(unittest.TestCase):
     def run_preflight(self,*,quote_data=None,funding_data=None,nonce="0x0",code="0x"):
         t,calls=transport(nonce=nonce,code=code)
-        with patch.object(m,"create_address",return_value="0x"+"ab"*20),patch.object(
-            m,"pin_artifacts",return_value="0xaabb"):
+        fake_initcode="0xaabb"
+        fake_digest=hashlib.sha256(bytes.fromhex(fake_initcode[2:])).hexdigest()
+        with patch.object(m,"create_address",return_value=m.APPROVED_MARKET_ADDRESS),patch.object(
+            m,"pin_artifacts",return_value=fake_initcode),patch.object(
+            m,"APPROVED_INITCODE_SHA256",fake_digest):
             d=m.preflight({}, {}, transport=t,
                  quote_fn=lambda *a,**k: quote_data if quote_data is not None else offer(),
                  funding_fn=lambda *a,**k: funding_data if funding_data is not None else funding())
@@ -180,10 +184,55 @@ class TestR257ActualOwnerOneCreatePolicy(unittest.TestCase):
             addr=m.create_address(m.APP)
             self.assertEqual(addr,"0x"+"11"*20)
 
+    def test_owner_approved_full_compiled_initcode_digest_rejects_drift(self):
+        # Even identical ABI and byte lengths cannot approve different
+        # executable deployment bytes; exact full SHA256 is mandatory.
+        t,_=transport()
+        with patch.object(m,"create_address",return_value=m.APPROVED_MARKET_ADDRESS),patch.object(
+            m,"pin_artifacts",return_value="0xaabb"):
+            with self.assertRaisesRegex(m.Refused,"SHA256 differs"):
+                m.preflight({}, {}, transport=t,
+                    quote_fn=lambda *a,**k: offer(),
+                    funding_fn=lambda *a,**k: funding())
+        self.assertEqual(m.APPROVED_INITCODE_SHA256,
+            "22d5b3310ec9a9efc66015762ea3d78d152f0a52eb9d67a257f18e3470c171ec")
+
+    def test_owner_approved_market_create_address_refuses_change(self):
+        t,_=transport()
+        with patch.object(m,"create_address",return_value="0x"+"ab"*20),patch.object(
+            m,"pin_artifacts",side_effect=AssertionError("NO INITCODE READ")):
+            with self.assertRaisesRegex(m.Refused,"owner-approved R257"):
+                m.preflight({}, {}, transport=t,
+                    quote_fn=lambda *a,**k: offer(),
+                    funding_fn=lambda *a,**k: funding())
+
+    def test_ephemeral_fake_key_signs_legacy_contract_create_offline(self):
+        # No real key, no key file, no ETH, no RPC; validates the exact
+        # contract CREATE transaction encoding before accessing app wallet.
+        try:
+            from eth_account import Account
+        except ImportError:
+            self.skipTest("local test venv missing eth-account")
+        fake_key=bytes([7])*32
+        signer=Account.from_key(fake_key)
+        unsigned={
+            "chainId":m.CHAIN,"nonce":m.EXPECTED_NONCE,
+            "gas":m.GAS_LIMIT,"gasPrice":m.GAS_PRICE_WEI,
+            "to":"","value":0,"data":bytes.fromhex("60006000"),
+        }
+        signed=Account.sign_transaction(unsigned,fake_key)
+        self.assertEqual(Account.recover_transaction(
+            "0x"+bytes(signed.raw_transaction).hex()).lower(),
+            signer.address.lower())
+        self.assertTrue(bytes(signed.raw_transaction).startswith(b"\xf8") or
+                        bytes(signed.raw_transaction).startswith(b"\xf9"))
+
     def test_r257_has_strict_immutable_pending_only_funding_parameters(self):
         self.assertEqual(m.BOND_WEI,10**15)
         self.assertEqual(m.GAS_LIMIT,8_342_601)
         self.assertEqual(m.GAS_PRICE_WEI,1000)
+        self.assertEqual(m.APPROVED_MARKET_ADDRESS.lower(),
+                         "0x6c01dbd7aa336a96d8ab09ea631e209612224080")
         self.assertEqual(m.EXPECTED_NONCE,0)
         self.assertEqual(m.CONFIRM,"DEPLOY-ONE-V2-CHAIN31340-BOND-0.001-TEST-ETH")
         self.assertNotEqual(m.APP.lower(),"0x13fb73aace8a11be2899d047635a757a224ce00b")
