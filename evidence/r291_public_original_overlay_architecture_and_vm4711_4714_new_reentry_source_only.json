@@ -52,14 +52,15 @@
       "tests/test_sse_pos_r291_common_public_overlay_onboarding.py",
       "tests/test_sse_pos_r291_verified_vendor_package_only.py"
     ],
-    "authoredFocusedTests": 28,
+    "authoredFocusedTests": 30,
     "ownerVmNewFocusedTestsPassed": false,
     "actualR291ZerotierJoinSubmitted": false,
     "actualR291VendorSignedPackageInstallationExecuted": false,
     "existingVMSignerDockerSshChanged": false,
     "prohibitsPrivateInfrastructureDataPlane": true,
     "doesNotRequirePreapprovedMonitorSshKeys": true,
-    "doesNotSetVmRoleMembershipCaps": true
+    "doesNotSetVmRoleMembershipCaps": true,
+    "packageAutomaticUnrelatedServiceRestartsDisabled": true
   },
   "funding": {
     "originalThreeNativeRoleGrantsFinalized": true,
