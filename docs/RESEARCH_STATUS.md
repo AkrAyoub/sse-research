@@ -1,3 +1,34 @@
+# R263 — Real V2 market healthy but has ZERO registered participants; finality only 7 blocks short
+
+VM4707 actually ran the new R262 5/5 focused tests PASS,
+then read the real chain31340 V2 market and ledger:
+`R262_REAL_V2_LIVE_ROLE_READINESS_READONLY_NO_TX=true`.
+Original canonical deployed contract block25339; at actual
+latest head25476 execution finalized25332 (**7 blocks short**).
+Both deployed actual runtime SHA256 hashes match R261 exact
+public evidence; Solc nonimmutable-byte parity and
+known constructor immutable values pass. Actual market
+`activeMonitorCount=0`, `nextRequestId=1`,
+`nextLeaseId=1`; service escrow, pending monitor
+funding, monitor bonds, withdrawable credits and
+market+ledger balances all =0. Real native contracts are
+empty, financially solvent, no real resource requests or
+leases; do NOT pretend a live marketplace SLA already ran.
+No wallet keys accessed or signed transaction sent.
+
+Next: run R260 and R206 exactly ONCE after finality
+covers block25339; prepare genuinely separate consumer,
+provider and four bonded monitor application-only
+encrypted EOAs using existing `tools/sse_pos_test_wallet.py`
+on their actual participating hosts, then per-role native
+TEST ETH funding+registration and real provider
+work with **separate new on-chain transaction approvals**.
+Four EOAs on one machine are not four independent
+hardware/operators. Evidence/plan:
+`docs/R263_VM4707_REAL_V2_LIVE_MARKET_EMPTY_STATE_AND_ROLE_IDENTITY_BOOTSTRAP.md`.
+
+---
+
 # R262 — actual live post-deploy Solc runtime parity VERIFIED; one-shot native role-readiness added
 
 Owner's actual VM4707 EVM runtime+compiler parity command
