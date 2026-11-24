@@ -1,3 +1,25 @@
+# R250 — R249 real VM4707 full V2 source+compiled-ABI regression PASS
+
+**Newest verified owner VM4707 source SHA**
+`6930c069b4e9738e63e2ce9d53b10d126053335e`:
+R249 and R235 full source gate success markers, 1,278
+Python tests (1,275 PASS, 3 SKIP), R247 policy suite
+10/10 PASS, real Solc ABI parity 21 actions/28 protocol
+events + public getter structs PASS, adaptive V2 EVM
+Foundry suite 21/21 PASS and whole `forge test -q`
+exit 0. Marketplace runtime 19,263B; ledger 10,668B.
+
+**R250 next step is NO MORE full-source retesting on the
+same source SHA**: collect live chain31340 **read-only R201**
+status from VM4707 and then, only on explicit owner approval,
+prepare separate app wallet/funding and one deployment
+transaction. This is not yet an actual live marketplace,
+physical SLA, native public-Internet permissionless admission
+or independent BLS-validator proof. Full evidence/plan in
+`docs/R250_R249_ACTUAL_FULL_VM4707_SOURCE_GATE_GREEN_AND_LIVE_CHAIN_NEXT.md`.
+
+---
+
 # R249 — Compiler ABI parity: inherited EIP712 event repaired, RETEST REQUIRED
 
 Actual VM4707 at SHA `c611ed1ff64059c642e30f0fc96f66d09feb057e`
