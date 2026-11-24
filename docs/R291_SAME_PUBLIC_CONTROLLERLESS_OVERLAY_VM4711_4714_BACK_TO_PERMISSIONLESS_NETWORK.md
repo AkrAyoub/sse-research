@@ -132,7 +132,7 @@ BLS validator APIs on the overlay.
 
 New source-only R291 tests
 `tests/test_sse_pos_r291_common_public_overlay_onboarding.py`
-(17 mocked tests) verify network
+(18 mocked tests) verify network
 identity/ports, membership, fca0
 address, multiple failures, original
 signer guards, exact owner consent,
