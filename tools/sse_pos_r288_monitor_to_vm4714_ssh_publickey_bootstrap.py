@@ -109,7 +109,11 @@ def client_public(*,name,uid,home):
     # OpenSSH ssh-keygen writes exactly one terminal LF in its normal
     # public .pub file. Strip only that one file terminator; never accept
     # embedded/newline-separated keys or relax direct CLI-key validation.
-    public_line=public.read_text(encoding="ascii")
+    # Read exact PUBLIC bytes: Path.read_text() does universal-newline
+    # conversion and can silently turn CRLF into LF. Only a single normal
+    # ssh-keygen terminal LF is permitted, not CRLF or embedded newlines.
+    # Never open/read the corresponding private key contents.
+    public_line=public.read_bytes().decode("ascii")
     if public_line.endswith("\n"):
         public_line=public_line[:-1]
     key,fp=_valid_public_key(public_line)
