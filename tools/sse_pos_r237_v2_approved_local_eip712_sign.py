@@ -49,7 +49,7 @@ class Refused(ValueError):
 
 
 def safe_keystore(path):
-    if type(path) is not Path or not path.is_absolute() or path.is_symlink() or ".." in path.parts:
+    if not isinstance(path, Path) or not path.is_absolute() or path.is_symlink() or ".." in path.parts:
         raise Refused("encrypted app keystore must be absolute, owner-local and non-symlink")
     folder=path.parent
     if folder.is_symlink() or not folder.is_dir() or not path.is_file():
