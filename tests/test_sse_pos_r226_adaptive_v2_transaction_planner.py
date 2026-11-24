@@ -37,12 +37,25 @@ def payload_words(p):
 
 class TestR226V2UnsignedPlanner(unittest.TestCase):
     def test_every_canonical_action_has_unique_selector(self):
-        selectors=[mod.keccak256(item[2].encode("ascii"))[:4]
-                   for item in mod.METHODS.values()]
-        self.assertEqual(len(selectors),21)
-        self.assertEqual(len(set(selectors)),len(selectors))
+        # ABI dispatch is scoped to ONE deployed contract address, not
+        # globally across the market and ledger. Both intentionally expose
+        # withdraw() with the same canonical EVM 4-byte selector.
+        by_contract={}
+        for action, (_, contract, signature, _) in mod.METHODS.items():
+            selector=mod.keccak256(signature.encode("ascii"))[:4]
+            seen=by_contract.setdefault(contract,{})
+            self.assertNotIn(selector,seen,
+                f"selector collision inside {contract}: {seen.get(selector)} / {action}")
+            seen[selector]=action
+        self.assertEqual(sum(len(items) for items in by_contract.values()),21)
+        market=by_contract["market"]
+        ledger=by_contract["ledger"]
+        withdraw=mod.keccak256(b"withdraw()")[:4]
+        self.assertEqual(set(market).intersection(ledger),{withdraw})
         self.assertEqual(plan("market-withdraw","observer",{}).calldata,"0x3ccfd60b")
         self.assertEqual(plan("ledger-withdraw","monitor",{}).calldata,"0x3ccfd60b")
+        self.assertEqual(plan("market-withdraw","observer",{}).target,MARKET)
+        self.assertEqual(plan("ledger-withdraw","monitor",{}).target,LEDGER)
 
     def test_permissionless_idle_close_no_private_keys_or_value(self):
         p=plan("expire-idle","observer",{"leaseId":7})
