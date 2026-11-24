@@ -1,3 +1,69 @@
+# R290 — Four owner VMs' R289 added test fails (3 literal escaped-newline subtests); source-fixed exact .pub byte parsing and REAL LF/CRLF test cases, 21 authored tests not yet VM-run
+
+Actual VM4711/VM4712/VM4713/VM4714
+owner tests each ran 20 R288 focused
+methods at Git SHA
+`51b85653d9ea5a348c556a9d4b1bd52e2924b089`;
+each showed **3 failures in one
+new subtest method**
+`test_client_public_rejects_double_lf_or_embedded_keys`.
+The source-authored fixture had WRONG
+literal backslash-n/backslash-r sequences
+instead of ACTUAL LF/CRLF. One fake case
+was accepted because no newline existed;
+one was rejected for wrong number of
+fields rather than expected message.
+Separately raw `Path.read_text()`
+normalizes CRLF before validation, so
+real CRLF rejection was not proved.
+Owner scripts `set -e` stopped BEFORE
+SSH key creation, SSH authorized_keys
+preview or mutation. NO SSH keys were
+created by these invocations; no Docker,
+EL/CL, Ethereum wallet or transfers
+changed.
+
+GitHub R290 fixes only the owner-PUBLIC
+SSH .pub read boundary to strict
+`read_bytes().decode("ascii")`, stripping
+one terminal LF and **not CR**, before
+existing strict one-line SSH ED25519
+validator. R290 corrected malicious
+test fixtures to use ACTUAL line-ending
+control bytes, plus added binary-file
+two-public-key injection regression.
+R288 tests now **21 AUTHORED** but
+**NOT YET run on real owner VMs**.
+An isolated local targeted
+parser behavior reproducer returned PASS
+for normal-LF/no-LF accept and
+double-LF/embedded second public key/
+CRLF/multiline reject, but is
+**NOT the actual full VM test suite**.
+Owner detailed runbook:
+`docs/R290_PUBLIC_SSH_KEY_FILE_STRICT_LF_CRLF_R288_TEST_FIX.md`;
+evidence:
+`evidence/r290_all_four_vm_r289_test_fixture_literal_backslashes_and_public_key_crlf_correction.json`.
+
+Future after all 21 VM tests PASS:
+explicit per-monitor creation of owner-private
+dedicated lab SSH identity (NOT ETH/BLS),
+public key copy only, and separately
+TTY-authorized per-key restricted
+VM4714 authorized_keys append.
+Existing running VM4714 raw localhost
+CPU worker is preserved; SSH tunnel
+R287 with hostpin then can measure
+actual cross-VM CPU rounds.
+All 3 original native chain31340
+fundings FINALIZED; additional
+four new VM EOAs remain UNFUNDED
+and proposed native 0.020000000084
+TEST ETH max total debit STILL
+NOT owner-authorized.
+
+---
+
 # R289 — real R288 test failure 17/18 on all FOUR VM owners: standard SSH .pub trailing LF; GitHub parser fix + 2 new safety tests, no SSH keys created yet
 
 Actual VM4711/VM4712/VM4713/VM4714 owner
