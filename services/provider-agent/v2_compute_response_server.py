@@ -14,6 +14,7 @@ from __future__ import annotations
 import argparse
 from http.server import BaseHTTPRequestHandler,HTTPServer
 import json
+import os
 from pathlib import Path
 import re
 import sys
@@ -100,7 +101,7 @@ def verify_config(profile,policy,signed_payload,snapshot):
     }
 
 
-def make_docker_executor(profile,endpoint,container_name):
+def make_docker_executor(profile,endpoint,container_name,*,rootless_docker=False):
     validate_profile(profile)
     local_endpoint(endpoint)
     if type(container_name) is not str or not NAME.fullmatch(container_name):
@@ -110,8 +111,13 @@ def make_docker_executor(profile,endpoint,container_name):
         "cpuMilli":profile["cpuMilli"],"memoryBytes":profile["memoryBytes"]
     }
     def compute(lease_id,epoch_id,request_hash):
+        inspection_options={"strict_hardening":True}
+        if rootless_docker:
+            if os.geteuid()==0:
+                raise Refused("rootless worker inspection forbids root process")
+            inspection_options["docker_socket"]=f"/run/user/{os.geteuid()}/docker.sock"
         verified=inspect_container(local_profile,endpoint,container_name,
-                                   strict_hardening=True)
+                                   **inspection_options)
         if verified["runtimeReportedRunning"] is not True:
             raise Refused("real Docker worker not running")
         result=run_compute_probe(endpoint,lease_id,epoch_id,request_hash)
@@ -215,6 +221,8 @@ def main(argv=None):
     p.add_argument("--port",type=int,default=8879)
     p.add_argument("--serve",action="store_true",
                    help="explicitly serve local HTTP after real Docker policy check")
+    p.add_argument("--rootless-docker",action="store_true",
+                   help="use ONLY private /run/user/<uid>/docker.sock for per-request Docker inspect; no privileged daemon fallback")
     a=p.parse_args(argv)
     try:
         profile=load_public_json(a.profile)
@@ -228,7 +236,8 @@ def main(argv=None):
             return 0
         if not a.container or not 1024<=a.port<=65535:
             raise Refused("--serve requires actual Docker worker and explicit unprivileged port")
-        executor=make_docker_executor(profile,a.worker_endpoint,a.container)
+        executor=make_docker_executor(profile,a.worker_endpoint,a.container,
+                                      rootless_docker=a.rootless_docker)
         context={
             **report,"profileHash":snapshot["lease"]["profileHash"],
             "policyHash":snapshot["lease"]["policyHash"],
