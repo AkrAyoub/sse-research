@@ -1,3 +1,57 @@
+# R275 — REAL original chain31340 CONSUMER TEST ETH FUNDING FINALIZED; VM4709 provider rootless Docker execution isolation SOURCE ONLY
+
+Actual owner VM4707 R271 one-shot shows first consumer nonce1
+funding TX `0x9f3a13cb295b5ba2f642804a30c391b9cce266784a83dd293d0dd7fb7d1f9fdd`
+status **SUCCESSFUL_CANONICAL_FINALIZED** in block
+**25564**, actual finalized execution **25588**, EL
+head **25728**; consumer EOA
+`0xD74A2aBC5a906BaFe39471CEe222c48BDD62DE3f`
+balance actual `latest` **AND finalized**
+**10000000000000000wei (0.01 native TEST ETH)**.
+No more consumer resend. Previous 8-block finality gap
+FULLY CLOSED. Beacon epoch854 head, 850 finalized.
+**No Monitor1 nonce2 or Monitor2 nonce3 signed/sent
+yet**; R267 tested sender may now submit owner-approved
+single Monitor1 transfer only after fresh finalized
+consumer preflight and exact TTY+hidden signer approval.
+Monitor2 still waits until Monitor1 finalized.
+
+Actual VM4709 R274 7/7 targeted tests PASS and host
+rootless readiness inspected: owner `/run/user/1001`
+0700, 65536 subuid/subgid available starting165536.
+Docker rootless binaries and private owner rootless
+socket are MISSING. Actual separate original-chain
+Besu+Beacon clients on existing ROOTFUL Docker daemon
+must remain untouched; provider EOA
+`0xBbd4F07be80E1f4c40A1b470A180C0F38352bEaf`
+encrypted owner-local, still UNFUNDED, no worker/SLA.
+
+New GitHub **R275 source only**, no VM host install or
+transmit: optional explicitly private-rootless Docker
+socket restriction in `tools/sse_compute_docker.py`,
+rootless-only `--rootless-docker` option on
+`services/provider-agent/v2_compute_response_server.py`,
+9 new mocked tests
+`tests/test_sse_pos_r275_rootless_worker_inspection.py`.
+Nonroot owner-only /run/user/UID/docker.sock,
+0700 owner private runtime-dir, Unix-socket actual
+owner and local accessibility, explicit
+`docker --host unix://...`, strip `DOCKER_HOST`
+/`DOCKER_CONTEXT`, fail closed no rootful fallback.
+Actual Docker provider hardening validation remains.
+**R275 tests have NOT yet been owner VM4709-run**.
+The code does NOT install Docker or claim physical
+CPU/SLA proof. Next run owner R275 test/compatibility
+suites and one-shot `apt-cache`/ `apt-get -s`
+read-only rootless package solver on VM4709, then
+review how to install a separate user rootless daemon
+without touching running native PoS Docker daemon.
+Evidence `evidence/r275_real_vm4707_consumer_native_tx_finalized_and_vm4709_rootless_gap.json`
+and runbook
+`docs/R275_FINALIZED_CONSUMER_FUNDING_AND_VM4709_NONROOT_ROOTLESS_PROVIDER_SOCKET.md`.
+
+---
+
 # R274 — consumer funding canonical but still short of native finality; source-only nonprivileged VM4709 rootless worker readiness
 
 Owner retried R267 Monitor1 --send on actual VM4707; safety gate
