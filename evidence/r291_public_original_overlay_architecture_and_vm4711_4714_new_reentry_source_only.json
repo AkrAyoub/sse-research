@@ -52,7 +52,7 @@
       "tests/test_sse_pos_r291_common_public_overlay_onboarding.py",
       "tests/test_sse_pos_r291_verified_vendor_package_only.py"
     ],
-    "authoredFocusedTests": 27,
+    "authoredFocusedTests": 28,
     "ownerVmNewFocusedTestsPassed": false,
     "actualR291ZerotierJoinSubmitted": false,
     "actualR291VendorSignedPackageInstallationExecuted": false,
