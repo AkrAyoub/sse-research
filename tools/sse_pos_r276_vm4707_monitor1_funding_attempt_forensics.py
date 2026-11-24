@@ -166,7 +166,10 @@ def main(argv=None):
     try:
         report=observe(role=args.role)
         print(json.dumps(report,indent=2,sort_keys=True))
-        print("R276_EXACT_CONSUMED_MONITOR1_ATTEMPT_READONLY_NO_RETRY=true")
+        if args.role=="monitor-1":
+            print("R276_EXACT_CONSUMED_MONITOR1_ATTEMPT_READONLY_NO_RETRY=true")
+        else:
+            print("R278_EXACT_CONSUMED_MONITOR2_ATTEMPT_READONLY_NO_RETRY=true")
         return 0
     except (Refused,ValueError,OSError,TypeError,KeyError,OverflowError) as exc:
         print("R276_MONITOR1_PUBLIC_FORENSIC_REFUSED: "+str(exc),file=sys.stderr)
