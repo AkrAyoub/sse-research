@@ -74,12 +74,13 @@ def strict_source_revision(expected,*,run=subprocess.run):
 def install(*,sha,root_guard=guarded_root_environment,
             revision_guard=strict_source_revision,which=shutil.which,
             vendor_install=vendor.install_verified_zerotier_apt,
-            vendor_run=vendor.call):
+            vendor_run=vendor.call,zt_installed_fn=None):
     user=root_guard()
     revision_guard(sha)
     overlay.protocol_guard()
-    if (which("zerotier-cli") is not None or
-        Path("/usr/sbin/zerotier-one").exists()):
+    if zt_installed_fn is None:
+        zt_installed_fn=lambda:Path("/usr/sbin/zerotier-one").exists()
+    if which("zerotier-cli") is not None or zt_installed_fn():
         raise Refused("ZeroTier already present; use read-only status, never reinstall")
     if not all(which(x) for x in ("gpg","apt-get","systemctl")):
         raise Refused("required signed APT/gpg/systemd prerequisites missing")
