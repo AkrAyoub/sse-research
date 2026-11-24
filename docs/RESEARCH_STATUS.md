@@ -1,3 +1,55 @@
+# R279 — REAL native Monitor1 nonce2 finalized and funded; four REAL standby VM4711–VM4714 host capacities measured; separate role-wallet bootstrap staged
+
+Actual owner VM4707 R276 **8/8 tests PASS** and exact
+original-chain31340 Monitor1 nonce2 TX
+`0xaf024159fe0b34d255689ab6ab5137c55aa247e7044f9792d56e6297ad447ebc`
+now **SUCCESSFUL_CANONICAL_FINALIZED** at block25739,
+execution finalized25812/head25956. VM4707 monitor1 EOA
+`0xd63b2Ba14E8aD16Cf5f494259dAE05AD59fE0147`
+latest AND finalized balance **0.005 TEST ETH**,
+app funder latest/pending nonce**3**.
+Previous R267 "marker consumed" was correctly protecting
+an **ALREADY SUCCESSFUL** native funding send; NEVER retry.
+Monitor2 nonce3 remains the last of three explicitly
+approved exact funding transfers but **no Monitor2
+broadcast/receipt is yet evidenced**. Existing R267
+exact pinned `fc50985a7bf067ff83485c931069211bc572863f`
+preflight can send once if fresh nonce3 and predecessor
+finality permit + owner TTY consent; R267 writes a
+one-time marker before sending. No new owner consent
+is implied for extra monitors or bonding.
+
+Actual owner SSH inventory for standby **VM4711,
+VM4712, VM4713, VM4714**, all Ubuntu24.04,
+**2 vCPU, 3.8GiB RAM (3.3GiB available), 35GB
+available disk**, Docker CLI+Python3 installed.
+Distinct usernames and private eth0 IP logs, but
+multiple hosts share TEMPLATE hostnames; no
+physical/ISP/operator independence or public
+WAN reachability proven. Suggest first lab
+roles: 4711-13 separate remote monitor EOAs,
+4714 dedicated compute EOA (avoids VM4709
+rootful PoS Docker daemon). New `scripts/r279_standby_vm_app_identity.sh`
+uses existing encrypted wallet tool+Python pinned
+requirements, strict reviewed SHA, owner account
+allowlist for **this experiment only**, --preview
+read-only default and interactive per-host --create
+wallet encryption 0700/0600; no native tx,
+Docker, BLS or PoS modifications.
+New `tests/test_sse_pos_r279_standby_vm_app_identity.py`
+has seven authored no-effect preview checks.
+Also R276 extended with `--role monitor-2`
+via R278 plus five new mocked status tests:
+exact successful pending/finalized/fail unknown
+nonce3 attempt, no broadcast. **R278/R279
+test suites have NOT yet run on actual VMs**.
+Public evidence
+`evidence/r277_vm4707_monitor1_native_funding_finalized_and_four_standby_small_vm_capacities.json`
+and detailed action runbook
+`docs/R279_REAL_MONITOR1_FINALIZED_VM4711_4714_STANDBY_ROLE_BOOTSTRAP.md`.
+
+---
+
 # R276 — Monitor1 nonce2 owner marker ALREADY CONSUMED (status UNKNOWN), exact public-only chain audit authored; actual provider regressions 30/30 PASS, standby VMs available
 
 Actual VM4707 owner's next R267 `--role monitor-1 --send`
