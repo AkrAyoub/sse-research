@@ -1,3 +1,53 @@
+# R276 — Monitor1 nonce2 owner marker ALREADY CONSUMED (status UNKNOWN), exact public-only chain audit authored; actual provider regressions 30/30 PASS, standby VMs available
+
+Actual VM4707 owner's next R267 `--role monitor-1 --send`
+returned `R267_ROLE_FUNDING_REFUSED: this exact role funding
+attempt already consumed; DO NOT RETRY`. This indicates
+the existing PRIVATE write-once R267 public attempt
+marker is already present; R267 creates it BEFORE the
+actual RPC send. **NO proof of Monitor1 broadcast,
+receipt, or funds in provided logs**. Do NOT replay,
+delete marker, skip nonce2, or submit Monitor2 nonce3.
+New GitHub `tools/sse_pos_r276_vm4707_monitor1_funding_attempt_forensics.py`
++ eight authored mocked tests will READ ONLY public
+nonce2 marker metadata and original chain31340 RPC
+signed hash, exact transaction, receipt, inclusion
+canonicality, execution finality, latest/finalized
+monitor balance. No EOA keystore, signing, transmission
+or key access. Missing RPC tx hash is UNKNOWN
+broadcast state, NEVER an automatic new send.
+**New R276 tests/real auditor not yet VM4707 run**.
+
+Real owner VM4709 R275 focused suites **9+16+5 = 30 tests PASS**,
+native existing Ubuntu docker.io **29.1.3**, apt-cache
+rootlesskit/uidmap/slirp4netns/fuse-overlayfs available;
+`docker-ce-rootless-extras` package unavailable in current
+configured apt sources. `apt-get -s` read-only solver
+selected **six NEW packages**, 0 upgrades/removals,
+73 old upgrades outstanding. This is NOT a working
+rootless Docker install and would not necessarily add
+missing rootless dockerd scripts. Do NOT modify rootful
+PoS Docker daemon just to host app provider.
+
+Reviewed actual earlier `docs/SSE_COMPLETE_ROLES_PERMISSIONLESS_SCALING_AND_VM_EXPERIMENTS.md`
+section9: owner stated **two extra large VMs**
+(roughly 4CPU/12–16GiB), **four small Ubuntu24.04
+VMs** (roughly 2CPU/4GiB/40GiB) standby. They were
+named New large A/B and New small C/D/E/F in role
+plan, NOT verified numbered VM IDs or independent
+operators. Prefer independent small machines for
+separate actual monitoring identities, compute-only
+provider without contention with original rootful
+PoS containers, and real fault injection.
+Actual host inventory and independent network domain
+must be measured; don't assume VM provisioning
+means running role agent.
+
+Public-only runbook and source test command:
+`docs/R276_VM4707_MONITOR1_CONSUMED_ATTEMPT_AND_STANDBY_VM_ALLOCATION.md`.
+
+---
+
 # R275 — REAL original chain31340 CONSUMER TEST ETH FUNDING FINALIZED; VM4709 provider rootless Docker execution isolation SOURCE ONLY
 
 Actual owner VM4707 R271 one-shot shows first consumer nonce1
