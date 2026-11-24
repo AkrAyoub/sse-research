@@ -1,0 +1,47 @@
+{
+  "schema": "SSE_R294_REAL_VM4711_TO_VM4714_ORIGINAL_OPEN_IPV6_OVERLAY_TCP_UDP_GENUINE_PACKET_ACK_V1",
+  "observationDate": "2026-11-24",
+  "userVMs": [
+    "VM4711",
+    "VM4714"
+  ],
+  "sourceSha": "5aabf950dde51cacb7f3b6c403778638a0572b57",
+  "code": "tools/sse_pos_r55_zerotier_ipv6_transport.py",
+  "originalSameOpenNetworkId": "ff2328775f000000",
+  "vm4711": {
+    "owner": "ayoubakrvm4711",
+    "actualLocalOverlayIpv6": "fca0:2328:77a9:8951:acf0::1",
+    "realFocusedR55SafetyTestsPassed": 12,
+    "remoteServerOverlayIpv6": "fca0:2328:77f8:9326:689f::1",
+    "realRemoteTcpPayloadRoundTrip": true,
+    "realRemoteUdpPayloadRoundTrip": true,
+    "realBothTransportPayloadRoundTrips": true,
+    "actualTcpRoundtripMs": 346.55,
+    "actualUdpRoundtripMs": 0.91,
+    "sourceUdpPortWithinAdHocNetworkPolicy": 29002
+  },
+  "vm4714": {
+    "owner": "ayoubakrvm4714",
+    "actualLocalOverlayIpv6": "fca0:2328:77f8:9326:689f::1",
+    "realFocusedR55SafetyTestsPassed": 12,
+    "realServerBoundOnlyToAssignedOverlayIpv6": true,
+    "actualShortLivedServerTcpPort": 29000,
+    "actualShortLivedServerUdpPort": 29001,
+    "realRemoteTcpRequestReceived": true,
+    "realRemoteUdpRequestReceived": true,
+    "bothTransportRequestsReceived": true,
+    "serverStoppedAfterFirstValidPair": true
+  },
+  "independentClientAndServerActualEvidenceMatch": true,
+  "noPrivateCloudLanIpUsedInApplicationProbe": true,
+  "noProviderSshKeyOrTunneledPrivateIpRequired": true,
+  "physicalIndependentIspAttested": false,
+  "newVm4707Vm4709DirectReachabilityProvenByThisNewRun": false,
+  "newVmNativeElClPeerHandshakeOrFinalityProven": false,
+  "marketplaceSlaOrEip712ProviderSignatureVerified": false,
+  "vm4714ExistingRealDockerComputeUnaffectedByEcho": true,
+  "originalNativePoSValidatorOrGenesisModified": false,
+  "fourNewEoasStillUnfunded": true,
+  "newOnchainFundingOrVoteSent": false,
+  "next": "Real bounded R55 one-server-per-monitor TCP+UDP VM4712 then VM4713 to VM4714; plus new-VM client to old VM4707 existing R55 bound echo only after old owner safely starts it, to independently verify cross-era packet path"
+}
