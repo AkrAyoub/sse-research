@@ -130,6 +130,7 @@ class TestR267ExactRoleSingleNonceFunding(unittest.TestCase):
             with patch.object(m,"private_paths",return_value=(key,deploy,marker)),patch.object(
                 m.pwd,"getpwuid",return_value=Mock(pw_name=m.OWNER)),patch.object(
                 m.os,"geteuid",return_value=12345),patch.object(
+                m,"require_private_owner_path",return_value=b"safe deploy marker"),patch.object(
                 m,"safe_keystore",side_effect=AssertionError("key read")):
                 with contextlib.redirect_stdout(io.StringIO()):
                     with self.assertRaisesRegex(m.Refused,"consent"):
