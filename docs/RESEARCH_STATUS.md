@@ -1,3 +1,41 @@
+# R265 — 3 actual VM4707 encrypted role EOAs CREATED; new native funding budget is only READ-ONLY PROPOSAL
+
+Owner actually created and locally encrypted three distinct
+application-only EOA keystore files on VM4707 (no keys
+printed, no transaction): consumer
+`0xD74A2aBC5a906BaFe39471CEe222c48BDD62DE3f`,
+monitor1 `0xd63b2Ba14E8aD16Cf5f494259dAE05AD59fE0147`,
+monitor2 `0xf8D4c882A7439507e2fc237DCBDf4A1c228F0FF8`.
+These three accounts are at the same VM fault domain,
+NOT independently operated physical monitors, and still
+have NOT been actually funded/registered on chain.
+Deployment receipt remains canonical successful at block25339;
+last actual finalized block **25332** (7 short); R260/R206
+formal finalized acceptance pending and R257 --send MUST
+NEVER be retried.
+
+New `tools/sse_pos_r265_vm4707_three_role_wallet_funding_quote.py`
+and 8 mock regression tests prepare actual chain31340
+strictly **READ-ONLY** proposed native transfers
+from already-funded separate app-only VM4707 EOA,
+not Genesis signer: consumer 0.01 and monitors0.005
+each; proposed total **0.02 TEST ETH** plus maximum
+three simple EOA transfer gas fees **63,000,000 wei**
+at max1000 wei/gas. Quote checks correct chain/genesis,
+actual canonical successful market CREATE, funder
+nonce1/balance, recipient balance0/nonce0/no-code
+and real node EOA gas estimates. NO wallet opens,
+signatures or sends; amounts NOT YET authorized.
+Tests/new code **not yet run on VM4707**.
+Evidence `docs/R265_VM4707_REAL_THREE_NEW_ROLE_WALLETS_AND_GAS_BOUNDED_FUNDING_PREVIEW.md`;
+public only `evidence/r264_vm4707_created_application_role_public_addresses.json`.
+Next owner run: R265 focused tests then the real read-only
+quote. Build exact per-recipient consent-gated
+no-retry single native transfer only AFTER explicit
+approval. Real roles / SLA remain unexecuted.
+
+---
+
 # R263 — Real V2 market healthy but has ZERO registered participants; finality only 7 blocks short
 
 VM4707 actually ran the new R262 5/5 focused tests PASS,
