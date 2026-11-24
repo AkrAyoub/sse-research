@@ -68,7 +68,7 @@ signed package install ONLY on
 new app VM4711–14:
 `scripts/r291_vm4711_4714_signed_overlay_install.sh`,
 `tools/sse_pos_r291_verified_vendor_package_only.py`
-and **10 new mocked tests**.
+and **12 new mocked tests**.
 Reuses exact original R175/R177
 fingerprint-verified scoped signed
 official ZeroTier Noble APT install
@@ -108,7 +108,7 @@ onboarding or open raw HTTP8877.
 
 R291 honest runbook:
 `docs/R291_SAME_PUBLIC_CONTROLLERLESS_OVERLAY_VM4711_4714_BACK_TO_PERMISSIONLESS_NETWORK.md`.
-When R291 owner 28 focused tests
+When R291 owner 30 focused tests
 and read-only status pass, branch
 by actual host ZeroTier state:
 if missing, separately operator
