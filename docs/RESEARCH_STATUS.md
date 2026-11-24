@@ -1,3 +1,35 @@
+# R256 — VM4707 Beacon live and syncing normally, transfer included not yet final; quote real V2 deployment gas read-only
+
+Owner actual VM4707 R141 captures 16:42:08Z and
+16:42:32Z showed chain31340 original EL/CL genesis,
+EL heads **24997→24999**, Beacon head slots
+**26609→26611**, two native EL and CL peers,
+no sync/optimism/offline, Beacon finality epoch **827**,
+root `0xaf3a0dc5cc13527ea117952dc86bccc1467284a9f3c9318b18709827646a8861`.
+Head epoch **831** vs finality epoch827 means a four-epoch
+lag to watch, but identical finality over just 2 slots is
+not a proven finality stall. Actual R254 1 TEST ETH
+tx receipt included **24966**, verified canonical on
+both VMs but `R255_FUNDING_NOT_FINAL_YET`.
+**Do not resend, sign, or deploy.**
+
+Implemented new `tools/sse_pos_r256_v2_readonly_native_deployment_quote.py`
+for a genuine VM4707 Besu `eth_estimateGas` of the
+actual R249-ABI-pinned compiled adaptive market constructor
+(which internally creates vote ledger), verifying genesis,
+code, balances and current gas price without signer or
+transaction. Six new mocked regression tests; this code
+and actual gas quote have **NOT YET run on VM4707**.
+The optional 0.001 TEST ETH bond quote scenario is
+**not** a protocol bonding/economic decision.
+Next get real read-only deployment gas quote while
+finality advances, then final R255 proof and **separate**
+one-deployment authorization.
+Evidence + exact instructions:
+`docs/R256_FINALITY_PROGRESS_AND_NATIVE_V2_CONSTRUCTOR_QUOTE.md`.
+
+---
+
 # R255 — First actual one-time native TEST ETH funding tx submitted; receipt/finality NEXT
 
 VM4706 owner at exact reviewed SHA
