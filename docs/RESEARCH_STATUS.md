@@ -1,3 +1,48 @@
+# R260 — REAL one-time market+ledger contract-CREATE transaction submitted; finalized receipt/code linkage NEXT
+
+Owner actual VM4707 at exact pinned R259 SHA
+`08f383680db5647192643a5d9fa2df5170c8877a`
+reported **14/14** new deployment safety unit tests PASS,
+real original chain31340 read-only exact SHA-pinned preflight
+PASS (R255 funding finalized, app wallet nonce0,
+actual `eth_estimateGas=6,670,081`, approved gas cap
+8,342,601 and 1000 wei/gas, full constructor SHA256
+`22d5b3310ec9a9efc66015762ea3d78d152f0a52eb9d67a257f18e3470c171ec`).
+Owner explicitly typed one-deployment TTY consent,
+unlocked ONLY the new separate application VM4707
+keystore privately, and **SENT EXACTLY ONE** signed
+legacy nonce0 native contract CREATE with `value=0`.
+Real Besu RPC acknowledged public txHash:
+`0xe9187bd24d72d2dec11fc6a2758802ddf6fa46a2941edd306329173fe132d6b6`.
+Private one-shot attempt marker consumed;
+`R257_ONE_SIGNED_DEPLOYMENT_SUBMITTED_NOT_YET_FINALIZED=true`.
+Expected market nonce0 CREATE address
+`0x6C01dBd7aA336a96d8Ab09Ea631E209612224080`.
+**DO NOT RESEND OR RERUN R257 --send.**
+No successful receipt/finality, market bytecode or ledger
+address have yet been owner verified.
+
+New substantive `tools/sse_pos_r260_v2_readonly_finalized_deployment_audit.py`
+and 11 mocked focused tests implement read-only exact
+authorized contract-CREATE receipt, original genesis,
+historical native funding canonical+finalized proof,
+execution canonical/finalized inclusion, native actual gas
+fee, actual on-chain market+ledger independent code
+comparison vs R249-compiled runtime outside Solidity
+compiler immutable patch slots, three known on-chain
+immutable binding values (market votes, minimumBond,
+ledger settlement), exact runtime SHA256 public manifest,
+then existing R206 on-chain finalized code/wiring audit.
+Tool must NOT require original finalized deployer
+balance >=1 ETH after gas is paid. **New R260 source/test
+NOT YET executed on real VM4707.**
+No second transaction is authorized. Continue only with
+the read-only real R260 audit and focus tests, then VM4706
+cross-host public R206 manifest verification. Details
+`docs/R260_VM4707_REAL_NATIVE_V2_CREATE_SUBMITTED_FINALIZED_ATTESTATION_NEXT.md`.
+
+---
+
 # R257 — First REAL native chain31340 TEST ETH transfer finalized; separate app deployer funded, one-shot V2 create prepared but NOT authorized
 
 Actual R255 VM4707 real read-only audit returned
