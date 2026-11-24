@@ -86,6 +86,37 @@ class TestR247CompiledV2ABIParity(unittest.TestCase):
         with self.assertRaises(a.Refused):
             a.check_function([],"escrowAccounting()",[("x","uint256")])
 
+    def test_single_scalar_array_and_named_multiword_returns_are_not_structs(self):
+        # The actual on-chain selected(uint256) returns ONE address[] array,
+        # while confirmedMonitor(uint256,address) returns ONE bool. Neither
+        # is a struct and both were rejected by the original R247 parser.
+        one=method("selected",[param("address[]","")])
+        a.check_function([one],"selected(uint256)",[("monitors","address[]")])
+        scalar=method("confirmedMonitor",[param("bool","")])
+        scalar["inputs"]=[param("uint256","leaseId"),param("address","monitor")]
+        a.check_function([scalar],"confirmedMonitor(uint256,address)",[
+            ("confirmed","bool")])
+        many={"type":"function","name":"escrowAccounting","inputs":[],
+              "outputs":[param("uint256","balance"),param("uint256","liabilities"),
+                         param("bool","covered")]}
+        a.check_function([many],"escrowAccounting()",[
+            ("balanceWei","uint256"),("outstandingWei","uint256"),
+            ("fullyCovered","bool")])
+        with self.assertRaises(a.Refused):
+            a.check_function([one],"selected(uint256)",[("monitors","address")])
+        with self.assertRaises(a.Refused):
+            a.check_function([scalar],"confirmedMonitor(uint256,address)",[
+                ("confirmed","uint256")])
+
+    def test_explicit_struct_return_only_for_nested_field_schema(self):
+        lease=method("lease",[tupleoutput(a.MARKET_LEASE)])
+        a.check_function([lease],"lease(uint256)",[a.MARKET_LEASE])
+        with self.assertRaises(a.Refused):
+            a.check_function([lease],"lease(uint256)",[("lease","address")])
+        with self.assertRaises(a.Refused):
+            a.check_function([lease],"lease(uint256)",[
+                (("bad","bytes32"),)])
+
     def test_load_real_compiled_envelope_reject_bad_bytes(self):
         with tempfile.TemporaryDirectory() as td:
             path=Path(td)/"Artifact.json"
