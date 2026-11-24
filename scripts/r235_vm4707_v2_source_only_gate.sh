@@ -32,8 +32,13 @@ echo "== R206 MANIFEST AUDIT POLICY MOCK TESTS =="
 python3 -B -m unittest discover -s tests -p 'test_sse_pos_r206_adaptive_v2_deployment_audit.py' -v
 echo "== FULL PYTHON PROJECT SUITE =="
 python3 -B -m unittest discover -s tests
+echo "== R247 COMPILED-ABI PARITY POLICY UNIT TESTS (NO NETWORK) =="
+python3 -B -m unittest discover -s tests -p 'test_sse_pos_r247_v2_compiled_abi_parity.py' -v
 echo "== EXACT SOURCE V2 EIP-170 / EIP-3860 SIZE =="
 forge build --sizes
+echo "== R247 ACTUAL SOLC-COMPILED MARKET/LEDGER ABI PARITY =="
+python3 -B tools/sse_pos_r247_v2_compiled_abi_parity.py
+echo "R247_COMPILED_V2_ABI_PARITY_COMPLETED=true"
 echo "== ADAPTIVE V2 CONTRACT TESTS =="
 forge test --match-contract SSEAdaptiveMarketV2Test -vv
 echo "== FULL FOUNDRY PROJECT SUITE =="
