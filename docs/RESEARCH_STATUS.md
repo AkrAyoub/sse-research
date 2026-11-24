@@ -1,3 +1,91 @@
+# R294 — ACTUAL VM4711 ↔ VM4714 open public ZeroTier IPv6 TCP+UDP ACKs BOTH VERIFIED; stage old↔new direct R55 cross-generation packets without touching native PoS
+
+At immutable reviewed Git SHA
+`5aabf950dde51cacb7f3b6c403778638a0572b57`,
+new VM4711 ran 12/12 original R55
+safety tests PASS then REAL
+`--check fca0:2328:77f8:9326:689f::1`
+over its own actual overlay IPv6
+`fca0:2328:77a9:8951:acf0::1`.
+Actual TCP payload/ACK TRUE,
+**TCP 346.55 ms**; actual UDP
+payload/ACK TRUE, **UDP 0.91 ms**;
+`realBothTransportPayloadRoundTrips=true`.
+On independent VM4714 owner terminal,
+R55 12/12 tests PASS, REAL
+`--plan` confirmed correct original
+same controllerless network
+`ff2328775f000000` and its own
+actual 6plane IPv6; REAL bounded
+TCP29000/UDP29001 echo server
+separately observed
+`realRemoteTcpRequestReceived=true`,
+`realRemoteUdpRequestReceived=true`,
+`bothTransportRequestsReceived=true`.
+Server exited after first successful
+TCP+UDP pair, as original R55
+implementation specifies.
+This is real two-new-VM IPv6
+overlay packet transport, NOT
+simulated; packet underlay ISP
+independence, native EL/CL P2P
+or signed paid V2 SLA are NOT
+proven. Still THREE new VMs'
+actual current network members are
+OK PUBLIC from R293. VM4712 and
+VM4713 have not yet run new real
+R55 monitor-to-VM4714 packet trials
+in current owner evidence.
+
+Original VM4706/4707/4709
+independently joined SAME open
+controllerless ZeroTier network
+and old VM4707↔4709 had actual
+native Besu/Lighthouse chain31340
+matching finalized root/epoch
+at earlier R225 evidence.
+Thus ALL new four and old nodes
+share network membership but
+**NO contemporaneous NEW-to-OLD
+R55 IPv6 packet roundtrip yet
+recorded**. To prove actual
+old/new host reachability without
+touching original validator,
+run the already public checked
+R55 script `--plan` then
+short-lived `--server` on old
+NON-SIGNING VM4707 owner,
+with strict known checksum,
+while new VM4711 performs its
+real R55 `--check` to old
+VM4707's ACTUAL fresh fca0
+IPv6. No Docker/EL/CL/VC
+restart, source branch checkout,
+SSH key distribution or private
+10.50.56.x route.
+Full safe operator commands:
+`docs/R294_REAL_VM4711_VM4714_IPV6_TCP_UDP_AND_CROSS_GENERATION_VM4707_CHECK.md`.
+Real owner evidence:
+`evidence/r294_vm4711_vm4714_actual_public_overlay_tcp_udp_confirmed.json`.
+Existing R55 source handles this;
+NO new speculative networking
+stack or fake proof required.
+
+Do not expose VM4714 raw local
+unsigned CPU worker8877 on
+open overlay. Actual V2 provider
+EIP712 signed/HTTPS SLA still
+requires original chain31340
+finalized funded lease and
+eligible selected bonded
+monitor committee; new four
+EOAs unfunded and no additional
+new native grants authorized.
+Original old three native
+TEST ETH grants finalized.
+
+---
+
 # R293 — ALL FOUR new VM4711/4712/4713/4714 actually joined ORIGINAL public open ZeroTier controllerless IPv6 overlay OK PUBLIC, assigned distinct real fca0 addresses; real cross-VM TCP+UDP still pending
 
 Owner independently reported complete actual
