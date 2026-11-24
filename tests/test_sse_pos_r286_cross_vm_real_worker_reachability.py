@@ -131,7 +131,9 @@ class TestR286ActualFourVmReadOnlyCrossHostPreflight(unittest.TestCase):
     def test_probe_requires_operator_opt_in(self):
         import contextlib,io
         with contextlib.redirect_stderr(io.StringIO()):
-            self.assertEqual(m.main([]),2)
+            with self.assertRaises(SystemExit) as captured:
+                m.main([])
+        self.assertEqual(captured.exception.code,2)
 
 
 if __name__=="__main__":
