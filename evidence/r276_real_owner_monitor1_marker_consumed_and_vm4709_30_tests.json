@@ -1,0 +1,63 @@
+{
+  "schema": "SSE_R276_REAL_VM4707_MONITOR1_MARKER_CONSUMED_STATUS_UNKNOWN_AND_VM4709_OFFLINE_TESTS_V1",
+  "observedUtcDate": "2026-11-24",
+  "originalChainId": 31340,
+  "vm4707": {
+    "originalConsumerFundingConfirmedFinalizedEarlier": true,
+    "consumerTxHash": "0x9f3a13cb295b5ba2f642804a30c391b9cce266784a83dd293d0dd7fb7d1f9fdd",
+    "monitor1Role": "monitor-1",
+    "monitor1Recipient": "0xd63b2Ba14E8aD16Cf5f494259dAE05AD59fE0147",
+    "expectedSourceAppEOA": "0xED0ED5E0526898c6E0e3C83140efcA12672E7ff0",
+    "expectedNonce": 2,
+    "expectedTransferWei": "5000000000000000",
+    "cliObserved": "R267_ROLE_FUNDING_REFUSED: this exact role funding attempt already consumed; DO NOT RETRY",
+    "singleUseAttemptMarkerPresent": true,
+    "broadcastProvenByNewOutput": false,
+    "receiptProvenByNewOutput": false,
+    "finalityProvenByNewOutput": false,
+    "monitor2FundingSent": false,
+    "doNotRepeatMonitor1Send": true
+  },
+  "vm4709": {
+    "sourceSha": "beec19c14c9ae9090518d303eea746682aa08e7f",
+    "rootlessProviderUnitTestsPassed": 9,
+    "computeDockerUnitTestsPassed": 16,
+    "v2ProviderUnitTestsPassed": 5,
+    "totalUnitTestsPassed": 30,
+    "installedDockerPackage": "docker.io 29.1.3-0ubuntu3~24.04.2",
+    "aptRootlessExtrasPackageFound": false,
+    "aptSimulationRequestedPackages": [
+      "uidmap",
+      "rootlesskit",
+      "slirp4netns",
+      "fuse-overlayfs"
+    ],
+    "aptSimulationNewPackages": [
+      "fuse-overlayfs",
+      "libslirp0",
+      "libsubid4",
+      "uidmap",
+      "rootlesskit",
+      "slirp4netns"
+    ],
+    "aptSimulationInstallCount": 6,
+    "aptSimulationUpgradeCount": 0,
+    "aptSimulationRemoveCount": 0,
+    "dockerPackagesChanged": false,
+    "realComputeWorkerProven": false
+  },
+  "historicalStandbyVmPlan": {
+    "source": "docs/SSE_COMPLETE_ROLES_PERMISSIONLESS_SCALING_AND_VM_EXPERIMENTS.md section 9",
+    "additionalLargeVmCount": 2,
+    "largeVmNominalVcpu": 4,
+    "smallUbuntuVmCount": 4,
+    "smallVmNominalVcpu": 2,
+    "smallVmNominalMemoryGb": 4,
+    "smallVmNominalDiskGb": 40,
+    "actualCurrentHostnamesAndAvailabilityVerified": false,
+    "independentlyAdministeredDomainsVerified": false
+  },
+  "r276NewGitHubReadOnlyForensicsAuthored": true,
+  "r276NewTestsActuallyRunOnVm4707": false,
+  "newTransactionOrDockerServiceMutationByAssistant": false
+}
