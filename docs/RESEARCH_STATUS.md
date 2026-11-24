@@ -1,3 +1,93 @@
+# R287 — ALL FOUR actual VM4711–14 network checks PASS (36/36 tests), provider exact Docker worker reverified + second real 8192-SHA result; pinned temporary SSH remote CPU source-only
+
+Owner VM4711/4712/4713/4714 each ran R286
+**9/9 focused tests PASS** (total **36/36 PASS**).
+Actual independent private network TCP probes to
+VM4714 private IPv4 **10.50.56.22**: all
+three candidate monitors established SSH
+TCP22 handshakes (2ms/1ms/1ms); provider
+local IP check also TCP22 connected (0ms).
+ALL FOUR raw HTTP TCP8877 probes
+**TCP_REFUSED**, which confirms intended
+loopback-only VM4714 worker exposure at
+that moment. These are private host TCP
+results, NOT authenticated SSH, public
+Internet reachability or onchain monitoring.
+
+Actual VM4714 R286 **re-inspected
+the exact originally owner-launched full
+Docker worker container ID and immutable
+image digest**, verified it was still
+running under strict CPU/memory/security
+caps, and executed a SECOND actual OS-random
+**8192 SHA256-round CPU challenge** with
+independent local digest match. Actual
+second localhost HTTP elapsed **0.015428s
+(15.428ms)**, digest
+`sha256:676dbe62ec36cd3f42a14ee6b65e3753be3a5ae71df244161b1a886732728abe`.
+The first earlier real CPU trial was
+2.379ms, but neither proves sustained
+throughput, physical independent fault
+domains, paid SLA or hardware attestation.
+Evidence
+`evidence/r287_real_four_vm_private_tcp_and_second_docker_cpu_probe.json`.
+
+NEW R287 GitHub SOURCE ONLY
+`tools/sse_pos_r287_three_vm_authenticated_temporary_compute_ssh_probe.py`
+and **14 new mock safety tests**
+`tests/test_sse_pos_r287_three_vm_authenticated_temporary_compute_ssh_probe.py`.
+Provider VM4714 `--provider-hostkey` reads
+ONLY standard public ED25519 host key and
+prints public SHA256 fingerprint; operator
+carries it OUT OF BAND from trusted
+VM4714 console. Monitor VM4711–13
+`--preflight --expected-host-fingerprint`
+uses actual bounded ssh-keyscan but
+**does NOT trust unpinned scan alone**;
+verifies exact expected fingerprint,
+creates only private ephemeral pinned
+known_hosts, runs noninteractive strict
+publickey SSH auth with no passwords,
+no permanent knownhosts, proxyjump,
+agent forwarding, X11 or host config.
+May use an explicit EXISTING owner-private
+SSH identity; never creates/copies/prints
+a key. If login unavailable, no tunnel.
+On monitors whose noninteractive SSH
+preflight succeeds, explicit `--probe`
+opens ONE short-lived monitor loopback
+forward over authentic SSH to provider
+loopback127.0.0.1:8877, performs REAL
+HTTP health and OS-random remote 8192-SHA
+challenge, recomputes digest on monitor,
+measures actual encrypted cross-VM
+response time and terminates its exact
+SSH process in finally. No raw LAN/public
+HTTP exposed, native chain tx, Docker or
+validator modifications. Still offchain,
+unsigned PRE-LEASE CPU observation, not
+R232 final selected/confirmed EIP712 SLA.
+R287 tests/provider SSH fingerprint/monitor
+auth/tunnel **NOT YET RUN on owner VMs**.
+Owner step order and precise trust assumptions:
+`docs/R287_REAL_4VM_NETWORK_AND_PINNED_TEMPORARY_SSH_COMPUTE.md`.
+
+ALL 3 original VM4707 consumer/monitor1/
+monitor2 native chain31340 grants FINALIZED.
+FOUR new VM4711–14 role EOA encrypted
+wallets remain UNFUNDED; new bounded
+4x0.005 TEST ETH quote (max combined
+0.020000000084 incl gas) passed R282
+real RPC and STILL NO additional owner
+approval, signing or broadcast.
+Real public EL/CL P2P admission for
+independent Internet participants, public
+provider HTTPS TLS, actual bonded monitors,
+onchain paid finalized V2 lease/votes/
+settlement all remain outstanding.
+
+---
+
 # R286 — REAL VM4714 Docker CPU WORKER operational and independently computed 8192 SHA256 rounds; source-only cross-VM reachability staged
 
 Owner VM4714 ACTUALLY executed R285 nine focused
