@@ -1,3 +1,139 @@
+# R291 — restored original R61 shared PUBLIC permissionless network over ZeroTier IPv6; old fixed private-IP SSH is NOT node/role onboarding
+
+OWNER explicitly rejected R286-R290's
+hardcoded 10.50.56.x private cloud
+LAN and per-monitor SSH authorization
+as a new SSE network architecture.
+This is CORRECT: the binding
+`docs/ARCHITECTURE.md` and
+`docs/R61_COMMON_PERMISSIONLESS_P2P_BOOTSTRAP.md`
+PROHIBIT provider-private LAN for
+native EL/CL bootstrapping and require
+the exact same open Internet-capable
+P2P mechanism for all independent
+full nodes and entrants. Older VM4706/
+VM4707/VM4709 actually ran native
+Besu+Lighthouse on the PUBLIC
+controllerless ad-hoc ZeroTier IPv6
+overlay `ff2328775f000000`,
+with individually assigned `fca0::/16`
+addresses and native EL/CL
+peer counts; VM4707/VM4709
+independently reported finalized
+epoch602 identical root on
+2026-11-23 (capture-skew formal
+window separately failed ~1.22s).
+An outside laptop previously exchanged
+ACTUAL IPv6 TCP+UDP payloads with VM4707
+over the open overlay but full outside-ISP
+EL+CL sync still not proven.
+ZeroTier planetary root/relay dependence
+remains, so not fully decentralized
+transport or assured direct-WAN connectivity.
+
+NEW R291 GITHUB **SOURCE ONLY**:
+`tools/sse_pos_r291_common_public_overlay_onboarding.py`
+does genuine read-only `--status`
+or separately owner-TTY-consented
+`--join` to exact existing open
+`ff2328775f000000` PUBLIC ad-hoc
+network via `sudo -n zerotier-cli`,
+requires actual `fca0::/16` local
+IPv6 and sane `zt` interface;
+protects original owner EL/CL/
+validator hosts. ANY compatible
+external operator may join open
+ZeroTier network without project
+account, SSE SSH invitation,
+fixed source IPv4, role whitelist
+or centrally assigned identity.
+Preserves immutable original
+chain31340 genesis, native clients,
+keys, Docker worker and existing
+public peer discovery. It does
+NOT claim newly joined role is
+synced EL/CL or publicly
+signed-provider SLA. Read-only
+inspection source also checks
+original encoded port range
+9000..30559, including native
+Besu30404/Beacon9000 and R55
+real echo 29000/29001.
+**17 mocked R291 tests authored,
+NOT yet executed on VM**.
+
+Optional separate exact-SHA, explicit
+TTY-owner-consented Ubuntu24.04
+signed package install ONLY on
+new app VM4711–14:
+`scripts/r291_vm4711_4714_signed_overlay_install.sh`,
+`tools/sse_pos_r291_verified_vendor_package_only.py`
+and **10 new mocked tests**.
+Reuses exact original R175/R177
+fingerprint-verified scoped signed
+official ZeroTier Noble APT install
+source; calls vendor `install_verified_zerotier_apt`
+ONLY, not broad installer `setup`
+that would modify Docker/EL/CL.
+Makes no overlay join until separate
+local owner consent. Guards original
+PoS hosts, old native EL+CL Docker,
+current VM4714 real local
+`127.0.0.1:8877` CPU container.
+No R291 package install/join/remote
+IPv6 TCP/UDP check has yet run
+on VM4711–14; actual ZeroTier
+installation state on these VMs
+is still UNKNOWN.
+
+Owner latest preceding R290 logs:
+ALL VM4711/12/13/14 actually ran
+**21/21 R288 tests PASS**.
+VM4711/12/13 each **created one
+distinct dedicated owner-private
+SSH ED25519 keypair** (PUBLIC
+fingerprints LeIVtAan...,
+aB50B+cp..., HY3616d2...).
+VM4714 `authorized_keys` was
+actually read-only observed bytes0.
+No provider SSH permission was
+granted, no authenticated remote
+CPU probe, no additional chain
+TX. These SSH keys are legacy
+PRIVATE LAB diagnostics, **not**
+node/role permissionless entry
+requirements. Leave owner keys
+unchanged; don't use for protocol
+onboarding or open raw HTTP8877.
+
+R291 honest runbook:
+`docs/R291_SAME_PUBLIC_CONTROLLERLESS_OVERLAY_VM4711_4714_BACK_TO_PERMISSIONLESS_NETWORK.md`.
+When R291 owner 27 focused tests
+and read-only status pass, branch
+by actual host ZeroTier state:
+if missing, separately operator
+approves signed package-only
+installation; then independently
+joins public open network.
+Use already-existing R55 for
+genuine new VM IPv6 TCP+UDP
+roundtrips via ephemeral echo
+instead of hardcoded private
+address. Then signed TLS/EIP712
+provider endpoint with real
+paid finalized lease, and native
+EL/CL peer/finality for any
+additional full node. No
+native TEST ETH send/validator
+change by R291 source.
+All original 3 TEST ETH grants
+FINALIZED; new four VMs' 0.005
+TEST ETH funding grants still
+only READONLY QUOTED and
+**NOT APPROVED**.
+
+---
+
 # R290 — Four owner VMs' R289 added test fails (3 literal escaped-newline subtests); source-fixed exact .pub byte parsing and REAL LF/CRLF test cases, 21 authored tests not yet VM-run
 
 Actual VM4711/VM4712/VM4713/VM4714
