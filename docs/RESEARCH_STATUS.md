@@ -1,3 +1,30 @@
+# R252 — Owner-created app-only encrypted V2 deployer on VM4707; funding required
+
+**Actual owner terminal output:** separate encrypted application
+EOA created successfully on VM4707:
+`0xED0ED5E0526898c6E0e3C83140efcA12672E7ff0`,
+role `adaptive-v2-deployer`. Tool reported
+`walletCreated:true`, encryption/password prompts,
+zero funds created, no signing or on-chain tx. The keystore and
+password must stay PRIVATE and be safely backed up offline.
+This is NOT a validator key and not the funded original
+Genesis EOA.
+
+**Current blocker: identify a genuinely spendable chain31340
+TEST ETH funding EOA and obtain explicit transfer approval.**
+The historical Genesis-funded public address had over
+1,000,007 native TEST ETH, but its **private signing key
+custody remains UNVERIFIED**. Do not fabricate a signer or
+assume a public balance can be transferred. V2 remains
+unverified deployed. No additional source tests needed at
+already-green immutable SHA
+`6930c069b4e9738e63e2ce9d53b10d126053335e`.
+
+Public evidence + bounded-scope next steps:
+`docs/R252_VM4707_ENCRYPTED_V2_DEPLOYER_PUBLIC_EOA_CREATED_FUNDING_BLOCKER.md`.
+
+---
+
 # R251 — Real chain31340 read-only preflight PASSED; next application wallet/deployment gate
 
 Actual VM4707 RPC read-only R201 output on 2026-11-24:
