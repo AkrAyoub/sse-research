@@ -1,3 +1,71 @@
+# R284 — ALL THREE existing approved chain31340 TEST ETH grants FINALIZED; four NEW wallets preflight verified and UNAUTHORIZED; VM4714 test-fixture bug corrected, existing Docker containers protected
+
+Owner VM4707 actual native R278 strict read-only
+Monitor2 nonce3 funding transaction
+`0x0c6b2e79f930b8e23e5ee9b32bd151733bb09d88a7ecbc8c145cec091cdb389a`
+is **MATCHING_TX_SUCCESSFUL_CANONICAL_FINALIZED**:
+included block26008, execution finalized26100,
+EL head26250, 0.005 native TEST ETH at
+both latest and finalized recipient balance.
+Original consumer nonce1 and Monitor1 nonce2
+previously proven finalized; all three approved
+native funding transfers are now FINALIZED.
+Source latest/pending nonce4. Never resend any
+of original once-only attempts.
+
+Owner VM4707 actual R282 four-standby-EOA
+**READONLY_SCENARIO_QUOTE_ELIGIBLE_FOR_SEPARATE_APPROVAL**:
+each real VM4711-4714 previously created
+encrypted EOA clean, balance0, nonce0, code0,
+live 21000-gas EOA estimate at actual
+gasPrice1000wei, original app deployer EOA
+balance979999993320597000wei. Proposed
+only 4x0.005 native TEST ETH at source
+nonces4/5/6/7, maximum debit
+20000000084000000wei=0.020000000084
+TEST ETH including fees. **No authorization,
+sender implementation, signing or funding for
+these NEW EOAs.** Approval scope separate.
+
+Owner VM4714 R283 new test suite yielded
+**7 PASS, 1 FAIL** because TEST-FIXTURE fake
+`id` helper contained literal escaped newline
+in shebang; original Bash script non-TTY
+test did not get to intended assertion.
+New GitHub FIX replaces escaped shell
+helper newlines; **new test not yet
+VM4714 re-executed**. Due set-e, prior
+R281 and Docker inspector suites did not run
+in that VM owner shell. Owner separately
+chose explicit `--run-sudo`, typed R283
+special consent and passed privileged local
+Docker daemon connection to actual `ps -a`.
+Actual script then **CORRECTLY REFUSED**:
+`R281_REFUSED: dedicated compute host has
+existing Docker containers; do not disturb them`.
+This proves SOME existing containers (could
+be stopped or running), not their names or
+purposes. It stopped BEFORE Docker build/
+start, so **NO real worker or CPU trial
+ran**, and preexisting containers were
+untouched. DO NOT delete/migrate any container
+or disable the guard without read-only
+inventory `sudo -n docker --host
+unix:///var/run/docker.sock ps -a --no-trunc
+--format '{{.ID}} {{.Names}} {{.Image}}
+{{.Status}} {{.Ports}}'`.
+
+Exact public owner evidence staged:
+`evidence/r284_vm4707_finalized_all_original_grants_vm4714_worker_refused_existing_containers.json`.
+Runbook:
+`docs/R284_ALL_3_NATIVE_FUNDING_FINALIZED_VM4714_SAFELY_REFUSED_EXISTING_CONTAINERS.md`.
+Actual physical CPU, independent monitor
+HTTPS probes, bonded monitors, funded lease,
+payout/refund and outside-ISP P2P joining
+NOT yet achieved.
+
+---
+
 # R283 — actual new VM4714 R281 eight tests PASS, rootful Docker permission denied; R282 six tests PASS, Monitor2 still pending. Dedicated explicit-sudo Docker worker optional SOURCE ONLY.
 
 Operator VM4714 `ayoubakrvm4714` ran R281
