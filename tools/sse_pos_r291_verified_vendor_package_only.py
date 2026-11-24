@@ -71,9 +71,50 @@ def strict_source_revision(expected,*,run=subprocess.run):
     return True
 
 
+def signed_package_command(argv,*,timeout=240,run=subprocess.run):
+    """Only vetted GPG + apt native client install, no automatic service restarts.
+
+    R152's generic runner sets NEEDRESTART_MODE=a, which is inappropriate
+    for VM4714 with an already running compute workload. This package-only
+    wrapper overrides it to 'l' (list, never automatic restarts).
+    """
+    if type(argv) is not list or not argv or any(type(x) is not str for x in argv):
+        raise Refused("invalid signed package command")
+    if argv[0]=="gpg":
+        if argv[1:3] not in (
+            ["--batch","--homedir"],["--batch","--yes"]
+        ):
+            raise Refused("unreviewed GPG command")
+    elif argv==["apt-get","update","-qq"]:
+        pass
+    elif argv==["apt-get","install","-y","-qq",
+                 "--no-install-recommends","zerotier-one"]:
+        pass
+    else:
+        raise Refused("only official signed ZeroTier package APT commands allowed")
+    env={**os.environ,
+         "DEBIAN_FRONTEND":"noninteractive",
+         "NEEDRESTART_MODE":"l",
+         "APT_LISTCHANGES_FRONTEND":"none",
+         "GIT_TERMINAL_PROMPT":"0"}
+    try:
+        p=run(argv,capture_output=True,text=True,shell=False,
+              check=False,timeout=timeout,env=env)
+    except (OSError,subprocess.TimeoutExpired) as exc:
+        raise Refused("bounded signed-package helper unavailable") from exc
+    if p.returncode!=0:
+        raise Refused("signed ZeroTier package operation failed with exit "+str(p.returncode))
+    return p.stdout
+
+
+def install_package_only():
+    # Reuse exact R175/R177 signed APT installer, never vendor.setup().
+    return vendor.install_verified_zerotier_apt(runner=signed_package_command)
+
+
 def install(*,sha,root_guard=guarded_root_environment,
             revision_guard=strict_source_revision,which=shutil.which,
-            vendor_install=vendor.install_verified_zerotier_apt,
+            vendor_install=install_package_only,
             vendor_run=vendor.call,zt_installed_fn=None):
     user=root_guard()
     revision_guard(sha)
