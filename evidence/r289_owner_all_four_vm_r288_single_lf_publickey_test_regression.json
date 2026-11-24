@@ -1,0 +1,51 @@
+{
+  "schema": "SSE_R289_REAL_OWNER_VM4711_4714_R288_ONE_PUBLIC_SSH_KEY_NEWLINE_TEST_FAILURE_AND_NO_MUTATIONS_V1",
+  "observedDate": "2026-11-24",
+  "sourceShaOwnerExecuted": "df7d96f6d3126ce25b4c212914cd5ce93cfac475",
+  "hosts": [
+    {
+      "vm": "VM4711",
+      "username": "ayoubakrvm4711",
+      "r288TestsRun": 18,
+      "r288Passed": 17,
+      "r288Errors": 1
+    },
+    {
+      "vm": "VM4712",
+      "username": "ayoubakrvm4712",
+      "r288TestsRun": 18,
+      "r288Passed": 17,
+      "r288Errors": 1
+    },
+    {
+      "vm": "VM4713",
+      "username": "ayoubakrvm4713",
+      "r288TestsRun": 18,
+      "r288Passed": 17,
+      "r288Errors": 1
+    },
+    {
+      "vm": "VM4714",
+      "username": "ayoubakrvm4714",
+      "r288TestsRun": 18,
+      "r288Passed": 17,
+      "r288Errors": 1
+    }
+  ],
+  "allFourSameFailedTest": "test_owner_client_public_only_reads_public_file",
+  "error": "Refused: public SSH ED25519 key must be one bounded line",
+  "rootCause": "The fake .pub fixture and actual ssh-keygen .pub include a single conventional terminal LF, but strict _valid_public_key rejects any LF before parsing the local file",
+  "r288PreviewOrCreateActuallyReachedOnAnyHost": false,
+  "newSshKeysCreatedByFailedOwnerScripts": false,
+  "providerAuthorizedKeysMutatedByFailedOwnerScripts": false,
+  "dockerOrEthereumKeysChangedByFailedOwnerScripts": false,
+  "githubR289FixSourceOnly": {
+    "handling": "client_public reads public file and removes at most one terminal LF; strict _valid_public_key remains unchanged for all caller-supplied public keys and multiline injection",
+    "addedTests": 2,
+    "newExpectedR288TestCount": 20,
+    "vmOwnerR289TestsActuallyRun": false
+  },
+  "originalThreeNativeFundingsFinalizedPreviously": true,
+  "fourNewEoasStillUnfunded": true,
+  "newFundingAuthorizationReceived": false
+}
