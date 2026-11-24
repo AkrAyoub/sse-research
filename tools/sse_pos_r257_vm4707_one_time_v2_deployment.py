@@ -169,7 +169,7 @@ def consume_one_shot_marker(path):
 def send_once(market,ledger,keystore,marker,*,transport=rpc_transport,
               preflight_fn=preflight,confirm=input,password_prompt=getpass,
               tty=True):
-    if tty and (not sys.stdin.isatty() and not sys.stderr.isatty()):
+    if tty and (not sys.stdin.isatty() or not sys.stderr.isatty()):
         raise Refused("owner terminal required for live deployment")
     if (os.geteuid()==0 or getuser()!="ayoubakrvm4707" or
         keystore!=owner_private_paths()[0] or marker!=owner_private_paths()[1]):
