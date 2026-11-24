@@ -1,3 +1,38 @@
+# R273 — Actual provider application EOA CREATED on VM4709, native PoS Docker containers verified; consumer nonce1 only 8 blocks short of finality
+
+Owner VM4707 actual R271: five targeted tests PASS; real
+original-chain31340 consumer nonce1 funding transaction
+`0x9f3a13cb295b5ba2f642804a30c391b9cce266784a83dd293d0dd7fb7d1f9fdd`
+successful canonical in block**25564**, recipient latest
+balance**10000000000000000 wei**, finalized balance**0**.
+Actual EL head**25697**, finalized**25556**,
+**8 blocks gap**; Beacon head slot27309 epoch853,
+finalized epoch849. No Monitor1 nonce2, Monitor2 nonce3
+funding occurred. No consumer replay or gate bypass.
+
+Owner VM4709 at pinned R272 SHA: seven focused tests PASS,
+real host probe 4 logical CPUs, 11.27 GB MemAvailable,
+97.73 GB free disk, `docker ps` unprivileged permission
+denied due to root-owned Unix socket. Authorized separate
+`sudo -n docker --host unix:///var/run/docker.sock ps`
+actually lists two running Besu EL and Lighthouse BN
+containers (EL healthy). Owner installed original pinned
+requirements into isolated owner local app-only venv and
+actually CREATED new encrypted separate VM4709 provider
+EOA `0xBbd4F07be80E1f4c40A1b470A180C0F38352bEaf`.
+No app signing secret printed, funding, provider worker,
+on-chain bid or physical SLA yet. Be precise: R234 provider
+runtime currently uses UNPRIVILEGED per-request
+`docker container inspect`; socket access is denied.
+Root's one-off Docker listing does NOT make worker ready.
+No Docker service, network, validators or blockchain node
+changed by these checks. Actual public-only evidence:
+`evidence/r273_vm4707_r271_and_vm4709_provider_wallet_created.json`,
+details and next steps:
+`docs/R273_REAL_VM4709_PROVIDER_WALLET_AND_VM4707_CONSUMER_EIGHT_BLOCK_FINALITY.md`.
+
+---
+
 # R272 — real consumer transfer canonical and funded at latest, 40 execution blocks short of finality; VM4709 has available real resources but Docker access blocked
 
 Owner VM4707 R271 actual new 5/5 focused tests PASS,
