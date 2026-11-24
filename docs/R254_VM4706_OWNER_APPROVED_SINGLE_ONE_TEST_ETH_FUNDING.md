@@ -49,7 +49,7 @@ Pre-authorization checks:
 Exactly ONE signed Cast CLI submission invocation:
 - fixed `--keystore` owner local encrypted original file;
   prompts hidden keystore password (NEVER on command line);
-- fixed `--legacy --gas-limit 21000 --gas-price 1000` (a bare numeric price is wei)`
+- fixed `--legacy --gas-limit 21000 --gas-price 1000` (bare numeric price in wei)
   to enforce maximum gas fee; `--nonce 0`, `--chain 31340`,
   `--from` exact source, `--rpc-url` fixed localhost;
 - fixed `--value 1ether` destination, `--async` returns
