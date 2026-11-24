@@ -1,3 +1,33 @@
+# R271 — user REAL R267 confirms consumer receipt successful+canonical, still pending FINALITY; no monitor send
+
+User twice ran the owner-authorized R267 `--role monitor-1` checks
+after the first actual chain31340 consumer test-ETH funding
+nonce1 `0x9f3a13cb295b5ba2f642804a30c391b9cce266784a83dd293d0dd7fb7d1f9fdd`.
+Both returned `R267_EARLIER_ROLE_FUNDING_PENDING_FINALITY_DO_NOT_RESEND`.
+This R267 code only emits that stage AFTER actual tx and receipt
+are verified exact successful/canonical, therefore the owner-observed
+consumer transfer was successful and canonical **but not yet finalized**.
+No monitor1 nonce2 or monitor2 nonce3 native transfer submitted, and
+consumer one-time marker consumed; **NO resend, marker deletion, nonce
+replacement, client restarts or finality-bypass**.
+
+New `tools/sse_pos_r271_consumer_native_tx_finality_snapshot.py`
+and five focused mock regression tests stage a **one-shot read-only**
+real consumer nonce1 transaction inclusion-height versus EL finalized
+height, latest/finalized recipient balance and live Beacon head/finality
+epoch lag. No polling, signing, keystore reads, Docker, tx broadcast.
+New code/tests **not yet owner VM-tested**. Full evidence:
+`docs/R271_VM4707_CONSUMER_TX_FINALITY_AND_VM4709_REAL_ROLE_HOST_PREPARATION.md`.
+
+VM4709 had genuine Besu+Lighthouse original-chain native peer/finality
+evidence on Nov23, but its CURRENT resource availability is not known.
+Candidate for REAL provider-host deployment after actual nonmutating
+CPU/memory/disk/Docker inventory, and local encrypted provider EOA.
+Do not treat VM4707's two monitor wallets as physically independent
+operators; genuine independent monitoring and WAN access are not yet proven.
+
+---
+
 # R268 — actual VM4707 R267 9/9 tests and finalized consumer nonce1 funding PREVIEW PASS; waiting for NEW owner funding consent
 
 At exact pinned Git SHA `8e10d74356fbfc33d493c103f7667d09d2f48c6f`, owner actually executed new R267 focused offline safety suite **9/9 PASS**, then actual VM4707 original-chain31340 read-only consumer native funding preview **PASS** with marker `R267_FUNDING_PREVIEW_ONLY_NO_SIGNING_NO_BROADCAST=true`. Actual latest finalized execution block **25396**, R206 native V2 finalized deployment verification **TRUE**. Already-funded separate app-only source `0xED0ED5E0526898c6E0e3C83140efcA12672E7ff0` latest balance **999999993383597000 wei**, latest/pending nonce **1**. Consumer `0xD74A2aBC5a906BaFe39471CEe222c48BDD62DE3f` real EOA zero balance/nonce/no-code. Actual Besu basic native transfer gas estimate **21000**. Exact proposed consumer nonce1 transfer **10000000000000000 wei =0.01 TEST ETH**, gasLimit21000 gasPrice1000wei/gas, max single debit **10000000021000000 wei**. Remaining intended stages monitor1 nonce2 **0.005**, monitor2 nonce3 **0.005** testETH, total proposed across stages **20000000063000000 wei**, but **NO new TEST ETH transfer has been approved, signed, broadcast or finalized**. Public evidence `evidence/r268_vm4707_r267_consumer_funding_readonly_preview.json`. Wait for explicit user approval before ever suggesting --send; R267 sender remains user-local interactive + marker-gated, no silent sends. Existing deployer R257/R254 approval is consumed.
