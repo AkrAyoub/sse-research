@@ -1,3 +1,69 @@
+# R285 — ACTUAL VM4714 32/32 focused tests PASS and only THREE old EXITED hello-world containers; preserve them, source-only real Docker worker coexistence gate
+
+Owner actual VM4714 tests after R283 fixture fix:
+8 R283 + 8 R281 + 16 Docker inspector =
+**32/32 PASS**. Owner actual privileged
+READ-ONLY `docker ps -a --no-trunc` lists
+EXACTLY three old hello-world containers:
+`serene_sammet`, `friendly_saha`,
+`zealous_wilson`, each
+`Exited (0) 5 months ago`; NO running
+Docker containers observed. They are NOT
+live chain31340 PoS containers, but are
+owner objects and must be left untouched.
+No real CPU compute Docker worker yet built,
+started, benchmarked or publicly reachable.
+
+New Github **R285 SOURCE ONLY** dedicated
+VM4714 read-only strict existing-container
+preservation gate:
+`tools/sse_pos_r285_vm4714_preserve_existing_docker_readonly_gate.py`
+and nine new mocked tests
+`tests/test_sse_pos_r285_vm4714_preserve_existing_docker_gate.py`.
+Requires exact owner and explicit local
+`sudo -n docker --host unix:///var/run/docker.sock`,
+two immutable read-only full-ID inventory
+reads and `container inspect`, checks
+exact three full IDs+names, actual image
+hello-world, stopped exit0, no changes,
+no running/unexpected containers, no
+remote Docker context or shell mutation.
+New R285 tests/read-only real audit
+**NOT YET owner-VM4714 executed**.
+Updated owner-gated
+`scripts/r281_vm4714_real_compute_worker.sh`
+allows only these exact preserved
+three exited objects via R285 proof,
+not arbitrary existing Docker containers;
+all other state REFUSES; original `--run`
+still denies any existing Docker container.
+Explicit `--run-sudo` still requires
+owner TTY and approved phrase, fixed
+local sudo daemon; actual proposed
+worker 0.5 CPU, 256MiB RAM, strict
+isolation, loopback only. Added bounded
+real local healthz startup check before
+real OS-random SHA256 8192-round proof.
+**NO OWNER WORKER START YET**.
+
+Previously VM4707 original native chain31340
+consumer+Monitor1+Monitor2 transfers
+ALL actual FINALIZED. R282 exact
+new 4-EOA 0.005 TEST ETH each RPC
+gas and nonce quote PASS but separate
+NEW spending not authorized; no new
+funding/registration/bond transactions.
+User still has other standby VMs if
+dedicated VM4714 host state changes.
+Owner read-only test+real audit and
+subsequent separately consented
+pre-lease CPU measurement: runbook
+`docs/R285_VM4714_EXACT_EXISTING_EXITED_HELLOWORLD_PRESERVATION_AND_REAL_WORKER.md`,
+evidence
+`evidence/r285_vm4714_three_existing_stopped_hello_world_and_original_grants_finalized.json`.
+
+---
+
 # R284 — ALL THREE existing approved chain31340 TEST ETH grants FINALIZED; four NEW wallets preflight verified and UNAUTHORIZED; VM4714 test-fixture bug corrected, existing Docker containers protected
 
 Owner VM4707 actual native R278 strict read-only
