@@ -128,19 +128,32 @@ class TestR257ActualOwnerOneCreatePolicy(unittest.TestCase):
                     password_prompt=lambda _: "never")
 
     def test_no_approval_does_not_access_keystore_or_marker_or_broadcast(self):
+        # Important: send_once's preflight_fn default was bound when the
+        # function was defined. Patching m.preflight alone does NOT change
+        # that default and accidentally calls the real R256 quote on {}.
+        # Inject an explicit synthetic preview, with no access to live RPC.
         key=Path("/safe/app.keystore.json")
         marker=Path("/safe/no-attempt")
+        preview={"initcode":"0xaabb","deployer":m.APP,"signedOrBroadcast":False}
+        prompts=[]
+        def declined(prompt):
+            prompts.append(prompt)
+            return "DECLINE"
+        def never_password(_):
+            raise AssertionError("PASSWORD MUST NOT BE REQUESTED")
+        def never_rpc(*_):
+            raise AssertionError("RPC MUST NOT BE CALLED ON DECLINED SEND")
         with patch.object(m,"owner_private_paths",return_value=(key,marker)),patch.object(
              m,"getuser",return_value="ayoubakrvm4707"),patch.object(
              m.os,"geteuid",return_value=1000),patch.object(
-             m,"preflight",return_value={"initcode":"0xaabb",
-                        "deployer":m.APP,"signedOrBroadcast":False}),patch.object(
              m,"safe_keystore",side_effect=AssertionError("KEY MUST STAY UNREAD")),patch.object(
              m,"consume_one_shot_marker",side_effect=AssertionError("NO SEND MARKER")):
             with contextlib.redirect_stdout(io.StringIO()):
-                with self.assertRaises(m.Refused):
-                    m.send_once({}, {}, key,marker,tty=False,confirm=lambda _:"DECLINE",
-                        password_prompt=lambda _: "NEVER CALL")
+                with self.assertRaisesRegex(m.Refused,"did not authorize"):
+                    m.send_once({}, {}, key,marker,tty=False,confirm=declined,
+                        password_prompt=never_password,transport=never_rpc,
+                        preflight_fn=lambda *a,**k: preview)
+        self.assertEqual(len(prompts),1)
 
     def test_marker_created_exclusively_and_prevents_duplicate_attempts(self):
         with tempfile.TemporaryDirectory() as tmp:
