@@ -91,7 +91,7 @@ class TestR247CompiledV2ABIParity(unittest.TestCase):
             path=Path(td)/"Artifact.json"
             path.write_text(json.dumps({
                 "abi":[],"deployedBytecode":{"object":"0x6000"},
-                "metadata":"source-only mock, not Foundry"
+                "metadata":"source-only fixture with longer bounds; no genuine Foundry artifact claimed"
             }))
             self.assertEqual(a.load_artifact(path)["abi"],[])
             path.write_text(json.dumps({
