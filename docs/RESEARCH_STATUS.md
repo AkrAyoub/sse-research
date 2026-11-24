@@ -1,3 +1,87 @@
+# R286 — REAL VM4714 Docker CPU WORKER operational and independently computed 8192 SHA256 rounds; source-only cross-VM reachability staged
+
+Owner VM4714 ACTUALLY executed R285 nine focused
+safety tests PASS and live exact old-container
+no-mutation gate PASS; then typed explicit
+R283 dedicated sudo-Docker worker consent.
+Actual Docker image BUILT
+`sha256:848cde736008713d2f72e8de20cc669326abc678e41f644d3d63480ce77bd20d`
+and real fourth container
+`59b9086543110acd2ef44da7fddeb100ab0341204de3dac595093803985f535b`
+named `sse-compute-vm4714` STARTED, while
+all three earlier stopped hello-world containers
+were unchanged. Actual strict Docker configuration
+inspection matched 0.5CPU, 256MiB RAM+swap,
+UID10001 nonroot, readonly rootfs,
+drop all Linux caps, seccomp builtin,
+no-new-privileges, 32 PIDs and isolated
+bridge with ONLY localhost port
+`127.0.0.1:8877`. Local real HTTP health
+and actual independent work challenged
+8192 SHA256 rounds; result digest
+`sha256:11b9981300b43f797513824e01fe62e3cc3d225ba5542b66ef20d33869c6882e`
+matched local recomputation, one owner
+probe observed 0.002379sec wall elapsed.
+Printed
+`R283_VM4714_ACTUAL_DEDICATED_SUDO_DOCKER_CPU_WORKER_VERIFIED=true`.
+This was ACTUAL CPU activity and actual
+Docker resource-limit configuration,
+**NOT** outside-host SLA, proof of
+sustained CPU consumption, trusted
+hardware, paid finalized lease, selected
+bonded monitors or onchain settlement.
+Actual worker running at launch end,
+present live state after log needs new check.
+No new TEST ETH funds or transactions.
+
+Public factual recorded evidence:
+`evidence/r286_vm4714_real_prelease_physical_cpu_worker_verified.json`.
+
+New GitHub R286 SOURCE ONLY
+`tools/sse_pos_r286_cross_vm_real_worker_reachability.py`
+and nine mocked tests
+`tests/test_sse_pos_r286_cross_vm_real_worker_reachability.py`
+prepare explicitly opt-in `--probe` on
+four actual VM4711–VM4714 nonroot accounts:
+two bounded real private TCP checks
+on fixed VM4714 10.50.56.22 ports22/8877
+to establish whether SSH private forwarding
+is even feasible and verify raw compute
+HTTP has NOT leaked off localhost.
+On VM4714 only, re-inspects exact real
+worker Docker full ID+image SHA/strict
+caps and sends ONE fresh OS-random actual
+localhost SHA compute request, independently
+verifying 8192 rounds. `--plan` does no
+network. No wallet, key, privileged
+mutations, new listeners, Docker
+start/stop, native chain RPC send or
+funding. R286 owner VM tests/probes
+**NOT YET RUN**. Distinct VM 10.50.56.x
+private reachability will NOT be called
+outside-ISP public Internet access.
+R232 monitor agent still requires real
+finalized paid onchain V2 lease,
+elected/confirmed bonded monitor,
+public TLS endpoint and provider
+EIP712 attribution. Full runbook:
+`docs/R286_REAL_VM4714_DOCKER_COMPUTE_PROOF_AND_CROSS_VM_MONITOR_REACHABILITY.md`.
+Do not rerun R285 exact-three baseline AFTER
+worker creation; it will correctly refuse
+because an actual fourth container now exists.
+
+ALL original 3 native TEST ETH grants
+were previously proven FINALIZED on
+chain31340. The four new VM4711–14
+encrypted app wallets remain unfunded.
+R282 4x0.005 native TEST ETH at gas
+cap max debit0.020000000084 quote
+is real-readonly eligible but NO
+new owner authorization or send
+has been provided.
+
+---
+
 # R285 — ACTUAL VM4714 32/32 focused tests PASS and only THREE old EXITED hello-world containers; preserve them, source-only real Docker worker coexistence gate
 
 Owner actual VM4714 tests after R283 fixture fix:
