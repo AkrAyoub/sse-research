@@ -1,3 +1,33 @@
+# R253 — 0 native TEST ETH at V2 deployer; VM4706 Genesis owner EOA previously UNLOCKED successfully
+
+Owner VM4707 read-only check: encrypted deployer file
+permissions correct (0700 parent / 0600 file), RPC chain ID
+31340, actual deployer public EOA
+`0xED0ED5E0526898c6E0e3C83140efcA12672E7ff0`
+balance exactly **0 TEST ETH**. No transfer or deployment.
+
+**Corrected historical custody evidence:** the actual
+`docs/R28_PRESERVE_EXISTING_WALLET.md` recorded
+successful OWNER-VM4706 pinned Cast decryption and
+public-address match for the original Genesis-funded
+execution EOA
+`0x13fb73aace8A11Be2899D047635A757a224Ce00B`
+on 2026-11-20. This disproves older broad phrasing
+"Genesis custody never verified"; current file existence,
+working password, fresh balance and spending authorization
+have NOT been re-proven. Existing VM4706 keystore must
+NOT be recreated, exported, moved or used without consent.
+
+**Next:** one read-only VM4706 keystore-path/permission,
+chain ID, public original balance+nonce check. Then ask
+owner to explicitly approve one bounded TEST ETH transfer,
+with no other automated key usage. See
+`docs/R253_ZERO_BALANCE_AND_RECOVERED_VM4706_GENESIS_CUSTODY_PROOF.md`.
+The complete marketplace source/compiled ABI/Foundry PASS
+remains pinned to `6930c069b4e9738e63e2ce9d53b10d126053335e`.
+
+---
+
 # R252 — Owner-created app-only encrypted V2 deployer on VM4707; funding required
 
 **Actual owner terminal output:** separate encrypted application
