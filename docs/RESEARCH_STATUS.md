@@ -1,3 +1,70 @@
+# R292 — REAL VM4711/4712/4714 signed ZeroTier installed and original PUBLIC overlay join submitted; daemon ONLINE, membership listed, 6plane not yet ready (asynchronous)
+
+Owner VM4711, VM4712, VM4714 actually
+ran R291 `18 + 12 = 30` new focused
+unit/safety tests EACH at exact Git
+SHA `b8aabf923407d45a6c518b0684cb2f68a1bc66bb`,
+**90/90 actual reported tests PASS** on
+these three. Each initially reported
+ZeroTier package ABSENT; each then
+locally approved exact
+`INSTALL-ONE-R291-SIGNED-ZEROTIER-ONLY`,
+and the vendor-GPG-pinned Ubuntu24.04
+APT-only installer reported
+`vendorZerotierPackageInstalled=true`
+and `daemonEnableStartCommandSucceeded=true`.
+Each independently approved joining the
+**SAME existing controllerless public
+overlay `ff2328775f000000`** using
+`JOIN-EXISTING-OPEN-SSE31340-ZEROTIER`.
+Each reported `joinCommandSent=true`,
+`daemonReportsOnline=true` and
+`networkIsJoined=true` IMMEDIATELY
+after submission, but
+`networkReportsOkPublic=false`,
+`actualOpenOverlayReadyForCrossHostTransport=false`,
+`assignedActual6planeIpv6=null`.
+ZeroTier joins/membership/address assignment
+are ASYNCHRONOUS, so **not yet verified
+fully connected**, and no remote
+overlay TCP/UDP/EL+CL/SLA evidence
+has been collected on these new VMs.
+DO NOT resubmit `--join` or reinstall
+on these three; run read-only
+`--status` and exact
+`sudo -n zerotier-cli -j listnetworks`
+plus `-j info` to learn current state
+first. ZeroTier daemon was already
+started successfully. No evidence yet
+provided for VM4713 R291 installation
+or public overlay join; do not infer
+any status for VM4713.
+
+Evidence:
+`evidence/r292_actual_vm4711_vm4712_vm4714_zerotier_signed_install_join_pending.json`.
+This is **real owner machine observations**
+at earlier original R291 Git SHA; no new
+code change necessary for first
+read-only network status check.
+Existing original VM4706/4707/4709
+PoS signer/EL/CL remain separate;
+VM4714 original real Docker CPU worker
+was NOT modified by R291 join/apt
+client-specific code and provider's
+unsigned worker endpoint should
+remain bound to localhost.
+The 3 original TEST ETH role grants
+still FINALIZED; 4 new app EOA
+fundings UNAUTHORIZED/UNSENT.
+The open overlay remains third-party
+ZeroTier planetary root/relay dependent;
+its NAT underlay might use the
+same VM cloud, so a new inter-VM
+IPv6 roundtrip is **not evidence
+of outside-ISP participation**.
+
+---
+
 # R291 — restored original R61 shared PUBLIC permissionless network over ZeroTier IPv6; old fixed private-IP SSH is NOT node/role onboarding
 
 OWNER explicitly rejected R286-R290's
