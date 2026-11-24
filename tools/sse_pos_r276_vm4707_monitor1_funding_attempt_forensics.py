@@ -18,7 +18,7 @@ from sse_pos_r260_v2_readonly_finalized_deployment_audit import (
     CHAIN, GENESIS, RPC, quantity,
 )
 from sse_pos_r267_vm4707_one_by_one_role_funding import (
-    APP, GAS_LIMIT, GAS_PRICE, RECIPIENTS, read_marker,
+    APP, GAS_LIMIT, GAS_PRICE, RECIPIENTS, read_marker, role_index,
 )
 
 
@@ -26,13 +26,15 @@ class Refused(ValueError):
     pass
 
 
-def observe(*,transport=local_rpc,marker_reader=read_marker):
+def observe(*,role="monitor-1",transport=local_rpc,marker_reader=read_marker):
     """One owner VM4707 forensic snapshot, never any JSON-RPC mutator."""
+    if role not in ("monitor-1","monitor-2"):
+        raise Refused("forensic role must be one approved monitor recipient")
     try:
-        doc=marker_reader("monitor-1")
+        doc=marker_reader(role)
     except (OSError,ValueError) as exc:
         raise Refused("existing public monitor-1 attempt marker missing/invalid") from exc
-    idx=1
+    idx=role_index(role)
     expected_role,recipient,value=RECIPIENTS[idx]
     expected_nonce=idx+1
     if (type(doc) is not dict or
@@ -117,10 +119,10 @@ def observe(*,transport=local_rpc,marker_reader=read_marker):
     if status=="MATCHING_TX_SUCCESSFUL_CANONICAL_FINALIZED" and finalized_balance<value:
         raise Refused("funding receipt finalized but monitor1 final balance is below grant")
     return {
-        "schema":"SSE_R276_VM4707_CONSUMED_MONITOR1_NONCE2_FORENSIC_READONLY_V1",
+        "schema":"SSE_R278_VM4707_CONSUMED_EXACT_ROLE_FUNDING_FORENSIC_READONLY_V1",
         "chainId":CHAIN,
         "originalGenesisVerified":True,
-        "role":"monitor-1",
+        "role":role,
         "attemptMarkerExistsAndExact":True,
         "ownerPrivateKeystoreRead":False,
         "onlyPublicAttemptMarkerRead":True,
@@ -142,7 +144,12 @@ def observe(*,transport=local_rpc,marker_reader=read_marker):
         "blocksUntilReceiptFinality":(max(0,height-final_height)
                                      if height is not None else None),
         "transactionStatus":status,
-        "monitor2PredecessorFinalizedEligible":status=="MATCHING_TX_SUCCESSFUL_CANONICAL_FINALIZED",
+        "monitor2PredecessorFinalizedEligible":(
+            role=="monitor-1" and
+            status=="MATCHING_TX_SUCCESSFUL_CANONICAL_FINALIZED"),
+        "allThreeApprovedRoleTransfersFinalized":(
+            role=="monitor-2" and
+            status=="MATCHING_TX_SUCCESSFUL_CANONICAL_FINALIZED"),
         "txVisibilityIsNotProofOfWhetherAttemptBroadcast":True,
         "transactionsSignedOrSent":False,
         "walletSecretsRead":False,
@@ -153,9 +160,11 @@ def observe(*,transport=local_rpc,marker_reader=read_marker):
 def main(argv=None):
     p=argparse.ArgumentParser(description=__doc__)
     p.add_argument("--rpc",required=True,choices=(RPC,))
+    p.add_argument("--role",choices=("monitor-1","monitor-2"),
+                   default="monitor-1")
     args=p.parse_args(argv)
     try:
-        report=observe()
+        report=observe(role=args.role)
         print(json.dumps(report,indent=2,sort_keys=True))
         print("R276_EXACT_CONSUMED_MONITOR1_ATTEMPT_READONLY_NO_RETRY=true")
         return 0
