@@ -1,3 +1,31 @@
+# R249 — Compiler ABI parity: inherited EIP712 event repaired, RETEST REQUIRED
+
+Actual VM4707 at SHA `c611ed1ff64059c642e30f0fc96f66d09feb057e`
+executed **9/9 passing R248 R247 checker unit tests** and
+successfully executed `forge build -q`.
+Against the **actual Solc-built market artifact**, the first
+R247 compiled event comparison stopped at the additional
+**`EIP712DomainChanged()`**, inherited from OpenZeppelin
+`EIP712`. This was not an SSE application event decoder mismatch
+or native chain failure. Checks of ledger and compiled output
+tuples were not reached.
+
+R249 GitHub source now accepts ONLY the exact standard
+inherited zero-field non-anonymous event; retains strict
+event coverage for all SSE market/ledger application events
+and rejects any other unexpected, malformed or duplicate event.
+New regression covers both V2 contract roles and adversarial
+schemas. **R249 revised code is committed but not yet
+tested against actual compiler artifacts.**
+
+Evidence: `docs/R249_VM4707_COMPILED_EIP712_ABI_EVENT_EXCEPTION.md`.
+Prior R246 complete V2 source-only regression PASS at exact
+SHA `6a25aa4aa86295cdac5d86596e95e18393e08b8f`
+is unchanged; source test PASS is not live deployment or
+independent physical SLA proof.
+
+---
+
 # R248 — R247 compiler-parity checker scalar/array return fix (NOT YET RETESTED)
 
 Actual VM4707 at exact source `6e50557d30b9d7c6835b8a5927c5a90ec18f1bd6`:
