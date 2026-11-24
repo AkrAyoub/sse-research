@@ -1,3 +1,28 @@
+# R248 — R247 compiler-parity checker scalar/array return fix (NOT YET RETESTED)
+
+Actual VM4707 at exact source `6e50557d30b9d7c6835b8a5927c5a90ec18f1bd6`:
+38/38 R226–R229, 43/43 R231–R239, 6/6 R242,
+5/5 R201 and 6/6 R206 all PASS. Full Python
+1,275 run, **1 ERROR and 3 skipped**: a newly written
+R247 ABI checker wrongly classified single `address[]`
+return as nested Solidity struct, raising a tuple-unpack exception.
+The fail-fast gate did NOT reach compiled-ABI checking or Forge.
+
+R248 now distinguishes flat single/multiple scalar/array outputs
+from nested Solidity struct returns, with two new regression
+tests. **The new fix is committed but has not yet been
+executed on VM4707 or tested against actual compiled Foundry
+artifacts.** See
+`docs/R248_VM4707_COMPILED_ABI_SINGLE_OUTPUT_REPAIR.md`.
+
+Prior exact `6a25aa4aa86295cdac5d86596e95e18393e08b8f`
+R246 full PASS remains valid (1,268 Python OK/3 skip,
+21/21 adaptive Foundry, full Forge exit0 and market 19,263B).
+No V2 deployment, real application TEST ETH transfer,
+validator change or independent physical SLA yet.
+
+---
+
 # R246/R247 — New full VM4707 source PASS; compiled ABI parity gate not yet verified
 
 **Actual owner VM4707 result on exact immutable source
