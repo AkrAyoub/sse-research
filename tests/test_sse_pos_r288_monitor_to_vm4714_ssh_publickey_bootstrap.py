@@ -89,6 +89,31 @@ class TestR288OwnerSshTrust(unittest.TestCase):
         self.assertFalse(out["sshPrivateKeyPrintedOrUploaded"])
         self.assertEqual(private.read_bytes(),b"TEST_FAKE_PRIVATE_NOT_AN_SSH_KEY")
 
+    def test_real_ssh_keygen_pub_file_one_terminal_lf_and_no_lf(self):
+        private,public=self.client_keypair()
+        # Original reported R288 failure: ssh-keygen .pub ends with one LF.
+        self.assertEqual(
+            r.client_public(name="ayoubakrvm4712",uid=self.uid,home=self.home)["publicKey"],
+            PUB)
+        public.write_text(PUB+" r288-test")
+        self.assertEqual(
+            r.client_public(name="ayoubakrvm4712",uid=self.uid,home=self.home)["publicKey"],
+            PUB)
+        self.assertEqual(private.read_bytes(),b"TEST_FAKE_PRIVATE_NOT_AN_SSH_KEY")
+
+    def test_client_public_rejects_double_lf_or_embedded_keys(self):
+        private,public=self.client_keypair()
+        for malicious in (
+            PUB+" r288-test\\n\\n",
+            PUB+"\\n"+PUB+" second\\n",
+            PUB+" r288-test\\r\\n",
+        ):
+            with self.subTest(case=repr(malicious[-16:])):
+                public.write_text(malicious)
+                with self.assertRaisesRegex(r.Refused,"one bounded line"):
+                    r.client_public(name="ayoubakrvm4712",uid=self.uid,home=self.home)
+        self.assertEqual(private.read_bytes(),b"TEST_FAKE_PRIVATE_NOT_AN_SSH_KEY")
+
     def test_client_create_requires_exact_phrase_before_ssh_keygen(self):
         called=[]
         with self.assertRaisesRegex(r.Refused,"authorization missing"):
