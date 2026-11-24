@@ -134,6 +134,16 @@ class TestR291RealOpenControllerlessTransportPolicies(unittest.TestCase):
         self.assertEqual(len(commands),2)
         self.assertFalse(any("join" in c for c in commands))
 
+    def test_offline_daemon_refuses_join_before_local_tty_or_write(self):
+        run,commands,which,join_count=runner(joined=False,online=False)
+        with self.assertRaisesRegex(m.Refused,"daemon is not online"):
+            m.join(run=run,which=which,
+                   stdin=FakeTty(True),stderr=FakeTty(True),
+                   input_fn=lambda p:self.fail("offline daemon must not ask consent"),
+                   owner_guard=lambda:"outside-operator")
+        self.assertEqual(join_count[0],0)
+        self.assertEqual(len(commands),2)
+
     def test_exact_local_tty_consent_required(self):
         run,commands,which,_=runner(joined=False)
         with self.assertRaisesRegex(m.Refused,"exact independent"):
