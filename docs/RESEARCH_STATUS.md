@@ -1,3 +1,68 @@
+# R283 — actual new VM4714 R281 eight tests PASS, rootful Docker permission denied; R282 six tests PASS, Monitor2 still pending. Dedicated explicit-sudo Docker worker optional SOURCE ONLY.
+
+Operator VM4714 `ayoubakrvm4714` ran R281
+eight new mocked safety tests PASS and no-effect
+compute worker preview:
+real pilot proposed one isolated 0.5CPU/256MiB,
+nonroot UID10001, read-only rootfs, 32PIDs, drop
+all caps, built-in seccomp and loopback
+`127.0.0.1:8877`. Actual
+`/var/run/docker.sock` is root:docker
+mode0660; unprivileged Docker read-only listing
+failed permission denied. Rootless setup scripts
+not present at guessed Ubuntu path.
+**NO REAL Docker container was started or CPU
+challenge measured yet**.
+
+Operator VM4707 R282 six tests PASS; actual
+R282 NO-SEND report
+`MONITOR2_NOT_FINALIZED_NO_STANDBY_FUNDING_QUOTE`.
+Exact Monitor2 nonce3 native TEST ETH transfer
+already successful canonical by prior R278,
+still NOT finalized at owner R282 read.
+No additional funding quote from RPC,
+no new standby funds authorized/sent.
+R267 monitor2 attempt marker must not be
+reset, resent or replaced.
+
+New GitHub R283 source-only safety option:
+`scripts/r281_vm4714_real_compute_worker.sh`
+now adds **explicit owner-TTY-only --run-sudo**
+to fixed local rootful Docker socket on
+dedicated compute-only **VM4714**, separate
+from original PoS Docker hosts. It never
+silently falls back to sudo; refuses any
+preexisting Docker container on host.
+Uses `sudo -n` only if already available,
+requires exact typed special consent, strict
+resource isolation, real Docker image digest,
+real independent 8192 SHA workload and
+live CPU timing. Newly extended
+`tools/sse_compute_docker.py` uses
+`dedicated_vm4714_sudo_docker=True` to
+read-only inspect ONLY exact named
+`sse-compute-vm4714` at loopback port8877,
+under exact VM4714 nonroot user with explicit
+fixed local Unix socket, and sanitizes
+Docker context/host env. Reject root, other
+owners, nonstrict/remote/wrong socket.
+Eight new mock tests authored
+`tests/test_sse_pos_r283_vm4714_explicit_sudo_compute.py`
+but **NOT yet tested on actual VM4714**.
+The rootful Docker API is root-equivalent on
+the dedicated VM, a CONTROLLED experiment
+only, not a production permissionless worker
+security guarantee. No PoS/keys/EVM/funds
+modified by commits. Need actual VM4714
+sudo -n *read-only* Docker inventory & new
+test pass before a separate optional TTY
+owner start. Full evidence:
+`evidence/r283_vm4714_dedicated_docker_socket_denied_and_vm4707_monitor2_pending.json`
+and runbook
+`docs/R283_VM4714_DEDICATED_EXPLICIT_SUDO_DOCKER_REAL_WORKER_GATE.md`.
+
+---
+
 # R282 — actual third original native TEST ETH grant nonce3 successful canonical but NOT YET FINALIZED; FOUR new encrypted separate-VM EOAs CREATED, dedicated real CPU worker source staged, new 4-grant no-send quote only
 
 VM4707 actual R267 final third already-approved
