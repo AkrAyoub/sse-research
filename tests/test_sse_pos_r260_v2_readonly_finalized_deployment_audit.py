@@ -81,7 +81,8 @@ def fake_api(*,finalized=True,tx=True,receipt=True,status="0x1",
 
 
 def positive_funding(_url,*,transport):
-    return {"fundingTxCanonicalAndFinalizedVerified":True,"destination":m.APP}
+    return {"fundingTransferFinalized":True,
+            "fundingTransactionHash":m.FUNDING_TX_HASH}
 
 
 def full_r206(_manifest,_url,*,transport):
@@ -171,6 +172,47 @@ class TestR260FinalizedExactCreationEvidence(unittest.TestCase):
             with self.subTest(refs=refs),self.assertRaises(m.Refused):
                 m.verify_compiler_runtime(corrupt,market_hex,
                                           m.EXPECTED_MARKET_RUNTIME_BYTES,"market")
+
+    def test_historical_original_funding_does_not_require_unspent_deployer_balance(self):
+        # After the deployment pays its own gas, current deployer balance
+        # is < 1 ether. The initial R255 funding event remains valid.
+        requested=[]
+        block="0x"+("b0"*32)
+        funding_tx={
+            "hash":m.FUNDING_TX_HASH, "from":m.ORIGINAL_FUNDING_SOURCE,
+            "to":m.APP,"value":hex(10**18),"nonce":"0x0",
+            "gas":hex(21000),"gasPrice":"0x3e8","input":"0x",
+        }
+        funding_receipt={
+            "transactionHash":m.FUNDING_TX_HASH,"from":m.ORIGINAL_FUNDING_SOURCE,
+            "to":m.APP,"status":"0x1","gasUsed":"0x5208",
+            "blockNumber":"0x6186","blockHash":block,
+        }
+        def transport(_url,method,params):
+            requested.append(method)
+            if method=="eth_getTransactionByHash": return funding_tx
+            if method=="eth_getTransactionReceipt": return funding_receipt
+            if method=="eth_getBlockByNumber":
+                if params[0]=="0x6186":return {"hash":block}
+                if params[0]=="finalized":return {"number":"0x61ff"}
+            raise AssertionError("unexpected historical funding call "+method)
+        result=m.verify_original_funding_history(m.RPC,transport=transport)
+        self.assertTrue(result["fundingTransferFinalized"])
+        self.assertNotIn("eth_getBalance",requested)
+
+    def test_historical_funding_cannot_accept_reverted_receipt(self):
+        funding_tx={
+            "hash":m.FUNDING_TX_HASH,"from":m.ORIGINAL_FUNDING_SOURCE,
+            "to":m.APP,"value":hex(10**18),"nonce":"0x0",
+            "gas":hex(21000),"gasPrice":"0x3e8","input":"0x",
+        }
+        def api(_url,method,_params):
+            if method=="eth_getTransactionByHash":return funding_tx
+            if method=="eth_getTransactionReceipt":
+                return {"transactionHash":m.FUNDING_TX_HASH,"status":"0x0"}
+            raise AssertionError("must fail before any other network read")
+        with self.assertRaises(m.Refused):
+            m.verify_original_funding_history(m.RPC,transport=api)
 
     def test_manifest_only_creates_new_small_public_file_never_overwrites(self):
         manifest={"schema":"SSE_R206_ADAPTIVE_MARKET_V2_DEPLOYMENT_V1",
