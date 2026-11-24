@@ -1,3 +1,86 @@
+# R293 — ALL FOUR new VM4711/4712/4713/4714 actually joined ORIGINAL public open ZeroTier controllerless IPv6 overlay OK PUBLIC, assigned distinct real fca0 addresses; real cross-VM TCP+UDP still pending
+
+Owner independently reported complete actual
+`sudo -n zerotier-cli -j info` and
+`-j listnetworks` plus R291 read-only
+status for ALL FOUR new role host VMs.
+ALL daemon `online=true`; same original
+R61/R55 controllerless PUBLIC ad-hoc network
+`ff2328775f000000`, `status=OK`,
+`type=PUBLIC`, `ztrb6cq527`,
+and real distinct assigned IPv6 /40:
+
+- VM4711 `fca0:2328:77a9:8951:acf0::1`
+  node `a98951acf0`, TCP fallback `false`.
+- VM4712 `fca0:2328:77b9:dc2a:748a::1`
+  node `b9dc2a748a`, TCP fallback `true`.
+- VM4713 `fca0:2328:7768:1f76:8561::1`
+  node `681f768561`, TCP fallback `true`.
+- VM4714 `fca0:2328:77f8:9326:689f::1`
+  node `f89326689f`, TCP fallback `true`.
+
+This confirms REAL overlay membership and
+online 6plane addresses on four distinct
+candidate provider/monitor VMs; no private
+10.50.56.x or project-owner SSH admission
+was used. `tcpFallbackActive=true` on
+three of four warns that vendor TCP fallback
+can be active, but does not prove the actual
+underlay path for any given host-pair probe.
+Same cloud provider underlay remains,
+so outside-ISP independent physical networking
+is NOT proven by these observations.
+Earlier R291 focused 30/30 tests were
+owner-reported PASS on 4711/4712/4714;
+owner has NOT provided 4713's unit test
+or package/join invocation logs, although
+its later REAL OK PUBLIC membership IS
+confirmed.
+
+No actual newly formed VM4711–13 ⇄
+VM4714 TCP+UDP packets are yet recorded.
+Next source already implemented and
+previously REAL-proven with an external
+WSL client is existing UNCHANGED
+`tools/sse_pos_r55_zerotier_ipv6_transport.py`,
+12 safety tests, real bounded IPv6 TCP29000
+and UDP29001 with UDP client source29002;
+provider VM4714 runs `--server`, each
+monitor in turn runs `--check
+fca0:2328:77f8:9326:689f::1` while
+its provider server is listening.
+R55 server automatically stops after
+FIRST matched TCP+UDP pair, so restart
+NEW R55 server only for the next
+individual monitor. Binding is ONLY the
+provider's actual 6plane local address,
+not wildcard or private infrastructure
+IP, no raw Docker worker8877 exposure,
+no SSH tunnel, no native PoS writes.
+This real application-overlaid transport
+proof is NOT native EL/CL peer finality
+or EIP712/provider SLA success.
+Full stepwise runbook:
+`docs/R293_FOUR_NEW_VMS_REAL_PUBLIC_OVERLAY_JOIN_AND_NEXT_R55_IPV6_TCP_UDP_PROOF.md`.
+Owner-grounded evidence:
+`evidence/r293_four_new_vm_actual_zerotier_open_ipv6_ok_public_membership.json`.
+No new R293 source code or fake packet
+results needed: original R55 proven
+network diagnostic reused as-is.
+
+Original VM4706/4707/4709 real native
+PoS chain31340 EL/CL and original
+VM4714 physical Docker CPU worker
+have NOT been restarted or modified
+by these new read-only overlays
+observations or GitHub documents.
+All 3 old native TEST ETH grants
+FINALIZED; four new app EOA wallets
+remain UNFUNDED and any additional
+native transfers UNAUTHORIZED.
+
+---
+
 # R292 — REAL VM4711/4712/4714 signed ZeroTier installed and original PUBLIC overlay join submitted; daemon ONLINE, membership listed, 6plane not yet ready (asynchronous)
 
 Owner VM4711, VM4712, VM4714 actually
