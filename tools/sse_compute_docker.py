@@ -5,7 +5,10 @@ observation, NOT remote cloud or trusted-execution attestation.
 """
 from __future__ import annotations
 import json
+import os
+from pathlib import Path
 import re
+import stat
 import subprocess
 import time
 from urllib.parse import urlsplit
@@ -35,8 +38,35 @@ def local_endpoint(endpoint: str) -> int:
     return port
 
 
+def require_local_owner_rootless_socket(socket_path: str) -> str:
+    """Require exact owner-private rootless UNIX socket; never use remote Docker.
+
+    This opt-in explicitly excludes the existing rootful PoS Docker daemon.
+    """
+    uid = os.geteuid()
+    expected = f"/run/user/{uid}/docker.sock"
+    if (uid == 0 or type(socket_path) is not str
+            or socket_path != expected):
+        raise ComputeError('expected exact nonroot owner Docker socket')
+    path = Path(socket_path)
+    runtime_dir = path.parent
+    if runtime_dir.is_symlink() or not runtime_dir.is_dir():
+        raise ComputeError('missing private owner rootless runtime directory')
+    d = runtime_dir.stat()
+    if d.st_uid != uid or stat.S_IMODE(d.st_mode) != 0o700:
+        raise ComputeError('rootless runtime directory not private and owner-controlled')
+    if path.is_symlink() or not path.exists():
+        raise ComputeError('rootless Docker UNIX socket missing or linked')
+    s = path.stat()
+    if (not stat.S_ISSOCK(s.st_mode) or s.st_uid != uid
+            or not os.access(path, os.R_OK | os.W_OK)):
+        raise ComputeError('rootless Docker socket not locally accessible by owner')
+    return 'unix://' + socket_path
+
+
 def inspect_container(profile: dict, endpoint: str, container_name: str,
-                      strict_hardening: bool = False) -> dict:
+                      strict_hardening: bool = False, *,
+                      docker_socket: str | None = None) -> dict:
     """Read local Docker config; verify exact image/CPU/memory/port.
 
     strict_hardening=True is mandatory for the new signed marketplace
@@ -50,8 +80,14 @@ def inspect_container(profile: dict, endpoint: str, container_name: str,
         raise ComputeError('profile endpoint differs from requested endpoint')
     if not isinstance(profile.get('imageId'), str) or not _IMAGE.fullmatch(profile['imageId']):
         raise ComputeError('profile requires an immutable image ID')
+    command = ['docker']
+    if docker_socket is not None:
+        # An explicitly selected private nonroot daemon. Never inherit
+        # Docker's default context or rootful PoS host socket in this mode.
+        command += ['--host', require_local_owner_rootless_socket(docker_socket)]
+    command += ['container', 'inspect', container_name]
     try:
-        p = subprocess.run(['docker', 'container', 'inspect', container_name],
+        p = subprocess.run(command,
                            capture_output=True, text=True, check=False,
                            timeout=8, shell=False)
     except (FileNotFoundError, subprocess.TimeoutExpired, OSError) as exc:
@@ -124,7 +160,10 @@ def inspect_container(profile: dict, endpoint: str, container_name: str,
     return {'imageId': d['Image'].lower(), 'cpuMilli': profile['cpuMilli'],
             'memoryBytes': profile['memoryBytes'], 'hostPort': port,
             'containerId': d['Id'], 'runtimeReportedRunning': True,
-            'localDockerConfigurationInspected': True, 'trustedHardwareAttestation': False}
+            'localDockerConfigurationInspected': True, 'trustedHardwareAttestation': False,
+            'dockerDaemonSelection': ('EXACT_OWNER_ROOTLESS_UNIX_SOCKET'
+                                      if docker_socket is not None
+                                      else 'LEGACY_DEFAULT_CONTEXT_NOT_ROOTLESS_ATTESTED')}
 
 
 def run_compute_probe(endpoint: str, lease_id: int, epoch_id: int, request_hash: str) -> dict:
