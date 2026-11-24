@@ -1,3 +1,40 @@
+# R261 — REAL native chain31340 market and linked vote ledger deployed at canonical latest state; 71-block finality gap
+
+Actual VM4707 live Besu read-only observations from user:
+deployment receipt block **25339**, status success,
+gas used **6616403** (under owner-approved 8342601);
+latest execution block **25424**, finalized **25268**;
+**still NOT final** (needs 25339). The single R257
+deployment tx must NEVER be resent.
+
+Market is actual live EVM code at
+`0x6C01dBd7aA336a96d8Ab09Ea631E209612224080`,
+runtime **19263B**, SHA256
+`aed48968f9b5ef4e8f238efaed8c539af5c8799de181f290b38a21803386c261`.
+Real `market.votes()` points to on-chain ledger
+`0x6635849b77f037fab611736612d7d3493dc650ff`,
+runtime **10668B**, SHA256
+`3a14ac0cd120271c50ac31661b6080546477aa8218e9944e51dd89998b78622d`.
+`ledger.settlement()` returns exact market and market
+`minimumBond()` returns **1e15 wei = 0.001 TEST ETH**.
+All these are actual canonical **latest-state** observations;
+R260 finalized compiled bytecode parity and R206 finalized
+receipt/code/wiring still pending.
+
+NEW public-only pinned candidate R206 manifest
+`evidence/r261_vm4707_latest_state_v2_deployment_candidate.json`
+enables direct R206 read-only finalized auditing of
+the observed addresses/code hashes on VM4707 and VM4706
+once execution finality >=25339. Do NOT claim candidate
+manifest is finalized attestation. Documentation
+`docs/R261_VM4707_REAL_LIVE_V2_MARKET_LEDGER_RUNTIME_ADDRESSES_AND_CANDIDATE_MANIFEST.md`.
+Next: a single read-only R260/R206 run once finality catches up,
+then actual independent role-wallet funding/registrations and
+physical provider/monitor service evidence with separate
+transaction authorizations.
+
+---
+
 # R260 — REAL one-time market+ledger contract-CREATE transaction submitted; finalized receipt/code linkage NEXT
 
 Owner actual VM4707 at exact pinned R259 SHA
