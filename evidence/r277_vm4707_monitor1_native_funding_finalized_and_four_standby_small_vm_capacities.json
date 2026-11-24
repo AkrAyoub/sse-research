@@ -1,0 +1,93 @@
+{
+  "schema": "SSE_R277_REAL_MONITOR1_FUNDED_FINALIZED_AND_FOUR_VM_STANDBY_HOST_READONLY_INVENTORY_V1",
+  "capturedFromOwnerLogsOnUtcDate": "2026-11-24",
+  "vm4707": {
+    "observedSourceSha": "fc50985a7bf067ff83485c931069211bc572863f",
+    "r276FocusedTestsPassed": 8,
+    "exactMonitor1AttemptMarkerPresent": true,
+    "monitor1AttemptRecoveredHash": "0xaf024159fe0b34d255689ab6ab5137c55aa247e7044f9792d56e6297ad447ebc",
+    "originalChainId": 31340,
+    "originalGenesisVerified": true,
+    "monitor1Recipient": "0xd63b2Ba14E8aD16Cf5f494259dAE05AD59fE0147",
+    "sourceAppEOA": "0xED0ED5E0526898c6E0e3C83140efcA12672E7ff0",
+    "sourceLatestNonce": 3,
+    "sourcePendingNonce": 3,
+    "transactionNonce": 2,
+    "valueWei": "5000000000000000",
+    "transactionSuccessfulCanonicalFinalized": true,
+    "transactionIncludedBlock": 25739,
+    "executionFinalizedBlock": 25812,
+    "executionHead": 25956,
+    "monitor1BalanceLatestWei": "5000000000000000",
+    "monitor1BalanceFinalizedWei": "5000000000000000",
+    "monitor2PredecessorFinalizedEligible": true,
+    "monitor2ActualTransactionObserved": false
+  },
+  "standbySmallVmObservations": [
+    {
+      "user": "ayoubakrvm4711",
+      "loginHostname": "patch-dil-template-s2-service-base-g68-20260628-044954",
+      "privateEth0Ipv4": "10.50.56.14",
+      "logicalCpus": 2,
+      "totalMemoryReportedGiB": 3.8,
+      "availableMemoryReportedGiB": 3.3,
+      "filesystemAvailableReportedGB": 35,
+      "ubuntuVersion": "24.04",
+      "dockerCliInstalled": true,
+      "python3Installed": true,
+      "proposedRole": "remote-monitor-1",
+      "actualAppWalletCreated": false
+    },
+    {
+      "user": "ayoubakrvm4712",
+      "loginHostname": "patch-dil-template-s1-service-base-g68-20260628-050503",
+      "privateEth0Ipv4": "10.50.56.19",
+      "logicalCpus": 2,
+      "totalMemoryReportedGiB": 3.8,
+      "availableMemoryReportedGiB": 3.3,
+      "filesystemAvailableReportedGB": 35,
+      "ubuntuVersion": "24.04",
+      "dockerCliInstalled": true,
+      "python3Installed": true,
+      "proposedRole": "remote-monitor-2",
+      "actualAppWalletCreated": false
+    },
+    {
+      "user": "ayoubakrvm4713",
+      "loginHostname": "patch-dil-template-s2-service-base-g68-20260628-044954",
+      "privateEth0Ipv4": "10.50.56.21",
+      "logicalCpus": 2,
+      "totalMemoryReportedGiB": 3.8,
+      "availableMemoryReportedGiB": 3.3,
+      "filesystemAvailableReportedGB": 35,
+      "ubuntuVersion": "24.04",
+      "dockerCliInstalled": true,
+      "python3Installed": true,
+      "proposedRole": "remote-monitor-3",
+      "actualAppWalletCreated": false
+    },
+    {
+      "user": "ayoubakrvm4714",
+      "loginHostname": "patch-dil-template-s1-service-base-g68-20260628-050503",
+      "privateEth0Ipv4": "10.50.56.22",
+      "logicalCpus": 2,
+      "totalMemoryReportedGiB": 3.8,
+      "availableMemoryReportedGiB": 3.3,
+      "filesystemAvailableReportedGB": 35,
+      "ubuntuVersion": "24.04",
+      "dockerCliInstalled": true,
+      "python3Installed": true,
+      "proposedRole": "isolated-compute-provider",
+      "actualAppWalletCreated": false
+    }
+  ],
+  "securityCaveats": {
+    "vmHostnamesSharedAcrossSomeIds": true,
+    "crossCloudPhysicalOperatorIndependenceVerified": false,
+    "publicInternetNativeP2pVerified": false,
+    "realMonitorHttpsProbeStarted": false,
+    "realPhysicalComputeWorkerStarted": false,
+    "newMonitor1FundingAttemptNeeded": false,
+    "furtherNativeBondOrNewHostFundingApproved": false
+  }
+}
