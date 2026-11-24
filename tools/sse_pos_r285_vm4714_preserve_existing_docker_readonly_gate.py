@@ -43,8 +43,11 @@ def _call(args, *, run):
         raise Refused("read-only local Docker CLI unavailable") from exc
     if result.returncode!=0:
         raise Refused("read-only local Docker CLI access denied or query failed")
-    if type(result.stdout) is not str or len(result.stdout)>8192:
-        raise Refused("Docker read-only listing exceeds safe response limit")
+    # Inspect of three existing Docker objects includes long HostConfig,
+    # labels and environment. Permit a bounded 192KiB read-only response;
+    # no stdout fields are passed to shell commands or executed.
+    if type(result.stdout) is not str or len(result.stdout)>196608:
+        raise Refused("Docker read-only response exceeds safe response limit")
     return result.stdout
 
 
