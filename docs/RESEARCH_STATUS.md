@@ -1,3 +1,55 @@
+# R289 — real R288 test failure 17/18 on all FOUR VM owners: standard SSH .pub trailing LF; GitHub parser fix + 2 new safety tests, no SSH keys created yet
+
+Actual VM4711/VM4712/VM4713/VM4714 owner
+R288 focused test suite at Git SHA
+`df7d96f6d3126ce25b4c212914cd5ce93cfac475`
+ran **18 tests per VM, 17 PASS/1 ERROR**
+each. All fail identically in
+`test_owner_client_public_only_reads_public_file`
+at strict `_valid_public_key` because
+standard owner SSH `.pub` ends in one LF.
+All owner shells stopped on `set -e`
+BEFORE any --client-create, --client-preview
+or --provider-preview; **no SSH keys were
+created and no authorized_keys modified**.
+This is a real SOURCE parser bug, not
+proof of invalid ED25519 key or real
+SSH account failure.
+
+GitHub R289 fixes only local
+`client_public()` by removing
+**one** terminal LF before existing
+strict one-line validator, keeping
+rejection of double/embedded LF and
+malicious CLI-supplied public keys.
+Two new regression tests were added
+for normal/no-LF public file and
+multiline/double-LF/CRLF rejection.
+Now **20 R288 tests authored, NOT YET
+owner-VM rerun**. Runbook
+`docs/R289_R288_SSH_PUB_TRAILING_NEWLINE_FIX_AND_OWNER_TEST_GATES.md`
+and evidence
+`evidence/r289_owner_all_four_vm_r288_single_lf_publickey_test_regression.json`.
+
+No earlier finality changed: three
+original native chain31340 funding grants
+FINALIZED; four new VMs' encrypted
+application wallets UNFUNDED, new four
+0.005 native TEST ETH grants
+STILL NOT AUTHORIZED. Existing VM4714
+Docker worker previously confirmed
+real CPU rounds and loopback only,
+not yet independently remotely accessed
+through SSH. Once owner runs new R288
+tests successfully, generate distinct
+monitor SSH identities by separate
+owner TTY consent and append-only
+VM4714 restricted public-key trust.
+No SSH or Docker privilege changes from
+GitHub edits themselves.
+
+---
+
 # R288 — REAL all three monitors verified VM4714 public SSH host key, but no noninteractive user login; restricted dedicated SSH key setup source-only
 
 Actual owner VM4711/4712/4713 R287 each 14 safety
