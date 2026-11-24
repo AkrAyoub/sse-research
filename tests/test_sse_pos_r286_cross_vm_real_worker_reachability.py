@@ -48,6 +48,7 @@ class TestR286ActualFourVmReadOnlyCrossHostPreflight(unittest.TestCase):
         self.assertEqual([r["tcpStatus"] for r in out["actualNetworkProbes"]],
                          ["TCP_HANDSHAKE_SUCCEEDED"]*2)
         self.assertFalse(out["actualWorkerDockerConfigReaudited"])
+        self.assertTrue(out["unexpectedRawWorkerPrivateNetworkExposureObserved"])
         self.assertFalse(out["remoteLeaseOrSlaVerified"])
 
     def test_monitor_connect_refused_is_observation_not_sla_failure(self):
@@ -56,6 +57,7 @@ class TestR286ActualFourVmReadOnlyCrossHostPreflight(unittest.TestCase):
         out=m.observe(user="ayoubakrvm4712",probe=True,connect=denied)
         self.assertEqual([r["tcpStatus"] for r in out["actualNetworkProbes"]],
                          ["TCP_REFUSED","TCP_REFUSED"])
+        self.assertFalse(out["unexpectedRawWorkerPrivateNetworkExposureObserved"])
         self.assertFalse(out["remoteLeaseOrSlaVerified"])
         self.assertFalse(out["nativeChainTransactionSent"])
 
