@@ -209,10 +209,7 @@ class TestR257ActualOwnerOneCreatePolicy(unittest.TestCase):
     def test_ephemeral_fake_key_signs_legacy_contract_create_offline(self):
         # No real key, no key file, no ETH, no RPC; validates the exact
         # contract CREATE transaction encoding before accessing app wallet.
-        try:
-            from eth_account import Account
-        except ImportError:
-            self.skipTest("local test venv missing eth-account")
+        from eth_account import Account
         fake_key=bytes([7])*32
         signer=Account.from_key(fake_key)
         unsigned={
@@ -224,8 +221,17 @@ class TestR257ActualOwnerOneCreatePolicy(unittest.TestCase):
         self.assertEqual(Account.recover_transaction(
             "0x"+bytes(signed.raw_transaction).hex()).lower(),
             signer.address.lower())
-        self.assertTrue(bytes(signed.raw_transaction).startswith(b"\xf8") or
-                        bytes(signed.raw_transaction).startswith(b"\xf9"))
+        self.assertTrue(m.verify_signed_legacy_create(
+            "0x"+bytes(signed.raw_transaction).hex(),"0x60006000"))
+        from rlp import decode
+        fields=decode(bytes(signed.raw_transaction))
+        self.assertEqual(fields[3],b"")  # deployed CREATE, no recipient
+        self.assertEqual(fields[5],bytes.fromhex("60006000"))
+        # A wrong calldata digest MUST NOT be accepted after signing.
+        with self.assertRaisesRegex(m.Refused,"signed CREATE RLP"):
+            m.verify_signed_legacy_create(
+                "0x"+bytes(signed.raw_transaction).hex(),"0x60006001")
+
 
     def test_r257_has_strict_immutable_pending_only_funding_parameters(self):
         self.assertEqual(m.BOND_WEI,10**15)
