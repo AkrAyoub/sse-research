@@ -1,3 +1,31 @@
+# R245 — Latest actual VM4707 integration evidence (2026-11-24)
+
+On real VM4707, Python 3.12 isolated venv and source
+`1c75859ae777d4b39a14071b37c4fb0b0c8a3af3`:
+
+- **R226–R229: 38/38 PASS** (new adaptive V2 market/ledger ABI,
+  public EIP-712 signature tests and read-only finalized mock policies).
+- **R231–R239: 42/43 PASS**, 1 real-source ERROR: strict
+  `type(path) is not Path` in R237 rejected the ordinary Linux
+  `PosixPath` keystore returned by `Path(...)`.
+- **R245 source correction committed**: use
+  `not isinstance(path, Path)` while retaining encrypted
+  keystore owner/permission/symlink restrictions, regression added.
+  **R245 fix has not yet been retested on VM4707.**
+- **No full Python source suite, R242 sender tests, new R236 contract
+  compile/Foundry tests, or EIP170 deployed runtime-size acceptance
+  yet**, due to fail-fast source gate. No live V2 deployed, signed
+  or funded; no physical remote SLA proven.
+
+This paragraph supersedes the historical R243 statement below that
+none of the new Python source had been tested, as those tests have
+since genuinely run on the actual VM. See
+`docs/R244_VM4707_R235_FIRST_REAL_REGRESSION_SELECTOR_TEST_REPAIR.md`
+and
+`docs/R245_VM4707_R235_SECOND_PYTHON_GATE_KEYSTORE_PATH_TYPE.md`.
+
+---
+
 # R243 — Active draft R226–R242 real-role integration, SOURCE-ONLY (unverified)
 
 As of 2026-11-23, new research integration work is on
