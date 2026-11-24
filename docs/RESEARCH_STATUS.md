@@ -1,3 +1,32 @@
+# R251 — Real chain31340 read-only preflight PASSED; next application wallet/deployment gate
+
+Actual VM4707 RPC read-only R201 output on 2026-11-24:
+**chain ID 31340 and original execution genesis verified**;
+latest execution block **24840**, finalized execution block
+**24692** (hash
+`0xd00e0982d035f2c64fa7edcc7a01cfb4e9abf8ec1dce0c8b7667a16a4ccd0b44`),
+block gas limit **30,000,000**, latest basefee **7 wei/gas**,
+and original public Genesis funded EOA balance at finalized
+**1,000,007.92902409 TEST ETH** (nonce **0**).
+**No private key custody** or app keystore verified.
+
+Full V2 source ABI/Foundry regressions are already green at
+the immutable tested `6930c069b4e9738e63e2ce9d53b10d126053335e`.
+No further test loops warranted without source change.
+Next: explicit authorization to create owner-only encrypted
+separate app deployer EOA (not Genesis), prove a legitimate
+test ETH funding signer and bounded deployment budget, then
+owner-authorized actual deployment with R206 finalized manifest.
+The literal `marketV2Deployed:false` R201 field is NOT an
+independent on-chain deployment scan. The full live network
+resource SLA and independent Internet/validator experiments
+remain outstanding.
+
+Complete evidence/steps:
+`docs/R251_ACTUAL_CHAIN31340_READ_ONLY_PREFLIGHT_AND_DEPLOYMENT_HANDOFF.md`.
+
+---
+
 # R250 — R249 real VM4707 full V2 source+compiled-ABI regression PASS
 
 **Newest verified owner VM4707 source SHA**
