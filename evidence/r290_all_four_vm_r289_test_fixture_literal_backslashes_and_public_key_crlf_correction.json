@@ -1,0 +1,54 @@
+{
+  "schema": "SSE_R290_REAL_4_VM_R289_R288_REGRESSION_ESCAPED_TEST_FIXTURE_AND_CRLF_STRICT_FILE_PARSER_V1",
+  "observedDate": "2026-11-24",
+  "realOwnerRuns": {
+    "sourceSha": "51b85653d9ea5a348c556a9d4b1bd52e2924b089",
+    "vmUsers": [
+      "ayoubakrvm4711",
+      "ayoubakrvm4712",
+      "ayoubakrvm4713",
+      "ayoubakrvm4714"
+    ],
+    "eachFocusedTestsRun": 20,
+    "eachTestsReportedFailures": 3,
+    "allFailuresIn": "test_client_public_rejects_double_lf_or_embedded_keys",
+    "subtestFailures": {
+      "literalDoubleBackslashNNotRejected": true,
+      "literalEmbeddedDoubleBackslashNRejectedButMessageMismatch": true,
+      "literalDoubleBackslashRDoubleBackslashNNotRejected": true
+    },
+    "actualObservedFailureCause": "R289 newly added test fixture wrote literal backslash+n/backslash+r sequences instead of actual LF/CRLF bytes, and expected every malformed case to raise one exact message; plus Path.read_text normalizes raw CRLF during local .pub read",
+    "allVMCommandsStoppedAfterFailedTests": true,
+    "ownerClientCreateReached": false,
+    "ownerProviderPreviewReached": false,
+    "sshClientKeysCreated": false,
+    "providerAuthorizedKeysChanged": false,
+    "ethereumOrDockerModified": false
+  },
+  "sourceOnlyFix": {
+    "source": "tools/sse_pos_r288_monitor_to_vm4714_ssh_publickey_bootstrap.py",
+    "publicFileRead": "raw bytes decoded ASCII to preserve exact CRLF/no newline translation",
+    "normalSshKeygenSingleFinalLfAllowed": true,
+    "additionalOrEmbeddedLfRejected": true,
+    "crlfRejected": true,
+    "callerSuppliedPublicKeyValidatorRelaxed": false,
+    "test": "tests/test_sse_pos_r288_monitor_to_vm4714_ssh_publickey_bootstrap.py",
+    "testFixturesWriteActualAsciiControlCharacters": true,
+    "additionalTestForMultipleKeys": true,
+    "authoredFocusedTestCount": 21,
+    "fullTestsOnOwnerVmsAfterFixPassed": false,
+    "targetedIsolatedLocalParserBehaviorChecked": true,
+    "targetedLocalResults": [
+      "single LF accepted",
+      "no LF accepted",
+      "double LF rejected",
+      "embedded second public key rejected",
+      "CRLF rejected",
+      "multiline rejected"
+    ],
+    "nativeChainOrPoSChanged": false
+  },
+  "previousThreeOriginalRoleGrantsFinalized": true,
+  "fourAdditionalVMWalletsUnfunded": true,
+  "additionalNativeRoleFundingAuthorized": false
+}
