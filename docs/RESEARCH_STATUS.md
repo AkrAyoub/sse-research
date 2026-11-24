@@ -1,3 +1,36 @@
+# R246/R247 — New full VM4707 source PASS; compiled ABI parity gate not yet verified
+
+**Actual owner VM4707 result on exact immutable source
+`6a25aa4aa86295cdac5d86596e95e18393e08b8f`:**
+38/38 R226–R229 Python PASS, 43/43 R231–R239 Python PASS,
+6/6 R242 sender-policy PASS, R201 5/5, R206 6/6,
+full Python **1,268 OK (3 skipped)**, Solidity **68 files
+compiled** by Solc 0.8.24, adaptive V2 **21/21 Foundry PASS**,
+complete `forge test -q` returned 0, and the genuine success
+marker `R235_SOURCE_ONLY_GATES_COMPLETED=true` was emitted.
+New market runtime **19,263B** (5,313B EIP-170 headroom),
+vote ledger **10,668B** (13,908B headroom).
+The updated R236 post-accept idle/bond-release adversarial cases
+are included in the 21/21 passing tests.
+See `docs/R246_VM4707_COMPLETE_R235_PYTHON_SOLIDITY_REGRESSION_PASS.md`.
+
+**New further R247 compiled-ABI gate committed AFTER that verified
+SHA, not yet executed on VM4707:** `tools/sse_pos_r247_v2_compiled_abi_parity.py`
+checks Solidity compiler-emitted function signatures, every
+on-chain event/indexed field, and public state tuple return types
+against exact R226/R227/R229 Python readers. Added to
+`scripts/r235_vm4707_v2_source_only_gate.sh` and source CI;
+it is NOT yet a passing result. Exact new SHA must be pinned and
+tested before live V2 use.
+
+All new tool and contract source remains a draft, unmerged and
+**not deployed to native chain31340**; no app wallet,
+TEST-ETH funding, live lease transactions, independent physical
+SLA, external-native peer admission or second independent
+BLS validator is proven by the R235 source-only tests.
+
+---
+
 # R245 — Latest actual VM4707 integration evidence (2026-11-24)
 
 On real VM4707, Python 3.12 isolated venv and source
