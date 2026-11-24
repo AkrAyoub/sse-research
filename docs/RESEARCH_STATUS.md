@@ -1,3 +1,50 @@
+# R257 — First REAL native chain31340 TEST ETH transfer finalized; separate app deployer funded, one-shot V2 create prepared but NOT authorized
+
+Actual R255 VM4707 real read-only audit returned
+`R255_REAL_NATIVE_V2_DEPLOYER_FUNDING_FINALIZED=true`.
+Exact tx
+`0x07e3ff069936936b3daf17efc5cb484c1712e93dc6bd6040c55a5fae1b8d2a90`
+sent 1 native TEST ETH from original VM4706 encrypted
+Genesis EOA to new VM4707 separate app-only deployer
+`0xED0ED5E0526898c6E0e3C83140efcA12672E7ff0`.
+Canonical successful inclusion block **24966**,
+finalized execution height **25076**, actual fee
+21,000 gas * 1,000 wei = **21,000,000 wei**.
+Deployer **finalized balance exactly 1 TEST ETH**,
+Genesis source finalized nonce **1**. No duplicate
+funding send required or authorized.
+
+R256 actual VM4707 passed 6/6 new mock policy tests,
+`forge build -q`, real original Besu constructor gas quote
+**6,670,081 gas** for exact compiled market+internal ledger,
+padded proposed cap **8,342,601 gas** at observed
+**1,000 wei/gas** = maximum scenario **8,342,601,000 wei**.
+Quoted bond 1e15 wei (0.001 TEST ETH) is an illustrative
+test parameter, NOT Sybil or economic-security proof.
+
+Substantive new
+`tools/sse_pos_r257_vm4707_one_time_v2_deployment.py`
+adds a strictly **read-only default deployment preview** and
+a DISTINCT `--send` owner-only interactive one-shot CREATE
+sender requiring actual R255 finality, R249 original clean
+source/ABI, live R256 quote, nonce0, bounded original-chain
+gas, app keystore, local separate exact typed authorization,
+and non-repeatable marker. **Neither sender nor mocked
+R257 regressions have been VM-tested or broadcast;
+the owner has NOT separately approved deployment.**
+The current GitHub compare shows NO Solidity contracts,
+Foundry config or vendored library change relative to the
+fully VM-tested immutable R249 SHA.
+
+Next run focused R257 mock tests and default **NO --send**
+public preview on VM4707, inspect proposed immutable bond
+and fee cap, obtain explicit one-deployment approval;
+then independently verify any real deployment receipt and
+contract runtime/wiring via R206. Evidence/commands
+`docs/R257_NATIVE_FUNDING_FINALIZED_DEPLOYER_READY_AND_ONE_TIME_V2_DEPLOYMENT_PREVIEW.md`.
+
+---
+
 # R256 — VM4707 Beacon live and syncing normally, transfer included not yet final; quote real V2 deployment gas read-only
 
 Owner actual VM4707 R141 captures 16:42:08Z and
