@@ -106,7 +106,13 @@ def client_public(*,name,uid,home):
     _require_regular_owner(public,uid,{0o600,0o400,0o644})
     if public.stat().st_size>500:
         raise Refused("public SSH identity too long")
-    key,fp=_valid_public_key(public.read_text(encoding="ascii"))
+    # OpenSSH ssh-keygen writes exactly one terminal LF in its normal
+    # public .pub file. Strip only that one file terminator; never accept
+    # embedded/newline-separated keys or relax direct CLI-key validation.
+    public_line=public.read_text(encoding="ascii")
+    if public_line.endswith("\n"):
+        public_line=public_line[:-1]
+    key,fp=_valid_public_key(public_line)
     return {
         "schema":"SSE_R288_OWNER_ONLY_MONITOR_SSH_PUBLIC_IDENTITY_V1",
         "sourceVm":MONITORS[name][0],
