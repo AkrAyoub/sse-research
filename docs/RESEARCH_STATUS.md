@@ -1,3 +1,34 @@
+# R262 — actual live post-deploy Solc runtime parity VERIFIED; one-shot native role-readiness added
+
+Owner's actual VM4707 EVM runtime+compiler parity command
+returned `LATEST_SOLC_BYTECODE_PARITY_VERIFIED=true`
+for both real native V2 contracts, market 19,263 bytes,
+SHA256 `aed48968f9b5ef4e8f238efaed8c539af5c8799de181f290b38a21803386c261`,
+linked vote ledger 10,668 bytes,
+SHA256 `3a14ac0cd120271c50ac31661b6080546477aa8218e9944e51dd89998b78622d`.
+Solc compiler immutable slots market **27**, ledger
+**12**; known real immutable values (market votes,
+minBond=1e15 wei, ledger settlement) matched.
+All nonimmutable EVM runtime bytes matched compiler source.
+No transactions were submitted. This is REAL live latest-state
+code parity, **NOT** finalized-state R260/R206 acceptance;
+most recent owner execution finalized block25300 < deployed block25339.
+
+New one-shot `tools/sse_pos_r262_native_v2_live_market_readiness.py`
+and five focused mocked tests enable exact live market/ledger
+code and immutable parity, actual active monitor roster,
+real consumer/request and lease counters, real onchain
+escrow/bond liabilities and contract balances, canonical
+successful receipt and separate finality distance in
+one READ-ONLY no-polling pass. NEW source not yet VM-tested.
+Evidence `docs/R262_REAL_V2_DEPLOYED_CODE_PARITY_AND_NATIVE_ROLE_READINESS.md`.
+Next state-changing actions require separately authorized
+consumer/provider/monitor EOA ownership and funding;
+R257 deployment approval is already consumed and does
+not authorize role transactions.
+
+---
+
 # R261 — REAL native chain31340 market and linked vote ledger deployed at canonical latest state; 71-block finality gap
 
 Actual VM4707 live Besu read-only observations from user:
