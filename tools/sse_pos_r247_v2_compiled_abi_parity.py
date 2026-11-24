@@ -89,9 +89,27 @@ def check_function(abi,signature_string,outputs=None):
     values=item.get("outputs")
     if type(values) is not list:
         raise Refused("compiled ABI missing outputs for "+signature_string)
-    if len(outputs)==1 and type(outputs[0]) is tuple:
+    # A Solidity struct getter has ONE output whose schema itself is
+    # a sequence of (field_name, field_type) pairs:
+    #     [((name, type), (name, type), ...)]
+    # A normal scalar/array getter has one or more flat pairs:
+    #     [(name, type)] or [(name, type), (name, type), ...]
+    # Do not mistake the single flat pair ("monitors", "address[]")
+    # for a nested struct just because it is a Python tuple.
+    is_struct=(
+        len(outputs)==1 and isinstance(outputs[0],(tuple,list)) and
+        len(outputs[0])>0 and
+        all(isinstance(field,(tuple,list)) and len(field)==2 and
+            all(type(part) is str for part in field)
+            for field in outputs[0])
+    )
+    if is_struct:
         expected=["("+",".join(field_type for _,field_type in outputs[0])+")"]
     else:
+        if not all(isinstance(field,(tuple,list)) and len(field)==2 and
+                   all(type(part) is str for part in field)
+                   for field in outputs):
+            raise Refused("invalid expected ABI return field declaration")
         expected=[kind for _,kind in outputs]
     actual=[canonical_type(x) for x in values]
     if actual!=expected:
