@@ -1,0 +1,41 @@
+{
+  "schema": "SSE_R264_REAL_VM4707_CREATED_APP_ROLE_EOAS_V1",
+  "chainId": 31340,
+  "observedAtUtcDate": "2026-11-24",
+  "host": "VM4707",
+  "ownerProvidedCreationLogs": true,
+  "appOnlyKeysNeverUploaded": true,
+  "genesisOwnerAndValidatorKeyReused": false,
+  "onChainFundingObserved": false,
+  "onChainMonitorRegistrationObserved": false,
+  "physicalOperatorIndependenceVerified": false,
+  "deploymentBlock": 25339,
+  "lastObservedFinalizedExecutionBlock": 25332,
+  "deploymentFinalizedAtLastObservation": false,
+  "accounts": [
+    {
+      "role": "adaptive-v2-consumer",
+      "address": "0xD74A2aBC5a906BaFe39471CEe222c48BDD62DE3f",
+      "host": "VM4707",
+      "publicLocalPath": "~/.local/share/sse-v2-app-only/adaptive-v2-consumer.keystore.json",
+      "walletCreated": true,
+      "signingCustodyNotIndependentlyVerified": true
+    },
+    {
+      "role": "adaptive-v2-monitor-1",
+      "address": "0xd63b2Ba14E8aD16Cf5f494259dAE05AD59fE0147",
+      "host": "VM4707",
+      "publicLocalPath": "~/.local/share/sse-v2-app-only/adaptive-v2-monitor-1.keystore.json",
+      "walletCreated": true,
+      "signingCustodyNotIndependentlyVerified": true
+    },
+    {
+      "role": "adaptive-v2-monitor-2",
+      "address": "0xf8D4c882A7439507e2fc237DCBDf4A1c228F0FF8",
+      "host": "VM4707",
+      "publicLocalPath": "~/.local/share/sse-v2-app-only/adaptive-v2-monitor-2.keystore.json",
+      "walletCreated": true,
+      "signingCustodyNotIndependentlyVerified": true
+    }
+  ]
+}
