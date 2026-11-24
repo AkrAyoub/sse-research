@@ -1,0 +1,77 @@
+{
+  "schema": "SSE_R266_ACTUAL_FINALIZED_VM4707_V2_DEPLOYMENT_AND_ROLE_FUNDING_QUOTE_V1",
+  "observedAtUtcDate": "2026-11-24",
+  "chainId": 31340,
+  "executionGenesisHash": "0x5f7cbcd4f1ddfbbedbdd2b180b83d9eff49d4b7263643858d7be2e9c243936bf",
+  "actualDeployment": {
+    "transactionHash": "0xe9187bd24d72d2dec11fc6a2758802ddf6fa46a2941edd306329173fe132d6b6",
+    "deployedBlock": 25339,
+    "finalizedExecutionBlock": 25364,
+    "finalizedExecutionBlockHash": "0x6a55a553c18ce93a8eb433d79763c13b2a11e3061cf65838783070e111e6303a",
+    "actualGasUsed": 6616403,
+    "actualGasPriceWei": 1000,
+    "actualFeeWei": "6616403000",
+    "authorizedMaxGasFeeWei": "8342601000",
+    "nonce0Source": "0xED0ED5E0526898c6E0e3C83140efcA12672E7ff0",
+    "approvedInitcodeSha256": "22d5b3310ec9a9efc66015762ea3d78d152f0a52eb9d67a257f18e3470c171ec",
+    "market": {
+      "address": "0x6C01dBd7aA336a96d8Ab09Ea631E209612224080",
+      "runtimeSha256": "aed48968f9b5ef4e8f238efaed8c539af5c8799de181f290b38a21803386c261",
+      "SolcNonImmutableCodeVerified": true,
+      "actualImmutablePatchSlots": 27
+    },
+    "voteLedger": {
+      "address": "0x6635849b77f037fab611736612d7d3493dc650ff",
+      "runtimeSha256": "3a14ac0cd120271c50ac31661b6080546477aa8218e9944e51dd89998b78622d",
+      "SolcNonImmutableCodeVerified": true,
+      "actualImmutablePatchSlots": 12
+    },
+    "immutableBondWei": "1000000000000000",
+    "mutualLedgerMarketLinkVerified": true,
+    "originalGenesisVerified": true,
+    "R260ActualFinalizedAuditPassed": true,
+    "R206IndependentScriptFinalizedAuditPassed": true,
+    "physicalIndependenceOrRealSlaVerified": false
+  },
+  "roleFundingQuote": {
+    "ownerVM": "VM4707",
+    "quoteScript": "tools/sse_pos_r265_vm4707_three_role_wallet_funding_quote.py",
+    "focusedTestsPassed": 8,
+    "source": "0xED0ED5E0526898c6E0e3C83140efcA12672E7ff0",
+    "sourcePendingNonce": 1,
+    "sourceLatestBalanceWei": "999999993383597000",
+    "recipients": [
+      {
+        "role": "consumer",
+        "address": "0xD74A2aBC5a906BaFe39471CEe222c48BDD62DE3f",
+        "proposedValueWei": "10000000000000000",
+        "proposedTestEth": "0.01",
+        "observedBalanceWei": "0",
+        "observedPendingNonce": 0
+      },
+      {
+        "role": "monitor-1",
+        "address": "0xd63b2Ba14E8aD16Cf5f494259dAE05AD59fE0147",
+        "proposedValueWei": "5000000000000000",
+        "proposedTestEth": "0.005",
+        "observedBalanceWei": "0",
+        "observedPendingNonce": 0
+      },
+      {
+        "role": "monitor-2",
+        "address": "0xf8D4c882A7439507e2fc237DCBDf4A1c228F0FF8",
+        "proposedValueWei": "5000000000000000",
+        "proposedTestEth": "0.005",
+        "observedBalanceWei": "0",
+        "observedPendingNonce": 0
+      }
+    ],
+    "perTransferGasLimit": 21000,
+    "maximumGasPriceWei": 1000,
+    "totalProposedTransferValueWei": "20000000000000000",
+    "totalProposedMaximumFeesWei": "63000000",
+    "maximumCombinedProposedDebitWei": "20000000063000000",
+    "fundingTransactionsAuthorized": false,
+    "fundingTransactionsSignedOrSent": false
+  }
+}
