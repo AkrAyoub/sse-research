@@ -1,3 +1,52 @@
+# R267 — FIRST native V2 contract deployment is ACTUALLY FINALIZED; one-by-one real role funding implementation STAGED, NOT authorized
+
+Owner VM4707 REAL R265 focused regression **8/8 PASS**,
+live original chain31340 public-only quote PASS and both
+independent **R260 AND R206 FINALIZED** audited deployment
+PASS at checked out SHA `72265cc545ca6cfc68ec91bbe60968ce2b4e465e`:
+actual first market CREATE nonce0 tx
+`0xe9187bd24d72d2dec11fc6a2758802ddf6fa46a2941edd306329173fe132d6b6`,
+successful execution block **25339**,
+finalized execution block **25364**,
+actual fee **6,616,403,000 wei**, approved full initcode
+SHA256 `22d5b3310ec9a9efc66015762ea3d78d152f0a52eb9d67a257f18e3470c171ec`.
+Actual finalized R249-built market/ledger contract runtime
+code SHA256, immutable-aware Solc parity and mutual links
+all PASS with market minimumBond1e15 wei. **NATIVE V2
+CONTRACT DEPLOYMENT MILESTONE COMPLETE.** No more R257
+or R254 funding/deployment sends. No physical independent
+SLA, unbiased VRF or global permissionless WAN onboarding
+proven by this deployment.
+
+Real R265 native role wallet funding quote observed existing
+separately encrypted app-only EOA
+`0xED0ED5E0526898c6E0e3C83140efcA12672E7ff0`,
+pending nonce1, actual latest balance
+**999999993383597000 wei**. Three real owner-created
+new VM4707 consumer+monitor EOAs all ZERO native TEST ETH,
+pending nonce0, no code. Proposed **NOT APPROVED** lab
+transfer values 0.01,0.005,0.005 TEST ETH with maximum
+3*21000*1000=63,000,000 wei total transfer gas.
+Source `evidence/r266_vm4707_finalized_v2_deployment_and_three_role_funding_quote.json`.
+
+New `tools/sse_pos_r267_vm4707_one_by_one_role_funding.py`
+is strict native role-funding sender SOURCE: default
+read-only exact owner review, optional separate owner
+authorization via `--send` and exact role/value/nonce
+TTY consent+hidden existing app keystore password,
+atomic non-retriable **per role** marker before
+ONE raw tx RPC call, verified EIP155 legacy RLP,
+fresh R206 finality, verified prior role tx **finalized**
+before next one, original Genesis signer forbidden.
+Exact nonces: consumer1, monitor1 2, monitor2 3.
+New offline mocked/fake-signed tests included, but
+**new R267 source/test NOT YET EXECUTED ON VM4707**.
+**NO new funding tx authorized/sent**.
+Evidence and safe review steps:
+`docs/R267_FINALIZED_NATIVE_V2_AND_EXACT_ONE_BY_ONE_ROLE_FUNDING_RUNBOOK.md`.
+
+---
+
 # R265 — 3 actual VM4707 encrypted role EOAs CREATED; new native funding budget is only READ-ONLY PROPOSAL
 
 Owner actually created and locally encrypted three distinct
