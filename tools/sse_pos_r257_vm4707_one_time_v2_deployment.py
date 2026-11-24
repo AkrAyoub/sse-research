@@ -71,6 +71,23 @@ def check_git(expected_sha):
         raise Refused("cannot verify pinned local Git source") from exc
     if actual!=expected_sha or dirty:
         raise Refused("checked-out source SHA mismatch or tracked source edits")
+    # The compiled constructor deploys immutable native contracts. Even
+    # ABI-compatible Solidity edits since R249 are NOT covered by the user's
+    # green 1,275-Python/21-Foundry R249 VM regression evidence.
+    try:
+        unchanged=subprocess.run(
+            ["git","diff","--quiet",
+             "6930c069b4e9738e63e2ce9d53b10d126053335e",
+             expected_sha,"--",
+             "contracts/SSEAdaptiveMarketV2.sol",
+             "contracts/SSEAdaptiveVoteLedger.sol",
+             "foundry.toml","lib"],
+            cwd=root,stdout=subprocess.DEVNULL,stderr=subprocess.DEVNULL,
+            timeout=4,check=False)
+    except (OSError,subprocess.TimeoutExpired) as exc:
+        raise Refused("cannot verify immutable audited native Solidity source") from exc
+    if unchanged.returncode!=0:
+        raise Refused("Solidity, build config or vendored libs changed since R249 fully tested SHA")
     return root
 
 
