@@ -178,6 +178,29 @@ def public_intent(intent):
     return {k:v for k,v in intent.items() if k!="initcode"}
 
 
+def verify_signed_legacy_create(raw_hex, expected_initcode):
+    """Inspect actual SIGNED RLP before sending; refuse wrong chain/to/fee."""
+    import rlp
+    if (type(raw_hex) is not str or not raw_hex.startswith("0x") or
+        type(expected_initcode) is not str or not expected_initcode.startswith("0x")):
+        raise Refused("bad signed deployment transaction encoding")
+    fields=rlp.decode(bytes.fromhex(raw_hex[2:]))
+    if type(fields) is not list or len(fields)!=9 or not all(type(v) is bytes for v in fields):
+        raise Refused("signed transaction is not a single legacy Ethereum RLP transaction")
+    number=lambda field: int.from_bytes(field,"big")
+    if (number(fields[0])!=EXPECTED_NONCE or
+        number(fields[1])!=GAS_PRICE_WEI or
+        number(fields[2])!=GAS_LIMIT or
+        fields[3]!=b"" or
+        number(fields[4])!=0 or
+        fields[5]!=bytes.fromhex(expected_initcode[2:]) or
+        number(fields[6]) not in (2*CHAIN+35,2*CHAIN+36) or
+        not 0 < number(fields[7]) < 2**256 or
+        not 0 < number(fields[8]) < 2**256):
+        raise Refused("signed CREATE RLP does not match exact owner-authorized chain, gas, data or zero recipient/value")
+    return True
+
+
 def consume_one_shot_marker(path):
     # Non-symlink create-exclusively; NO marker deletion on RPC errors.
     flags=os.O_WRONLY | os.O_CREAT | os.O_EXCL
@@ -244,6 +267,7 @@ def send_once(market,ledger,keystore,marker,*,transport=rpc_transport,
         txhash="0x"+bytes(signed.hash).hex()
         if Account.recover_transaction(raw).lower()!=APP.lower():
             raise Refused("offline signed deployment tx does not recover intended app-only EOA")
+        verify_signed_legacy_create(raw,renewed["initcode"])
         # NON-RETRIABLE boundary. If RPC fails after this line, investigate
         # txhash and chain nonce/receipt. Never delete this marker casually.
         consume_one_shot_marker(marker)
