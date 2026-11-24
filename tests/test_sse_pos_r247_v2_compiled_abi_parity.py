@@ -59,6 +59,41 @@ class TestR247CompiledV2ABIParity(unittest.TestCase):
         with self.assertRaises(a.Refused):
             a.check_events([], [template],"market")
 
+    def test_inherited_openzeppelin_eip712_domain_event_allowed_only_exactly(self):
+        # Actual compiler ABI includes IERC5267/OpenZeppelin EIP712's
+        # EIP712DomainChanged(), which is not an SSE application event.
+        inherited={"type":"event","name":"EIP712DomainChanged",
+                   "anonymous":False,"inputs":[]}
+        for role,definitions in (("market",a.MARKET_EVENTS),
+                                 ("ledger",a.LEDGER_EVENTS)):
+            template=definitions[0]
+            application=event(*template)
+            a.check_events([application,inherited],[template],role)
+            # The inherited event is optional as between pinned OZ versions.
+            a.check_events([application],[template],role)
+            # Still require every application-specific event.
+            with self.assertRaises(a.Refused):
+                a.check_events([inherited],[template],role)
+            # Fail closed if an additional arbitrary third-party event appears.
+            with self.assertRaises(a.Refused):
+                a.check_events([application,inherited,
+                                {"type":"event","name":"Unexpected",
+                                 "anonymous":False,"inputs":[]}],
+                               [template],role)
+            # Reject malformed or anonymous inherited event signatures.
+            bad=json.loads(json.dumps(inherited))
+            bad["anonymous"]=True
+            with self.assertRaises(a.Refused):
+                a.check_events([application,bad],[template],role)
+            bad=json.loads(json.dumps(inherited))
+            bad["inputs"]=[param("uint256","unexpected",False)]
+            with self.assertRaises(a.Refused):
+                a.check_events([application,bad],[template],role)
+            # Duplicate signature cannot hide behind standard allowlist.
+            with self.assertRaises(a.Refused):
+                a.check_events([application,inherited,inherited],
+                               [template],role)
+
     def test_solidity_enum_uint8_event_exact(self):
         v=next(x for x in a.LEDGER_EVENTS if x[0].startswith("VoteRecorded("))
         a.check_events([event(*v)],[v],"ledger")
