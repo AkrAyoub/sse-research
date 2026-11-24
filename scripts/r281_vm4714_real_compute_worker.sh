@@ -165,6 +165,8 @@ IMAGE_ID="$IMAGE_ID" R283_EXPLICIT_VM4714_SUDO_DOCKER="$([[ "$MODE" == "--run-su
 import json
 import os
 import secrets
+import time
+from urllib.request import urlopen
 from sse_compute_docker import inspect_container, run_compute_probe
 
 profile={
@@ -180,6 +182,23 @@ verified=inspect_container(profile,profile["endpoint"],"sse-compute-vm4714",
                            ))
 if verified["runtimeReportedRunning"] is not True:
     raise SystemExit("R281_REAL_DOCKER_WORKER_NOT_RUNNING")
+# Starting a real Python process inside a Docker container is asynchronous.
+# Check only the ACTUAL loopback health endpoint with a 3-second bounded
+# readiness window; never substitute a fabricated CPU result.
+ready=False
+for attempt in range(12):
+    try:
+        with urlopen(profile["endpoint"]+"/healthz",timeout=1) as response:
+            if response.status==200:
+                meta=json.loads(response.read(2048))
+                if meta.get("localComputeWorker") is True:
+                    ready=True
+                    break
+    except (OSError,TimeoutError,ValueError):
+        pass
+    time.sleep(0.25)
+if not ready:
+    raise SystemExit("R285_REAL_DOCKER_WORKER_HEALTHZ_NOT_READY")
 challenge="0x"+secrets.token_hex(32)
 obs=run_compute_probe(profile["endpoint"],1,0,challenge)
 if obs["workloadResultVerified"] is not True or obs["rounds"]!=8192:
