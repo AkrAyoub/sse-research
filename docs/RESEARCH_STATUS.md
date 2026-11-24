@@ -59,7 +59,7 @@ original encoded port range
 9000..30559, including native
 Besu30404/Beacon9000 and R55
 real echo 29000/29001.
-**17 mocked R291 tests authored,
+**18 mocked R291 tests authored,
 NOT yet executed on VM**.
 
 Optional separate exact-SHA, explicit
@@ -108,7 +108,7 @@ onboarding or open raw HTTP8877.
 
 R291 honest runbook:
 `docs/R291_SAME_PUBLIC_CONTROLLERLESS_OVERLAY_VM4711_4714_BACK_TO_PERMISSIONLESS_NETWORK.md`.
-When R291 owner 27 focused tests
+When R291 owner 28 focused tests
 and read-only status pass, branch
 by actual host ZeroTier state:
 if missing, separately operator
