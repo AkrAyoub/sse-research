@@ -1,3 +1,78 @@
+# R288 — REAL all three monitors verified VM4714 public SSH host key, but no noninteractive user login; restricted dedicated SSH key setup source-only
+
+Actual owner VM4711/4712/4713 R287 each 14 safety
+tests PASS; VM4714 R287 14 PASS,
+**56/56 unit tests actually passed**.
+Each monitor supplied a non-SHA256 string initially,
+which R287 safely rejected before network authentication.
+Owner VM4714 supplied genuine public SSH server
+ED25519 fingerprint
+`SHA256:jWl81QyIY7+m7Y51lzA2g0wM6F0lIuvdE3bv2SeAFoY`.
+Each monitor then reused that exact public
+VM4714-console pin; actual R287 server
+identity verification PASSED but
+`sshNoninteractivePublicKeyLoginVerified=false`
+on ALL THREE monitors. No authenticated
+SSH tunnel, cross-VM CPU challenge, permanent
+SSH keys, authorized_keys mutations, Docker
+changes, or Ethereum transactions were made.
+Lack of publickey login may be missing
+monitor key, provider authorized_keys entry or
+sshd policy; exact cause not yet evidenced.
+
+NEW R288 GitHub SOURCE ONLY
+`tools/sse_pos_r288_monitor_to_vm4714_ssh_publickey_bootstrap.py`
+and 18 mocked safety tests
+`tests/test_sse_pos_r288_monitor_to_vm4714_ssh_publickey_bootstrap.py`
+are authored, NOT YET RUN on owner VMs.
+Owner-only VM4711–13 `--client-preview`,
+interactive one-time `--client-create` unique
+ED25519 SSH identity stored owner-private mode
+0600 under existing app-only directory
+but NEVER touches encrypted native ETH EOA
+or BLS validators; `--client-public` prints
+ONLY PUBLIC SSH key/fingerprint. Intentionally
+passphrase-free key for noninteractive lab
+BatchMode, access strictly restricted by
+owner-only private key file and VM4714
+authorized_keys limited entries.
+Provider VM4714 `--provider-preview` reads
+only authorized_keys metadata; separate
+`--provider-authorize --source-vm vm4711|vm4712|vm4713
+--public-key ssh-ed25519...` with exact
+TTY owner consent appends ONE PUBLIC key
+without altering existing SSH authorized keys.
+The restrictions are original observed source
+private IP, `restrict,port-forwarding,
+permitopen="127.0.0.1:8877",
+command="/usr/bin/true"`. Existing real
+original Docker worker remains on loopback.
+R287 strict host-pin preflight/probe
+with new explicitly selected
+`--identity-file` after authorization
+can then test actual authenticated
+short-lived SSH CPU challenge; not a
+public SLA until onchain prerequisites.
+Owner runbook:
+`docs/R288_MONITOR_SSH_HOSTPIN_CONFIRMED_ACCOUNT_PUBLICKEY_AUTH_MISSING_AND_RESTRICTED_KEY_SETUP.md`.
+Evidence:
+`evidence/r288_real_vm4711_13_hostkey_pinned_ssh_pubkey_auth_missing.json`.
+
+Original native chain31340 VM4707 three
+previous approved grants FINALIZED. Four
+new VM4711–14 encrypted EOA wallets remain
+UNFUNDED, R282 real RPC quote
+4x0.005 native TEST ETH with max debit
+0.020000000084 eligible but NO new
+explicit spending consent and NO tx.
+Outside-ISP permissionless P2P admission,
+bonded monitor committee, public TLS
+provider origin, finalized paid lease
+and onchain signed SLA vote/settlement
+remain outstanding.
+
+---
+
 # R287 — ALL FOUR actual VM4711–14 network checks PASS (36/36 tests), provider exact Docker worker reverified + second real 8192-SHA result; pinned temporary SSH remote CPU source-only
 
 Owner VM4711/4712/4713/4714 each ran R286
