@@ -36,6 +36,11 @@ BOND_WEI = 10**15  # unapproved scenario until owner separately authorizes immut
 GAS_LIMIT = 8_342_601
 GAS_PRICE_WEI = 1_000
 MAX_FEE_WEI = GAS_LIMIT * GAS_PRICE_WEI
+# Actual prior VM4707 R257 preview, explicitly authorized by owner.
+# Hash includes the complete compiled market creation initcode AND exact
+# ABI-encoded uint256 0.001 TEST ETH constructor monitor bond.
+APPROVED_INITCODE_SHA256 = "22d5b3310ec9a9efc66015762ea3d78d152f0a52eb9d67a257f18e3470c171ec"
+APPROVED_MARKET_ADDRESS = "0x6C01dBd7aA336a96d8Ab09Ea631E209612224080"
 EXPECTED_NONCE = 0
 CONFIRM = "DEPLOY-ONE-V2-CHAIN31340-BOND-0.001-TEST-ETH"
 ROLE = "adaptive-v2-deployer"
@@ -136,9 +141,14 @@ def preflight(market,ledger,*,transport=rpc_transport,quote_fn=quote_deployment,
         raise Refused("app account has pending/sent transaction; refuse duplicate deployment")
 
     address=create_address(APP)
+    if address.lower() != APPROVED_MARKET_ADDRESS.lower():
+        raise Refused("predicted CREATE address differs from owner-approved R257 preview")
     if transport(RPC,"eth_getCode",[address,"latest"])!="0x":
         raise Refused("predicted new deployment address already has contract code")
     code=pin_artifacts(market,ledger,BOND_WEI)
+    digest=hashlib.sha256(bytes.fromhex(code[2:])).hexdigest()
+    if digest != APPROVED_INITCODE_SHA256:
+        raise Refused("compiled market constructor initcode SHA256 differs from EXPLICIT owner approval")
     return {
         "schema":"SSE_R257_V2_SINGLE_CREATE_OWNER_REVIEW_V1",
         "chainId":CHAIN,
@@ -157,7 +167,7 @@ def preflight(market,ledger,*,transport=rpc_transport,quote_fn=quote_deployment,
         "nodeActualGasEstimate":estimated,
         "nodeQuoteGasPriceWei":str(node_price),
         "currentFinalizedBalanceWei":offer["balanceWeiAtFinalized"],
-        "initcodeSha256":hashlib.sha256(bytes.fromhex(code[2:])).hexdigest(),
+        "initcodeSha256":digest,
         "initcode":code,  # PUBLIC contract initcode, but avoid printing it in TTY
         "signedOrBroadcast":False,
         "separateOwnerApprovalStillRequired":True,
@@ -216,7 +226,9 @@ def send_once(market,ledger,keystore,marker,*,transport=rpc_transport,
         renewed=preflight_fn(market,ledger,transport=transport)
         keys=("deployer","deployerPendingNonce","predictedMarketCreateAddress",
               "constructorBondWei","gasLimit","gasPriceWei","initcodeSha256")
-        if any(renewed[k]!=intent[k] for k in keys):
+        if (any(renewed[k]!=intent[k] for k in keys) or
+            renewed["initcodeSha256"] != APPROVED_INITCODE_SHA256 or
+            renewed["predictedMarketCreateAddress"].lower() != APPROVED_MARKET_ADDRESS.lower()):
             raise Refused("live deployment intent changed after approval")
         tx={
             "chainId":CHAIN,
