@@ -36,6 +36,8 @@ on:
       - "scripts/r235_vm4707_v2_source_only_gate.sh"
       - "tools/sse_pos_r242_v2_owner_local_send.py"
       - "tests/test_sse_pos_r242_v2_owner_local_send.py"
+      - "tools/sse_pos_r247_v2_compiled_abi_parity.py"
+      - "tests/test_sse_pos_r247_v2_compiled_abi_parity.py"
       - ".github/workflows/sse-adaptive-v2-source.yml"
   workflow_dispatch:
 
@@ -70,6 +72,10 @@ jobs:
         run: python3 -B -m unittest discover -s tests -p 'test_sse_pos_r242_v2_owner_local_send.py' -v
       - name: Compile and report contract size
         run: forge build --sizes
+      - name: R247 compiled ABI parity unit tests
+        run: python3 -B -m unittest discover -s tests -p 'test_sse_pos_r247_v2_compiled_abi_parity.py' -v
+      - name: Verify compiled V2 Solidity ABI versus off-chain Python actions events and tuples
+        run: python3 -B tools/sse_pos_r247_v2_compiled_abi_parity.py
       - name: Adversarial adaptive-marketplace EVM tests
         run: forge test --match-contract SSEAdaptiveMarketV2Test -vv
       - name: Read-only chain-gate policy tests (mock transport only)
