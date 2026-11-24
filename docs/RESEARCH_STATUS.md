@@ -1,3 +1,80 @@
+# R282 — actual third original native TEST ETH grant nonce3 successful canonical but NOT YET FINALIZED; FOUR new encrypted separate-VM EOAs CREATED, dedicated real CPU worker source staged, new 4-grant no-send quote only
+
+VM4707 actual R267 final third already-approved
+Monitor2 TEST ETH transfer nonce**3**
+`0x0c6b2e79f930b8e23e5ee9b32bd151733bb09d88a7ecbc8c145cec091cdb389a`
+submitted by owner TTY with encrypted app-only EOA;
+R278 **5/5 tests PASS**, real original chain31340
+same tx SUCCESSFUL+CANONICAL included block**26008**,
+EL finalized**25876** / head**26011**,
+**132 blocks from finality AS OF THAT capture**;
+Monitor2 recipient latest balance **0.005 TEST ETH**,
+finalized balance **0** and source nonce now**4**.
+R267 exact marker consumed; NEVER resend or reset.
+All three original funds NOT YET confirmed finalized.
+
+REAL standby role identity results supplied in four
+owner-terminal attachments at previously pinned Git
+SHA`52033d7099a9981d6652de27d5e23cb3f20388e4`.
+R279 7/7 tests PASS on **each** of four distinct
+VM accounts (total 28 PASS). Actual owner terminal
+consent, actual pinned app-dependency venv install,
+actual new private encrypted EOA created once each:
+- VM4711 monitor A `0x1a89D81288522912643e15D8e06a2a7D9dc4bc08`
+- VM4712 monitor B `0x30dc70daA83B2D4199B98Cf1b93f31f1BA80f0Aa`
+- VM4713 monitor C `0x001f529E8d17A243078631100CA7Ad93c001Ea2d`
+- VM4714 provider `0x016B91ED50Ec350e600327C4287F2ED882E0Cf66`.
+All four are unfunded and unregistered; no
+secrets, passwords or validator keys committed.
+Actual evidence
+`evidence/r280_vm4707_monitor2_canonical_pending_and_four_distinct_standby_role_wallets_created.json`.
+
+NEW GitHub SOURCE ONLY R281:
+`scripts/r281_vm4714_real_compute_worker.sh`
+has default no-effect `--preview` and optional
+individually owner-consented `--run` with real
+dedicated VM4714 isolated Docker:
+0.5 CPU, 256MiB RAM+swap, 32 PIDs, nonroot
+UID10001, read-only rootfs, seccomp builtin,
+all caps dropped, no-new-privileges, bridge
+network with loopback-only port 8877,
+real pinned-postbuild image SHA and per-request
+strict local Docker inspection and real CPU
+8192 SHA rounds with fresh OS-random challenge.
+No auto sudo, rootful PoS VM usage, key reads,
+or chain tx. If proof fails, removes only the
+newly started exact container. **R281 not yet
+VM4714-tested or started.** Eight new preview
+safety/mocked tests authored.
+Details:
+`docs/R281_REAL_FOUR_STANDBY_ROLE_EOAS_AND_DEDICATED_CPU_WORKER.md`.
+
+NEW GitHub SOURCE ONLY R282:
+`tools/sse_pos_r282_standby_four_eoa_funding_readonly_quote.py`
+and six mocked tests stage exact safe NO-SEND quote
+for the four newly created separate host wallets,
+proposed 0.005 native TEST ETH per EOA, max
+**0.020000000084 TEST ETH** including four
+21000gas*1000wei legacy cap. One-shot quote
+will NOT reach real RPC recipient/gas/balance
+quote unless previous Monitor2 canonical successful
+FINALIZED as independently checked by R278, source
+nonce4 and all new EOA accounts empty/clean.
+**Not authorized**: no new funds, bonding, bids
+or worker setup approved beyond owner's own TTY
+launch. Needs separate explicit exact owner
+approval BEFORE any four new sends; no new
+transaction sender created yet.
+**R282 tests and live quote have NOT yet VM4707-run.**
+
+Neither creating a unique app-only EOA on separate
+VMs nor actual pre-lease compute worker CPU rounds
+by itself proves independent organizational fault
+domains, public HTTPS accessibility, paid SLA,
+authenticated monitor evidence or onchain payouts.
+
+---
+
 # R279 — REAL native Monitor1 nonce2 finalized and funded; four REAL standby VM4711–VM4714 host capacities measured; separate role-wallet bootstrap staged
 
 Actual owner VM4707 R276 **8/8 tests PASS** and exact
