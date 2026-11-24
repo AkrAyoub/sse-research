@@ -129,3 +129,72 @@ runtime fingerprints/bindings must be independently verified
 by R206 before any marketplace role transaction.
 No live provider/monitor SLA, independent operator, Internet
 permissionlessness or genuine unbiased VRF is claimed.
+
+---
+
+## R259 — Exact owner deployment authorization and post-approval safety hardening (2026-11-24)
+
+The owner has now **EXPLICITLY AUTHORIZED EXACTLY ONE** native
+chain31340 `SSEAdaptiveMarketV2` contract-creation transaction:
+- separate EXISTING VM4707 app-only EOA
+  `0xED0ED5E0526898c6E0e3C83140efcA12672E7ff0`,
+  nonce **0** (NEVER original VM4706 Genesis EOA);
+- constructor immutable `minimumBondWei=1000000000000000`
+  (0.001 worthless research TEST ETH; no meaningful Sybil-security
+  or physical-independence claim);
+- `value=0` wei; legacy gas limit **8,342,601**,
+  fixed gas price **1,000 wei per gas**;
+  maximum network gas cost **8,342,601,000 wei**;
+- exact constructor initcode including ABI-encoded bond
+  SHA256:
+  `22d5b3310ec9a9efc66015762ea3d78d152f0a52eb9d67a257f18e3470c171ec`;
+- exact predicted source-nonce0 market contract address
+  `0x6C01dBd7aA336a96d8Ab09Ea631E209612224080`.
+
+Previous actual owner VM4707 output confirms all **11/11**
+R257 tests passed and read-only native R257 preview passed
+at source SHA
+`69d434ceb40b8faf63b6092e8aebec74a6eac679`:
+R255 funding finalized, app EOA finalized 1 TEST ETH,
+pending nonce0, original chain/genesis, live estimated gas
+6,670,081 and exact initcode hash above. No signature
+or creation broadcast occurred in that output.
+
+**Security correction after owner's explicit SHA-specific approval**:
+The original R257 enforced compiled ABI and initcode byte size,
+but did not reject a *different* SHA-256 constructor initcode
+with unchanged ABI/length. R259 changed the production R257
+sender to **fail closed unless SHA256 of the entire actual
+compiled initcode exactly equals the user's approved digest**,
+and its predicted CREATE address exactly equals the one the
+owner already reviewed. Additionally, before submitting
+any signed transaction, R259 RLP-decodes the **actual signed
+legacy EIP-155 transaction** to check chain31340 `v`,
+nonce0, `to=`empty` (CREATE), value0, full authorized
+constructor bytes, gas limit 8,342,601 and gas price 1,000;
+it still checks recovered signer equals the separate app EOA.
+This uses a deterministic ephemeral fake test key for an
+**OFFLINE local unit test only**; no participant secret is used
+in tests.
+
+**Status of this new R259 hardening:** source committed on
+the same draft feature branch, but NOT YET retested on the
+actual VM4707 after the additions. Before operating the
+authorized --send from VM4707, fetch exact new Git SHA,
+rerun the focused R257 suite, and rerun the R257
+public-only preview. The owner-local --send mode then
+requires a separate literal interactive TTY approval
+`DEPLOY-ONE-V2-CHAIN31340-BOND-0.001-TEST-ETH` plus
+the owner-kept VM4707 application keystore's **hidden
+password**, two full real-chain preflights, and a one-time
+private attempt marker created immediately before
+**exactly one** `eth_sendRawTransaction` call.
+
+**NO DEPLOYMENT TRANSACTION HAS YET BEEN SUBMITTED BY THE
+GITHUB CHANGES OR THE OWNER LOGS.** Upon ANY error after the
+attempt marker/txHash, never rerun/rebroadcast. Inspect the
+public transaction hash, exact nonce and receipt. Check
+actual canonical execution finality and compiled runtime
+fingerprints/ledger wiring (R206) only after a real
+successful receipt. No contract address is considered
+verified until actual on-chain R206 verification.
