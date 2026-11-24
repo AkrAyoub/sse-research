@@ -103,15 +103,25 @@ class TestR288OwnerSshTrust(unittest.TestCase):
 
     def test_client_public_rejects_double_lf_or_embedded_keys(self):
         private,public=self.client_keypair()
+        # These are ACTUAL control characters written to the .pub file,
+        # not literal backslash followed by the letter n. The previous
+        # R289 fixture accidentally used double-escaped sequences.
         for malicious in (
-            PUB+" r288-test\\n\\n",
-            PUB+"\\n"+PUB+" second\\n",
-            PUB+" r288-test\\r\\n",
+            PUB+" r288-test\n\n",
+            PUB+"\n"+PUB+" second\n",
+            PUB+" r288-test\r\n",
         ):
             with self.subTest(case=repr(malicious[-16:])):
-                public.write_text(malicious)
+                public.write_bytes(malicious.encode("ascii"))
                 with self.assertRaisesRegex(r.Refused,"one bounded line"):
                     r.client_public(name="ayoubakrvm4712",uid=self.uid,home=self.home)
+        self.assertEqual(private.read_bytes(),b"TEST_FAKE_PRIVATE_NOT_AN_SSH_KEY")
+
+    def test_client_public_rejects_actual_multiline_binary_file(self):
+        private,public=self.client_keypair()
+        public.write_bytes((PUB+"\nssh-ed25519 "+PUB.split()[1]+"\n").encode("ascii"))
+        with self.assertRaises(r.Refused):
+            r.client_public(name="ayoubakrvm4712",uid=self.uid,home=self.home)
         self.assertEqual(private.read_bytes(),b"TEST_FAKE_PRIVATE_NOT_AN_SSH_KEY")
 
     def test_client_create_requires_exact_phrase_before_ssh_keygen(self):
