@@ -113,7 +113,9 @@ class TestR275RootlessDockerExplicitOnly(unittest.TestCase):
             return subprocess.CompletedProcess(cmd,0,json.dumps([strict_docker_fixture()]),"")
         with patch.object(worker,"require_local_owner_rootless_socket",
                           return_value="unix://"+ROOTLESS
-        ) as validate, patch.object(worker.subprocess,"run",side_effect=fake_run):
+        ) as validate, patch.object(worker.subprocess,"run",side_effect=fake_run),patch.dict(
+            worker.os.environ,{"DOCKER_HOST":"tcp://rootful.example:2375",
+                               "DOCKER_CONTEXT":"dangerous-context"}):
             result=worker.inspect_container(
                 LOCAL_PROFILE,ENDPOINT,NAME,strict_hardening=True,
                 docker_socket=ROOTLESS)
@@ -122,6 +124,8 @@ class TestR275RootlessDockerExplicitOnly(unittest.TestCase):
             "docker","--host","unix://"+ROOTLESS,"container","inspect",NAME
         ])
         self.assertFalse(calls[0][1]["shell"])
+        self.assertNotIn("DOCKER_HOST",calls[0][1]["env"])
+        self.assertNotIn("DOCKER_CONTEXT",calls[0][1]["env"])
         self.assertEqual(result["dockerDaemonSelection"],"EXACT_OWNER_ROOTLESS_UNIX_SOCKET")
         self.assertTrue(result["localDockerConfigurationInspected"])
 
