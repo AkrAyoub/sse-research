@@ -177,7 +177,7 @@ Actual upstream scoped signed-by Ubuntu
 Noble APT repo, HTTPS metadata preflight
 and APT signature verification are
 required; never curl|bash/skip signature.
-The operation creates only reviewed
+The signed-package subprocess uses `NEEDRESTART_MODE=l` (list-only) and refuses any APT package other than `zerotier-one`, to avoid automatically restarting unrelated services such as the already running VM4714 Docker worker. Package installation can still change local OS/service state and is not a no-risk operation. The operation creates only reviewed
 scoped apt keyring/source, installs
 zerotier-one package and enables
 its daemon. **It does not join any
@@ -190,7 +190,7 @@ and need local owner authorization.
 
 New R291 root helper
 `tools/sse_pos_r291_verified_vendor_package_only.py`
-and ten mocked unit tests
+and twelve mocked unit tests
 `tests/test_sse_pos_r291_verified_vendor_package_only.py`
 are source-authored, NOT yet user-VM-run.
 Future anonymous participants do not
