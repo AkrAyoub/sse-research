@@ -186,6 +186,8 @@ def join(*,run=subprocess.run,which=shutil.which,
         raise Refused("ZeroTier client absent; use independently reviewed signed vendor APT install first")
     if not report["readOnlyZeroTierCliAccessible"]:
         raise Refused("local sudo -n ZeroTier CLI info/listnetworks unavailable")
+    if not report["daemonReportsOnline"]:
+        raise Refused("existing ZeroTier daemon is not online; do not attempt join")
     if report["networkIsJoined"]:
         raise Refused("existing network not healthy; inspect without rejoining")
     ins=sys.stdin if stdin is None else stdin
