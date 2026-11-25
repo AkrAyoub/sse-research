@@ -1,3 +1,11 @@
+# R296 — ALL THREE real monitor-to-provider overlay TCP/UDP pairs verified (2026-11-25)
+
+Owner supplied both VM4713 client and VM4714 server terminal results. VM4713 local IPv6 fca0:2328:7768:1f76:8561::1 to VM4714 fca0:2328:77f8:9326:689f::1: real TCP and UDP payload round trips both true; TCP RTT 3.16 ms, UDP RTT 0.27 ms. VM4714 independently reported bothTransportRequestsReceived=true, realRemoteTcpRequestReceived=true, realRemoteUdpRequestReceived=true on public controllerless network ff2328775f000000. Together with R294/R295, all three monitor-to-provider transport pairs passed. The earlier VM4707↔VM4711 cross-generation test remains valid. These are observed overlay packets, not evidence of independent ISP underlay, native EL/CL peer admission, signed service delivery or a paid SLA.
+
+No additional echo test required for this matrix. Next: secure provider HTTPS endpoint and authenticated finalized-chain RPC access for application-only hosts; four new app EOAs remain unfunded pending explicit owner approval of previously quoted four 0.005 native TEST ETH grants (maximum aggregate 0.020000000084 including quoted gas). No transaction authorized by the supplied network logs. Preserve original deployed V2, validator, genesis and raw loopback worker. Do not use private-IP SSH as application transport.
+
+---
+
 # R295 — REAL old native full-node VM4707 ↔ new monitor VM4711 controllerless public IPv6 packet ACKs BOTH; new VM4712 ↔ provider VM4714 both; VM4713 transport and REAL V2 paid lease still pending
 
 Real owner terminal logs prove
