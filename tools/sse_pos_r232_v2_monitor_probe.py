@@ -89,11 +89,16 @@ def canonical_origin(origin):
     return origin
 
 
-def prepared_monitor(snapshot,monitor,origin,*,transport=rpc,rpc_url=None):
+def prepared_monitor(snapshot,monitor,origin,*,transport=rpc,rpc_url=None,allow_canonical=False):
     monitor=checked_addr(monitor)
     origin=canonical_origin(origin)
+    provisional=(type(snapshot) is dict and
+                 snapshot.get("schema")=="SSE_R350_CANONICAL_V2_LEASE_READONLY_V1" and
+                 snapshot.get("finalizedAuthorization") is False and
+                 snapshot.get("reorganizationPossible") is True)
     if (type(snapshot) is not dict or
-        snapshot.get("schema")!="SSE_R229_FINALIZED_V2_LEASE_READONLY_V1" or
+        (snapshot.get("schema")!="SSE_R229_FINALIZED_V2_LEASE_READONLY_V1" and
+         not (allow_canonical is True and provisional)) or
         snapshot.get("deploymentRuntimeAndWiringAttested") is not True):
         raise Refused("no verified canonical deployment/lease evidence")
     if (snapshot.get("epoch") is None or
@@ -109,24 +114,32 @@ def prepared_monitor(snapshot,monitor,origin,*,transport=rpc,rpc_url=None):
     committed="0x"+keccak256(origin.encode("ascii")).hex()
     if snapshot["lease"]["endpointHash"]!=committed:
         raise Refused("real lease endpoint commitment not equal to canonical origin")
+    height=snapshot["observedExecutionHeight"] if provisional else snapshot["finalizedExecutionHeight"]
+    if provisional and rpc_url is None:
+        raise Refused("canonical membership requires live RPC anchor verification")
     if rpc_url is not None:
         if rpc_url not in ("http://127.0.0.1:18545","http://127.0.0.1:28545"):
             raise Refused("unreviewed localhost RPC")
         raw=eth_call(transport,rpc_url,snapshot["ledger"],
                      "confirmedMonitor(uint256,address)",(
                          snapshot["leaseId"],int(monitor,16)),
-                     snapshot["finalizedExecutionHeight"])
+                     height)
         confirmed=decode_state(raw,(("confirmed","bool"),))["confirmed"]
         if not confirmed:
             raise Refused("real monitor did not confirm selected seat")
+        if provisional:
+            from sse_pos_r350_v2_canonical_lease_snapshot import block_identity
+            if block_identity(transport(rpc_url,"eth_getBlockByNumber",[hex(height),False]))!=(height,snapshot["observedExecutionHash"]):
+                raise Refused("canonical membership anchor reorganized")
     return {
         "leaseId":snapshot["leaseId"],"epochId":snapshot["epochId"],
         "requestHash":snapshot["epoch"]["market"]["requestHash"],
         "monitor":monitor,"provider":snapshot["lease"]["provider"],
         "origin":origin,
-        "finalizedExecutionHeight":snapshot["finalizedExecutionHeight"],
-        "selectedMonitorAtFinalized":True,
-        "confirmedMonitorAtFinalized":rpc_url is not None,
+        **({"observedExecutionHeight":height,"observedExecutionHash":snapshot["observedExecutionHash"]} if provisional else {"finalizedExecutionHeight":height}),
+        "selectedMonitorAtFinalized":not provisional,
+        "confirmedMonitorAtFinalized":rpc_url is not None and not provisional,
+        "confirmedMonitorAtCanonical":provisional,
     }
 
 
@@ -186,7 +199,7 @@ def http_probe(origin,payload,timeout_seconds=5,*,opener=None,tls_context=None):
             "elapsedMs":elapsed,"body":raw,"reason":None}
 
 
-def inspect_response(observation,snapshot,prepared):
+def inspect_response(observation,snapshot,prepared,*,allow_canonical=False):
     if observation["body"] is None:
         return {
             "schema":"SSE_R232_REAL_PROBE_OBSERVATION_V1",
@@ -206,7 +219,7 @@ def inspect_response(observation,snapshot,prepared):
                         parse_constant=lambda _: (_ for _ in ()).throw(Refused("nonfinite")))
     except (UnicodeDecodeError,ValueError,TypeError) as exc:
         raise Refused("invalid bounded provider reply") from exc
-    actual=validate_signed_reply(body,snapshot)
+    actual=validate_signed_reply(body,snapshot,allow_canonical=True) if allow_canonical else validate_signed_reply(body,snapshot)
     if actual["responseHash"]!=body["responseHash"]:
         raise Refused("signed response message changed")
     now=datetime.now(timezone.utc).isoformat()
@@ -243,7 +256,8 @@ def inspect_response(observation,snapshot,prepared):
         "rawObservationSha256":observation_digest,
         "provisionalMonitorEvidenceHash":commitment,
         "providerSignatureVerified":True,
-        "realFinalizedLeaseScopeVerified":True,
+        "realFinalizedLeaseScopeVerified":snapshot.get("schema")=="SSE_R229_FINALIZED_V2_LEASE_READONLY_V1",
+        "provisionalCanonicalScopeVerified":snapshot.get("schema")=="SSE_R350_CANONICAL_V2_LEASE_READONLY_V1",
         "provisionalOnly":True,"onChainVoteOrFailureVerdict":False,
         "physicalSlaTruthVerified":False,
         "localClockAttested":False,
