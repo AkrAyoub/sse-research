@@ -21,6 +21,7 @@ import html
 from urllib.parse import urlsplit
 from http.server import BaseHTTPRequestHandler,ThreadingHTTPServer
 import json
+import os
 from pathlib import Path
 import re
 import sys
@@ -37,7 +38,7 @@ from sse_pos_r206_adaptive_v2_deployment_audit import (
     Refused as AuditRefused,load as load_manifest,verify as verify_market,rpc,
 )
 from sse_pos_r229_v2_finalized_lease_snapshot import (
-    Refused as MarketRefused,inspect as finalized_market_lease,
+    Refused as MarketRefused,inspect as finalized_market_lease,query,decode_struct,
 )
 
 ROLES=frozenset((
@@ -75,6 +76,28 @@ def approved_options(node_id,roles,el,bn,market_manifest=None):
     }
 
 
+def monitor_account(config,proof,transport):
+    address=config.get("monitorAddress")
+    if address is None:
+        return None
+    height=proof["finalizedExecutionHeight"]
+    market=proof["contracts"]["market"]["address"]
+    ledger=proof["contracts"]["ledger"]["address"]
+    account=int(address,16)
+    def call(contract,signature,fields):
+        return decode_struct(query(transport,config["el"],contract,signature,[account],height),fields)
+    record=call(market,"monitors(address)",(("bondWei","uint256"),("lockedAssignments","uint256"),("active","bool")))
+    balance=transport(config["el"],"eth_getBalance",[address,hex(height)])
+    if not isinstance(balance,str) or not re.fullmatch(r"0x(?:0|[1-9a-fA-F][0-9a-fA-F]*)",balance):
+        raise Refused("malformed finalized account balance")
+    return {"address":address,"finalizedExecutionHeight":height,"active":record["active"],
+            "bondWei":str(record["bondWei"]),"lockedAssignments":str(record["lockedAssignments"]),
+            "balanceWei":str(int(balance,16)),
+            "marketWithdrawableWei":str(call(market,"withdrawable(address)",(("amount","uint256"),))["amount"]),
+            "ledgerWithdrawableWei":str(call(ledger,"withdrawable(address)",(("amount","uint256"),))["amount"]),
+            "walletOwnershipVerified":False}
+
+
 def node_status(config,*,capture=real_node_capture,audit=verify_market,transport=rpc):
     if config["bn"] is None:
         manifest=load_manifest(config["manifest"])
@@ -91,6 +114,7 @@ def node_status(config,*,capture=real_node_capture,audit=verify_market,transport
                 "chainId":verified["chainId"],"executionBlockNumber":latest,
                 "finalizedExecutionHeight":height,"finalityLagSeconds":lag,
                 "deploymentAudit":verified,
+                "monitorAccount":monitor_account(config,verified,transport),
                 "independentLocalConsensusVerified":False,
                 "roleActivationVerified":False,"transactionsSignedOrSubmitted":False}
     report=capture(config["nodeId"],config["el"],config["bn"])
@@ -152,6 +176,11 @@ def status_html(payload,public_readonly=False):
         detail="Read-only observed original-chain node health. Declarations are not on-chain registrations or active validator status."
         scope="Local execution and consensus observation"
         checks=check("Active validator",payload.get("stakingValidatorActuallyActiveVerified"))+check("Physical resources",payload.get("providerPhysicalResourceVerified"))+check("Monitor eligibility",payload.get("monitorEligibilityActuallyFundedVerified"))+check("Consumer lease funding",payload.get("consumerLeaseActuallyFundedVerified"))
+    account=payload.get("monitorAccount")
+    account_panel=""
+    if account is not None:
+        account_rows="".join(field(label,account[key]) for label,key in (("Public account","address"),("Observed finalized block","finalizedExecutionHeight"),("On-chain active registration","active"),("Native balance (wei)","balanceWei"),("Bond (wei)","bondWei"),("Locked assignments","lockedAssignments"),("Market withdrawable (wei)","marketWithdrawableWei"),("Ledger withdrawable (wei)","ledgerWithdrawableWei")))
+        account_panel="<section class='panel'><h2>Monitor account</h2><table>"+account_rows+"</table><p class='muted'>Public address observation only; wallet ownership and committee selection are not established.</p></section>"
     cards="".join(metric(label,value) for label,value in metrics)
     lease_note=("Lease lookups disabled on this public listener." if public_readonly else
                 "Finalized lease lookup: /v2/lease/{id} requires a verified deployment manifest.")
@@ -162,7 +191,7 @@ def status_html(payload,public_readonly=False):
             "<p class='muted'>"+esc(detail)+"</p></section><div class='grid'>"+cards+"</div>"
             "<section class='panel'><h2>Selected roles</h2><p>"+esc(roles)+"</p><table>"+checks+"</table>"
             "<p class='notice'>Declared roles do not establish authorization, eligibility or completed work.</p></section>"
-            "<section class='panel'><h2>Blockchain evidence</h2><table>"+rows+"</table></section>"
+            +account_panel+"<section class='panel'><h2>Blockchain evidence</h2><table>"+rows+"</table></section>"
             "<section class='panel'><h2>Public data</h2><p><a href='/'>Refresh observation</a> &middot; <a href='/v2/status'>Live JSON</a></p>"
             "<p class='muted'>"+esc(lease_note)+" Successful observations may be cached for 15 seconds.</p></section>"
             "<footer>No wallet keys, transaction signing or privileged host controls exposed by this console.</footer></main></body></html>").encode("utf-8")
@@ -226,9 +255,12 @@ class StatusCache:
 def make_server(config,port=8766,*,capture=real_node_capture,inspect=finalized_market_lease,public_readonly=False):
     if type(port) is not int or port!=0 and not 1024<=port<=65535:
         raise Refused("only local unprivileged console port (0 for tests)")
-    if type(config) is not dict or set(config)!={"nodeId","declaredRoles","el","bn","manifest"}:
+    if type(config) is not dict or set(config)-{"monitorAddress"}!={"nodeId","declaredRoles","el","bn","manifest"}:
         raise Refused("unexpected node role-local configuration")
 
+    address=config.get("monitorAddress")
+    if address is not None and (not isinstance(address,str) or not re.fullmatch(r"0x[0-9a-fA-F]{40}",address) or int(address,16)==0 or config["bn"] is not None or "monitor" not in config["declaredRoles"]):
+        raise Refused("monitor account requires a nonzero public address and application monitor role")
     cache=StatusCache()
 
     class Handler(BaseHTTPRequestHandler):
@@ -291,6 +323,7 @@ def main(argv=None):
     p.add_argument("--el",required=True)
     p.add_argument("--bn",help="local Beacon endpoint; omit for application-only RPC mode")
     p.add_argument("--v2-manifest",type=Path)
+    p.add_argument("--monitor-address",default=os.environ.get("SSE_MONITOR_ADDRESS"),help="explicit public monitor account to display; no ownership claim")
     p.add_argument("--port",type=int,default=8766)
     p.add_argument("--public-readonly",action="store_true",help="restrict tunnel-facing console to bounded cached status and health; no lease lookups")
     p.add_argument("--serve",action="store_true",
@@ -298,6 +331,8 @@ def main(argv=None):
     a=p.parse_args(argv)
     try:
         conf=approved_options(a.node_id,a.roles.split(","),a.el,a.bn,a.v2_manifest)
+        if a.monitor_address:
+            conf["monitorAddress"]=a.monitor_address
         if not a.serve:
             print(json.dumps({
                 "schema":"SSE_R238_PUBLIC_NODE_CONSOLE_SOURCE_PLAN_V1",
