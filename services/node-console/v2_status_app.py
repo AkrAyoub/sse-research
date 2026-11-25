@@ -29,7 +29,7 @@ from sse_pos_r141_independent_fleet_audit import (
     Refused as NodeRefused,capture as real_node_capture,
 )
 from sse_pos_r206_adaptive_v2_deployment_audit import (
-    Refused as AuditRefused,load as load_manifest,
+    Refused as AuditRefused,load as load_manifest,verify as verify_market,rpc,
 )
 from sse_pos_r229_v2_finalized_lease_snapshot import (
     Refused as MarketRefused,inspect as finalized_market_lease,
@@ -55,10 +55,12 @@ def approved_options(node_id,roles,el,bn,market_manifest=None):
         role not in ROLES for role in roles
     ):
         raise Refused("only unique approved locally declared roles supported")
-    if el not in ("http://127.0.0.1:18545","http://127.0.0.1:28545") or bn not in (
+    if el not in ("http://127.0.0.1:18545","http://127.0.0.1:28545") or bn not in (None,
         "http://127.0.0.1:15052","http://127.0.0.1:25052"
-    ) or (el.endswith(":18545") != bn.endswith(":15052")):
+    ) or (bn is not None and el.endswith(":18545") != bn.endswith(":15052")):
         raise Refused("local client RPC/REST port pair not verified for known node")
+    if bn is None and (set(roles).intersection({"observer","full_node","validator"}) or market_manifest is None):
+        raise Refused("RPC-only console requires application roles and a deployment manifest")
     if market_manifest is not None and (type(market_manifest) is not Path or
         not market_manifest.is_absolute()):
         raise Refused("public R206 manifest must be an explicit absolute file path")
@@ -68,7 +70,24 @@ def approved_options(node_id,roles,el,bn,market_manifest=None):
     }
 
 
-def node_status(config,*,capture=real_node_capture):
+def node_status(config,*,capture=real_node_capture,audit=verify_market,transport=rpc):
+    if config["bn"] is None:
+        manifest=load_manifest(config["manifest"])
+        verified=audit(manifest,config["el"],transport=transport)
+        head=transport(config["el"],"eth_getBlockByNumber",["latest",False])
+        final=transport(config["el"],"eth_getBlockByNumber",["finalized",False])
+        height=int(final["number"],16)
+        latest=int(head["number"],16)
+        lag=int(head["timestamp"],16)-int(final["timestamp"],16)
+        if height<verified["finalizedExecutionHeight"] or latest<height or lag<0:
+            raise Refused("inconsistent RPC head/finality")
+        return {"schema":"SSE_R314_APPLICATION_RPC_STATUS_V1",
+                "nodeId":config["nodeId"],"declaredRoles":config["declaredRoles"],
+                "chainId":verified["chainId"],"executionBlockNumber":latest,
+                "finalizedExecutionHeight":height,"finalityLagSeconds":lag,
+                "deploymentAudit":verified,
+                "independentLocalConsensusVerified":False,
+                "roleActivationVerified":False,"transactionsSignedOrSubmitted":False}
     report=capture(config["nodeId"],config["el"],config["bn"])
     # Explicit new truth values are NOT derived from the declared role tags.
     return {
@@ -92,6 +111,17 @@ def node_status(config,*,capture=real_node_capture):
 def status_html(payload):
     # All node IDs/values are escaped, not interpolated into JS or DOM
     # attributes; CSP explicitly disables inline script and active assets.
+    if payload["schema"]=="SSE_R314_APPLICATION_RPC_STATUS_V1":
+        esc=lambda x:html.escape(str(x),quote=True)
+        fields=(("Node",payload["nodeId"]),("Selected roles",", ".join(payload["declaredRoles"])),
+                ("Chain",payload["chainId"]),("Execution head",payload["executionBlockNumber"]),
+                ("Finalized execution height",payload["finalizedExecutionHeight"]),
+                ("Head/finality timestamp gap (s)",payload["finalityLagSeconds"]))
+        rows="".join("<tr><th>"+esc(k)+"</th><td>"+esc(v)+"</td></tr>" for k,v in fields)
+        return ("<!doctype html><html lang='en'><meta charset='utf-8'><title>SSE application node</title>"
+                "<h1>SSE application node</h1><p>Verified deployment via configured RPC. "
+                "Not independent consensus verification or role activation.</p><table>"+rows+
+                "</table><p><a href='/v2/status'>Live JSON</a> | Finalized lease: /v2/lease/{id}</p></html>").encode("utf-8")
     chain=payload["executionAndConsensusLocalObservation"]
     name=html.escape(payload["nodeId"],quote=True)
     roles=", ".join(html.escape(x,quote=True) for x in payload["declaredRoles"])
@@ -196,7 +226,7 @@ def main(argv=None):
     p.add_argument("--node-id",required=True)
     p.add_argument("--roles",default="observer",help="comma-separated declared local roles, not activation")
     p.add_argument("--el",required=True)
-    p.add_argument("--bn",required=True)
+    p.add_argument("--bn",help="local Beacon endpoint; omit for application-only RPC mode")
     p.add_argument("--v2-manifest",type=Path)
     p.add_argument("--port",type=int,default=8766)
     p.add_argument("--serve",action="store_true",
