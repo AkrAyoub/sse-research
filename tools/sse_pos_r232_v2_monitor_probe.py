@@ -13,6 +13,8 @@ from __future__ import annotations
 import argparse
 from datetime import datetime,timezone
 import hashlib
+import ipaddress
+import ssl
 import json
 import os
 from pathlib import Path
@@ -22,7 +24,7 @@ import sys
 import time
 from urllib.error import HTTPError,URLError
 from urllib.parse import urlsplit
-from urllib.request import Request,HTTPRedirectHandler,ProxyHandler,build_opener
+from urllib.request import Request,HTTPRedirectHandler,ProxyHandler,HTTPSHandler,build_opener
 
 from sse_challenge import keccak256
 from sse_pos_r206_adaptive_v2_deployment_audit import (
@@ -64,7 +66,16 @@ def canonical_origin(origin):
         port is not None and not 1<=port<=65535):
         raise Refused("invalid provider root URL")
     host=u.hostname
-    if origin!=origin.lower() or not FQDN.fullmatch(host):
+    if ":" in host:
+        try:
+            ip=ipaddress.IPv6Address(host)
+        except ValueError as exc:
+            raise Refused("invalid overlay IPv6 origin") from exc
+        if (ip not in ipaddress.IPv6Network("fca0::/16") or
+            u.scheme!="https" or port is None or
+            origin!=f"https://[{ip}]:{port}"):
+            raise Refused("expected canonical authenticated overlay HTTPS origin")
+    elif origin!=origin.lower() or not FQDN.fullmatch(host):
         raise Refused("noncanonical provider hostname")
     if u.scheme=="http":
         if host!="127.0.0.1" or port is None:
@@ -128,7 +139,19 @@ def _unique_pairs(pairs):
     return out
 
 
-def http_probe(origin,payload,timeout_seconds=5,*,opener=None):
+def pinned_tls_context(certificate,fingerprint):
+    if type(fingerprint) is not str or not re.fullmatch(r"[0-9a-f]{64}",fingerprint):
+        raise Refused("expected public DER SHA256 fingerprint")
+    pem=Path(certificate).read_text("ascii")
+    der=ssl.PEM_cert_to_DER_cert(pem)
+    if hashlib.sha256(der).hexdigest()!=fingerprint:
+        raise Refused("provider certificate fingerprint mismatch")
+    ctx=ssl.create_default_context(cadata=pem)
+    ctx.minimum_version=ssl.TLSVersion.TLSv1_2
+    return ctx
+
+
+def http_probe(origin,payload,timeout_seconds=5,*,opener=None,tls_context=None):
     canonical_origin(origin)
     if type(timeout_seconds) not in (int,float) or not 0<timeout_seconds<=30:
         raise Refused("probe timeout must be in (0,30]")
@@ -137,7 +160,7 @@ def http_probe(origin,payload,timeout_seconds=5,*,opener=None):
     if len(raw_request)>MAX_REQUEST_BYTES:
         raise Refused("request too large")
     if opener is None:
-        opener=build_opener(ProxyHandler({}),NoRedirect())
+        opener=build_opener(ProxyHandler({}),NoRedirect(),HTTPSHandler(context=tls_context))
     req=Request(origin+"/v2/challenge",data=raw_request,method="POST",
                 headers={"Content-Type":"application/json","Accept":"application/json"})
     started=time.monotonic_ns()
@@ -262,12 +285,17 @@ def main(argv=None):
     p.add_argument("--monitor",required=True)
     p.add_argument("--origin",required=True)
     p.add_argument("--timeout",type=float,default=5)
+    p.add_argument("--tls-cert",type=Path)
+    p.add_argument("--tls-fingerprint")
     p.add_argument("--probe",action="store_true",
                    help="make ONE real provider HTTP request; no blockchain write")
     p.add_argument("--output",help="create-once private evidence JSON for --probe")
     p.add_argument("--raw-response-output",help="optional create-once private verbatim signed HTTP reply")
     a=p.parse_args(argv)
     try:
+        if bool(a.tls_cert)!=bool(a.tls_fingerprint):
+            raise Refused("both public certificate and fingerprint required")
+        tls_context=pinned_tls_context(a.tls_cert,a.tls_fingerprint) if a.tls_cert else None
         if (a.output or a.raw_response_output) and not a.probe:
             raise Refused("evidence archival requires explicit --probe")
         snapshot=inspect_lease(load_manifest(a.manifest),a.rpc,
@@ -283,7 +311,7 @@ def main(argv=None):
             },indent=2,sort_keys=True))
             return 0
         payload={k:context[k] for k in ("leaseId","epochId","requestHash")}
-        observation=http_probe(context["origin"],payload,a.timeout)
+        observation=http_probe(context["origin"],payload,a.timeout,tls_context=tls_context)
         result=inspect_response(observation,snapshot,context)
         if a.raw_response_output:
             if observation["body"] is None:
