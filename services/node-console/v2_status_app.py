@@ -98,6 +98,31 @@ def monitor_account(config,proof,transport):
             "walletOwnershipVerified":False}
 
 
+def market_overview(config,proof,transport):
+    height=proof["finalizedExecutionHeight"]
+    market=proof["contracts"]["market"]["address"]
+    def read(signature,args,fields):
+        return decode_struct(query(transport,config["el"],market,signature,args,height),fields)
+    def count(signature):
+        return read(signature,[],(("value","uint256"),))["value"]
+    next_request=count("nextRequestId()")
+    next_lease=count("nextLeaseId()")
+    if next_request<1 or next_lease<1:
+        raise Refused("invalid finalized market counters")
+    recent=[]
+    for request_id in range(max(1,next_request-3),next_request):
+        record=read("requests(uint256)",[request_id],(("consumer","address"),("profileHash","bytes32"),("policyHash","bytes32"),("maxEpochFeeWei","uint256"),("biddingClose","uint64"),("selected","bool")))
+        if int(record["consumer"],16)==0:
+            raise Refused("missing request in finalized market range")
+        record["maxEpochFeeWei"]=str(record["maxEpochFeeWei"])
+        record["requestId"]=str(request_id)
+        record["bidCount"]=str(read("bidCount(uint256)",[request_id],(("value","uint256"),))["value"])
+        recent.append(record)
+    return {"finalizedExecutionHeight":height,"requestsCreated":str(next_request-1),
+            "leasesCreated":str(next_lease-1),"activeMonitorCount":str(count("activeMonitorCount()")),
+            "recentRequests":recent,"recentRequestLimit":3}
+
+
 def node_status(config,*,capture=real_node_capture,audit=verify_market,transport=rpc):
     if config["bn"] is None:
         manifest=load_manifest(config["manifest"])
@@ -115,6 +140,7 @@ def node_status(config,*,capture=real_node_capture,audit=verify_market,transport
                 "finalizedExecutionHeight":height,"finalityLagSeconds":lag,
                 "deploymentAudit":verified,
                 "monitorAccount":monitor_account(config,verified,transport),
+                "marketOverview":market_overview(config,verified,transport) if config.get("marketOverview") else None,
                 "independentLocalConsensusVerified":False,
                 "roleActivationVerified":False,"transactionsSignedOrSubmitted":False}
     report=capture(config["nodeId"],config["el"],config["bn"])
@@ -181,6 +207,13 @@ def status_html(payload,public_readonly=False):
     if account is not None:
         account_rows="".join(field(label,account[key]) for label,key in (("Public account","address"),("Observed finalized block","finalizedExecutionHeight"),("On-chain active registration","active"),("Native balance (wei)","balanceWei"),("Bond (wei)","bondWei"),("Locked assignments","lockedAssignments"),("Market withdrawable (wei)","marketWithdrawableWei"),("Ledger withdrawable (wei)","ledgerWithdrawableWei")))
         account_panel="<section class='panel'><h2>Monitor account</h2><table>"+account_rows+"</table><p class='muted'>Public address observation only; wallet ownership and committee selection are not established.</p></section>"
+    overview=payload.get("marketOverview")
+    market_panel=""
+    if overview is not None:
+        market_rows="".join(field(label,overview[key]) for label,key in (("Finalized block","finalizedExecutionHeight"),("Requests created (cumulative)","requestsCreated"),("Leases created (cumulative)","leasesCreated"),("Active registered monitors","activeMonitorCount")))
+        for request in reversed(overview["recentRequests"]):
+            market_rows+=field("Request #"+request["requestId"],"Bids: "+request["bidCount"]+" | Selected: "+str(request["selected"])+" | Max fee (wei): "+request["maxEpochFeeWei"]+" | Bidding close (Unix UTC): "+str(request["biddingClose"]))
+        market_panel="<section class='panel'><h2>Finalized marketplace</h2><table>"+market_rows+"</table><p class='muted'>Latest three requests at most. Counts do not establish independent hosts or active service delivery.</p></section>"
     cards="".join(metric(label,value) for label,value in metrics)
     lease_note=("Lease lookups disabled on this public listener." if public_readonly else
                 "Finalized lease lookup: /v2/lease/{id} requires a verified deployment manifest.")
@@ -191,7 +224,7 @@ def status_html(payload,public_readonly=False):
             "<p class='muted'>"+esc(detail)+"</p></section><div class='grid'>"+cards+"</div>"
             "<section class='panel'><h2>Selected roles</h2><p>"+esc(roles)+"</p><table>"+checks+"</table>"
             "<p class='notice'>Declared roles do not establish authorization, eligibility or completed work.</p></section>"
-            +account_panel+"<section class='panel'><h2>Blockchain evidence</h2><table>"+rows+"</table></section>"
+            +account_panel+market_panel+"<section class='panel'><h2>Blockchain evidence</h2><table>"+rows+"</table></section>"
             "<section class='panel'><h2>Public data</h2><p><a href='/'>Refresh observation</a> &middot; <a href='/v2/status'>Live JSON</a></p>"
             "<p class='muted'>"+esc(lease_note)+" Successful observations may be cached for 15 seconds.</p></section>"
             "<footer>No wallet keys, transaction signing or privileged host controls exposed by this console.</footer></main></body></html>").encode("utf-8")
@@ -255,12 +288,14 @@ class StatusCache:
 def make_server(config,port=8766,*,capture=real_node_capture,inspect=finalized_market_lease,public_readonly=False):
     if type(port) is not int or port!=0 and not 1024<=port<=65535:
         raise Refused("only local unprivileged console port (0 for tests)")
-    if type(config) is not dict or set(config)-{"monitorAddress"}!={"nodeId","declaredRoles","el","bn","manifest"}:
+    if type(config) is not dict or set(config)-{"monitorAddress","marketOverview"}!={"nodeId","declaredRoles","el","bn","manifest"}:
         raise Refused("unexpected node role-local configuration")
 
     address=config.get("monitorAddress")
     if address is not None and (not isinstance(address,str) or not re.fullmatch(r"0x[0-9a-fA-F]{40}",address) or int(address,16)==0 or config["bn"] is not None or "monitor" not in config["declaredRoles"]):
         raise Refused("monitor account requires a nonzero public address and application monitor role")
+    if config.get("marketOverview") and config["bn"] is not None:
+        raise Refused("market overview currently requires application RPC mode")
     cache=StatusCache()
 
     class Handler(BaseHTTPRequestHandler):
@@ -323,6 +358,7 @@ def main(argv=None):
     p.add_argument("--el",required=True)
     p.add_argument("--bn",help="local Beacon endpoint; omit for application-only RPC mode")
     p.add_argument("--v2-manifest",type=Path)
+    p.add_argument("--market-overview",action="store_true",default=os.environ.get("SSE_MARKET_OVERVIEW")=="1",help="bounded finalized marketplace observation")
     p.add_argument("--monitor-address",default=os.environ.get("SSE_MONITOR_ADDRESS"),help="explicit public monitor account to display; no ownership claim")
     p.add_argument("--port",type=int,default=8766)
     p.add_argument("--public-readonly",action="store_true",help="restrict tunnel-facing console to bounded cached status and health; no lease lookups")
@@ -331,6 +367,8 @@ def main(argv=None):
     a=p.parse_args(argv)
     try:
         conf=approved_options(a.node_id,a.roles.split(","),a.el,a.bn,a.v2_manifest)
+        if a.market_overview:
+            conf["marketOverview"]=True
         if a.monitor_address:
             conf["monitorAddress"]=a.monitor_address
         if not a.serve:
