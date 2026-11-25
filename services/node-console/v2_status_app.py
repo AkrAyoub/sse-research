@@ -16,6 +16,7 @@ from __future__ import annotations
 
 import argparse
 import base64
+from datetime import datetime, timezone
 import hashlib
 import html
 from urllib.parse import urlsplit
@@ -185,16 +186,21 @@ def node_status(config,*,capture=real_node_capture,audit=verify_market,transport
     }
 
 
-DASHBOARD_CSS="""*{box-sizing:border-box}body{margin:0;background:#0c1424;color:#e7edf7;font:15px/1.6 system-ui,sans-serif}main{max-width:1120px;margin:auto;padding:32px 24px 56px}header{display:flex;justify-content:space-between;align-items:center;gap:16px;flex-wrap:wrap;border-bottom:1px solid #28364b;padding-bottom:20px}h1,h2,p{margin:0}h1{font-size:32px;letter-spacing:-1px}h2{font-size:19px;margin-bottom:12px}.brand{color:#5eead4;font-size:12px;font-weight:700;letter-spacing:2px}.muted{color:#aabbd1}.tag{background:#20374a;color:#b9e7ee;border-radius:6px;padding:6px 12px}a{color:#5eead4;text-decoration:none}a:hover{text-decoration:underline}.intro{margin:28px 0}.grid{display:grid;grid-template-columns:repeat(auto-fit,minmax(180px,1fr));gap:12px}.metric,.panel{background:#142136;border:1px solid #28364b;border-radius:12px;padding:20px}.metric span{display:block;color:#aabbd1;font-size:13px}.metric strong{font-size:28px;font-variant-numeric:tabular-nums;overflow-wrap:anywhere}.panel{margin-top:16px}table{width:100%;border-collapse:collapse}th,td{text-align:left;padding:10px 0;border-bottom:1px solid #28364b;vertical-align:top;overflow-wrap:anywhere}th{color:#aabbd1;font-weight:500;width:40%}td{font-variant-numeric:tabular-nums}.good{color:#5eead4}.caution{color:#f5cc80}.notice{border-left:3px solid #f5cc80;padding-left:14px;margin:16px 0;color:#f5cc80}footer{margin-top:24px;color:#aabbd1;font-size:13px} @media(max-width:550px){main{padding:20px 14px}.metric,.panel{padding:14px}h1{font-size:25px}th{width:36%}}"""
+DASHBOARD_CSS="""*{box-sizing:border-box}html{scroll-behavior:smooth}body{margin:0;background:#f5f7fb;color:#17263b;font:14px/1.55 system-ui,sans-serif}a{color:#1659c7;text-decoration:none}a:hover{text-decoration:underline}a:focus-visible,summary:focus-visible{outline:3px solid #2563eb;outline-offset:4px}.shell{display:grid;grid-template-columns:235px minmax(0,1fr);min-height:100vh}.sidebar{position:sticky;top:0;height:100vh;background:#101c30;color:#c4d1e3;padding:28px 18px;display:flex;flex-direction:column;gap:24px}.brand{font-size:19px;font-weight:800;color:white;letter-spacing:-.5px}.brand small{display:block;font-size:10px;letter-spacing:2px;color:#8baccd;margin-top:4px}.nav-label{font-size:10px;letter-spacing:1.4px;text-transform:uppercase;color:#8baccd;margin:0 10px 8px}.sidebar a{display:block;color:#d9e5f5;padding:10px 12px;border-radius:7px;margin:3px 0}.sidebar a:hover{background:#243a56;text-decoration:none}.sidebar .network{margin-top:auto;border-top:1px solid #34445b;padding-top:16px;font-size:12px}.workspace{min-width:0}.topbar{background:white;border-bottom:1px solid #e0e6ef;padding:18px 34px;display:flex;align-items:center;justify-content:space-between;gap:16px;flex-wrap:wrap}.topbar strong{font-size:13px}.tag{display:inline-block;padding:5px 10px;border-radius:6px;background:#eaf0fa;color:#315581;font-size:12px;font-weight:600}.button{display:inline-block;background:#1858b8;color:white;padding:9px 14px;border-radius:7px;font-weight:600}.button:hover{background:#114898;text-decoration:none}main{max-width:1440px;margin:auto;padding:30px 34px 50px}h1,h2,p{margin:0}h1{font-size:30px;letter-spacing:-1px;line-height:1.2}h2{font-size:18px;letter-spacing:-.3px;margin-bottom:12px}h3{font-size:14px;margin:0 0 8px}.muted{color:#5d6b80}.eyebrow{font-size:11px;font-weight:700;letter-spacing:1.5px;text-transform:uppercase;color:#54749b;margin-bottom:8px}.intro{margin-bottom:22px;display:flex;justify-content:space-between;gap:16px;align-items:flex-start;flex-wrap:wrap}.intro p{margin-top:8px}.grid{display:grid;grid-template-columns:repeat(4,minmax(0,1fr));gap:14px}.metric,.panel{background:white;border:1px solid #e0e6ef;border-radius:12px;box-shadow:0 2px 5px #182c4805;padding:20px}.metric span{display:block;font-size:12px;font-weight:600;color:#5d6b80}.metric strong{display:block;font-size:28px;letter-spacing:-1px;font-variant-numeric:tabular-nums;overflow-wrap:anywhere;margin-top:12px}.panel{margin-top:18px;scroll-margin-top:24px}.panel>p{margin-bottom:12px}.role-tags{display:flex;flex-wrap:wrap;gap:8px;margin:12px 0}.role-tags span{background:#e9f0fd;color:#204b90;padding:6px 11px;border-radius:6px;font-weight:600}.notice{border-left:3px solid #bc7b17;background:#fff8ec;padding:12px;margin:14px 0;color:#80550e;border-radius:0 5px 5px 0}.good{color:#087849}.caution{color:#8f610c}table{width:100%;border-collapse:collapse;table-layout:fixed}th,td{text-align:left;padding:11px 8px;border-bottom:1px solid #edf0f5;vertical-align:top;overflow-wrap:anywhere}th{font-size:12px;color:#5d6b80;font-weight:600;width:35%}td{font-variant-numeric:tabular-nums}tr:last-child th,tr:last-child td{border-bottom:0}.blockstrip{display:grid;grid-template-columns:repeat(4,minmax(0,1fr));gap:10px;margin:16px 0}.blocktile{border:1px solid #dce5f1;background:#f5f8fe;border-radius:9px;padding:12px;color:#1c4e8e}.blocktile strong,.blocktile small{display:block}.blocktile strong{font-size:16px}.blocktile small{font-size:11px;color:#5d6b80}.blocktile:hover{background:#eaf1ff;text-decoration:none}.blockdetail{border-top:1px solid #e0e6ef;scroll-margin-top:20px}.blockdetail summary{padding:13px 4px;cursor:pointer;font-weight:600}.blockdetail ul{padding-left:24px;overflow-wrap:anywhere}.split{display:grid;grid-template-columns:1fr 1fr;gap:14px}.split .panel{min-width:0}.money{font-variant-numeric:tabular-nums}.footer{margin-top:24px;color:#5d6b80;font-size:12px}.actions{display:flex;gap:12px;align-items:center;flex-wrap:wrap}.subtle{font-size:12px;color:#5d6b80}@media(max-width:1100px){.grid,.blockstrip{grid-template-columns:repeat(2,minmax(0,1fr))}.split{grid-template-columns:1fr}}@media(max-width:740px){.shell{display:block}.sidebar{height:auto;position:static;padding:16px;gap:12px}.sidebar nav{display:flex;flex-wrap:wrap;gap:3px}.sidebar a{padding:7px 10px}.sidebar .network,.nav-label{display:none}.topbar{padding:12px 16px}main{padding:22px 14px}.metric,.panel{padding:15px}.metric strong{font-size:22px}h1{font-size:25px}th{width:38%}}@media(prefers-reduced-motion:reduce){html{scroll-behavior:auto}}"""
 DASHBOARD_STYLE_HASH=base64.b64encode(hashlib.sha256(DASHBOARD_CSS.encode("utf-8")).digest()).decode("ascii")
 
 
 def status_html(payload,public_readonly=False):
     esc=lambda x:html.escape(str(x),quote=True)
+    def eth(value):
+        whole,fraction=divmod(int(value),10**18)
+        return (str(whole)+"."+str(fraction).zfill(18)).rstrip("0").rstrip(".")+" TEST ETH"
+    def utc(value):
+        return datetime.fromtimestamp(int(value),timezone.utc).strftime("%Y-%m-%d %H:%M:%S UTC")
     def field(label,value):
         return "<tr><th>"+esc(label)+"</th><td>"+esc(value)+"</td></tr>"
     def metric(label,value):
-        return "<div class='metric'><span>"+esc(label)+"</span><strong>"+esc(value)+"</strong></div>"
+        return "<div class='metric'><span>"+esc(label)+"</span><strong>"+esc(f"{value:,}" if isinstance(value,int) else value)+"</strong></div>"
     def check(label,value):
         return field(label,"Verified" if value is True else "Not verified")
     name=esc(payload["nodeId"])
@@ -203,7 +209,7 @@ def status_html(payload,public_readonly=False):
     if app:
         audit=payload["deploymentAudit"]
         metrics=(("Chain ID",payload["chainId"]),("Execution head",payload["executionBlockNumber"]),
-                 ("Finalized block",payload["finalizedExecutionHeight"]),("Finality timestamp gap (s)",payload["finalityLagSeconds"]))
+                 ("Finalized block",payload["finalizedExecutionHeight"]),("Finality timestamp gap",str(payload["finalityLagSeconds"]//60)+"m "+str(payload["finalityLagSeconds"]%60)+"s"))
         rows="".join(check(label,audit.get(key)) for label,key in (
             ("Original genesis","originalGenesisVerified"),("Contract runtime code","runtimeCodeSha256Verified"),
             ("Market / ledger bindings","mutualMarketLedgerBindingsVerified"),
@@ -227,38 +233,49 @@ def status_html(payload,public_readonly=False):
     account=payload.get("monitorAccount")
     account_panel=""
     if account is not None:
-        account_rows="".join(field(label,account[key]) for label,key in (("Public account","address"),("Observed finalized block","finalizedExecutionHeight"),("On-chain active registration","active"),("Native balance (wei)","balanceWei"),("Bond (wei)","bondWei"),("Locked assignments","lockedAssignments"),("Market withdrawable (wei)","marketWithdrawableWei"),("Ledger withdrawable (wei)","ledgerWithdrawableWei")))
-        account_panel="<section class='panel'><h2>Monitor account</h2><table>"+account_rows+"</table><p class='muted'>Public address observation only; wallet ownership and committee selection are not established.</p></section>"
+        account_rows="".join(field(label,eth(account[key]) if key.endswith("Wei") else ("Active" if account[key] else "Inactive") if key=="active" else account[key]) for label,key in (("Public account","address"),("Observed finalized block","finalizedExecutionHeight"),("On-chain active registration","active"),("Native balance","balanceWei"),("Bond","bondWei"),("Locked assignments","lockedAssignments"),("Market withdrawable","marketWithdrawableWei"),("Ledger withdrawable","ledgerWithdrawableWei")))
+        account_panel="<section class='panel' id='account'><div class='eyebrow'>Role / Monitor</div><h2>Monitor account</h2><table>"+account_rows+"</table><p class='muted'>Public address observation only; wallet ownership and committee selection are not established.</p></section>"
     overview=payload.get("marketOverview")
     market_panel=""
     if overview is not None:
         market_rows="".join(field(label,overview[key]) for label,key in (("Finalized block","finalizedExecutionHeight"),("Requests created (cumulative)","requestsCreated"),("Leases created (cumulative)","leasesCreated"),("Active registered monitors","activeMonitorCount")))
         for request in reversed(overview["recentRequests"]):
-            market_rows+=field("Request #"+request["requestId"],"Bids: "+request["bidCount"]+" | Selected: "+str(request["selected"])+" | Max fee (wei): "+request["maxEpochFeeWei"]+" | Bidding close (Unix UTC): "+str(request["biddingClose"]))
-        market_panel="<section class='panel'><h2>Finalized marketplace</h2><table>"+market_rows+"</table><p class='muted'>Latest three requests at most. Counts do not establish independent hosts or active service delivery.</p></section>"
+            market_rows+=field("Request #"+request["requestId"],"Bids: "+request["bidCount"]+" | Selected: "+str(request["selected"])+" | Max fee: "+eth(request["maxEpochFeeWei"])+" | Bidding close: "+utc(request["biddingClose"]))
+        market_panel="<section class='panel' id='market'><div class='eyebrow'>Network / Marketplace</div><h2>Finalized marketplace</h2><table>"+market_rows+"</table><p class='muted'>Latest three requests at most. Counts do not establish independent hosts or active service delivery.</p></section>"
     explorer=payload.get("blockExplorer")
     block_panel=""
     if explorer is not None:
         parts=[]
+        tiles=[]
         for block in explorer["blocks"]:
             block_rows="".join(field(label,block[key]) for label,key in (("Block hash","hash"),("Parent hash","parentHash"),("State root","stateRoot"),("Transactions root","transactionsRoot"),("Receipts root","receiptsRoot"),("Timestamp (Unix UTC)","timestamp"),("Gas used","gasUsed"),("Gas limit","gasLimit"),("Transaction count","transactionCount")))
             hashes="".join("<li>"+esc(tx)+"</li>" for tx in block["transactionHashes"])
-            parts.append("<details><summary>Block "+esc(block["number"])+" / "+esc(block["transactionCount"])+" transactions</summary><table>"+block_rows+"</table><ul>"+hashes+"</ul>"+("<p>Transaction list truncated.</p>" if block["transactionHashesTruncated"] else "")+"</details>")
-        block_panel="<section class='panel'><h2>Finalized block explorer</h2><p class='muted'>Eight most recent finalized execution blocks from configured RPC. Local disk storage is not verified.</p>"+"".join(parts)+"</section>"
+            tiles.append("<a class='blocktile' href='#block-"+esc(block["number"])+"'><small>FINALIZED BLOCK</small><strong>#"+esc(block["number"])+"</strong><small>"+esc(block["transactionCount"])+" transactions</small></a>")
+            parts.append("<details class='blockdetail' id='block-"+esc(block["number"])+"'><summary>Block "+esc(block["number"])+" / "+esc(block["transactionCount"])+" transactions</summary><table>"+block_rows+"</table><ul>"+hashes+"</ul>"+("<p>Transaction list truncated.</p>" if block["transactionHashesTruncated"] else "")+"</details>")
+        block_panel="<section class='panel' id='blocks'><div class='eyebrow'>Network / Explorer</div><h2>Finalized block explorer</h2><p class='muted'>Eight most recent finalized execution blocks from configured RPC. Local disk storage is not verified.</p><div class='blockstrip'>"+"".join(tiles)+"</div>"+"".join(parts)+"</section>"
     cards="".join(metric(label,value) for label,value in metrics)
     lease_note=("Lease lookups disabled on this public listener." if public_readonly else
                 "Finalized lease lookup: /v2/lease/{id} requires a verified deployment manifest.")
+    links=[("Overview","#overview"),("Selected roles","#roles")]
+    if account is not None: links.append(("Monitor account","#account"))
+    if overview is not None: links.append(("Marketplace","#market"))
+    if explorer is not None: links.append(("Blockchain explorer","#blocks"))
+    links.append(("Verification","#evidence"))
+    links.append(("Raw JSON","/v2/status"))
+    nav="".join("<a href='"+href+"'>"+esc(label)+"</a>" for label,href in links)
+    tags="".join("<span>"+esc(role.replace("_"," ").title())+"</span>" for role in payload["declaredRoles"])
     return ("<!doctype html><html lang='en'><head><meta charset='utf-8'><meta name='viewport' content='width=device-width,initial-scale=1'>"
-            "<title>SSE Intercloud / "+name+"</title><style>"+DASHBOARD_CSS+"</style></head><body><main>"
-            "<header><div><div class='brand'>SSE INTERCLOUD</div><h1>"+name+"</h1><p class='muted'>"+esc(scope)+"</p></div>"
-            "<span class='tag'>Read-only / TEST ETH</span></header><section class='intro'><h2>Network overview</h2>"
-            "<p class='muted'>"+esc(detail)+"</p></section><div class='grid'>"+cards+"</div>"
-            "<section class='panel'><h2>Selected roles</h2><p>"+esc(roles)+"</p><table>"+checks+"</table>"
+            "<title>SSE Intercloud / "+name+"</title><style>"+DASHBOARD_CSS+"</style></head><body><div class='shell'>"
+            "<aside class='sidebar'><div class='brand'>SSE / Intercloud<small>NODE CONSOLE</small></div><div><div class='nav-label'>Workspace</div><nav aria-label='Dashboard sections'>"+nav+"</nav></div>"
+            "<div class='network'>Research network<br>Native TEST ETH<br>Read-only public view</div></aside>"
+            "<div class='workspace'><header class='topbar'><strong>Node workspace / "+name+"</strong><div class='actions'><span class='tag'>"+esc(scope)+"</span><a class='button' href='/'>Refresh data</a></div></header>"
+            "<main id='overview'><section class='intro'><div><div class='eyebrow'>Network overview</div><h1>"+name+"</h1><p class='muted'>"+esc(detail)+"</p></div><span class='tag'>Read-only / TEST ETH</span></section>"
+            "<div class='grid'>"+cards+"</div>"
+            "<section class='panel' id='roles'><h2>Selected roles</h2><div class='role-tags'>"+tags+"</div><p class='subtle'>"+esc(roles)+"</p><table>"+checks+"</table>"
             "<p class='notice'>Declared roles do not establish authorization, eligibility or completed work.</p></section>"
-             +account_panel+market_panel+block_panel+"<section class='panel'><h2>Blockchain evidence</h2><table>"+rows+"</table></section>"
-            "<section class='panel'><h2>Public data</h2><p><a href='/'>Refresh observation</a> &middot; <a href='/v2/status'>Live JSON</a></p>"
-            "<p class='muted'>"+esc(lease_note)+" Successful observations may be cached for 15 seconds.</p></section>"
-            "<footer>No wallet keys, transaction signing or privileged host controls exposed by this console.</footer></main></body></html>").encode("utf-8")
+            +account_panel+market_panel+block_panel+"<section class='panel' id='evidence'><div class='eyebrow'>Trust / Evidence</div><h2>Blockchain evidence</h2><table>"+rows+"</table></section>"
+            "<footer class='footer'><p>"+esc(lease_note)+" Successful observations may be cached for 15 seconds.</p>"
+            "<p>No wallet keys, transaction signing or privileged host controls exposed by this console.</p></footer></main></div></div></body></html>").encode("utf-8")
 
 
 def lease_status(config,lease_id,*,inspect=finalized_market_lease):
