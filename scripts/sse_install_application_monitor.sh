@@ -26,6 +26,27 @@ echo "Installs signed Ubuntu dependencies and verified ZeroTier package, joins e
 read -r -p "Type INSTALL-SSE-MONITOR to authorize: " APPROVAL
 [[ "$APPROVAL" == INSTALL-SSE-MONITOR ]] || fail "not authorized"
 sudo -n true || fail "local administrative permission required"
+# Repair only the exact public keyring/source left by a prior interrupted install.
+# Re-verify fingerprint before granting public read access; never trust an arbitrary key.
+sudo -n /bin/bash -s <<'REPAIR_APT'
+set -euo pipefail
+key=/usr/share/keyrings/sse-zerotier.gpg
+source=/etc/apt/sources.list.d/sse-zerotier.list
+if [[ -e "$source" || -L "$source" || -e "$key" || -L "$key" ]]; then
+  test -f "$key" && test ! -L "$key"
+  test -f "$source" && test ! -L "$source"
+  test "$(stat -c %u "$key")" = 0
+  test "$(stat -c %u "$source")" = 0
+  test "$(cat "$source")" = 'deb [arch=amd64 signed-by=/usr/share/keyrings/sse-zerotier.gpg] https://download.zerotier.com/debian/noble noble main'
+  tmp="$(mktemp -d)"
+  trap 'rm -rf -- "$tmp"' EXIT
+  fingerprint="$(gpg --batch --homedir "$tmp" --with-colons --show-keys "$key" | awk -F: '$1=="pub"{p=1} $1=="sub"{p=0} $1=="fpr"&&p{print $10;p=0}')"
+  test "$fingerprint" = 74A5E9C458E1A431F1DA57A71657198823E52A61
+  chmod 0644 "$key" "$source"
+  sudo -u _apt test -r "$key"
+  echo R330_VERIFIED_PUBLIC_APT_KEYRING_READABLE=true
+fi
+REPAIR_APT
 sudo -n env DEBIAN_FRONTEND=noninteractive NEEDRESTART_MODE=l apt-get update
 sudo -n env DEBIAN_FRONTEND=noninteractive NEEDRESTART_MODE=l apt-get install -y -qq --no-install-recommends python3-venv gnupg ca-certificates
 if ! command -v zerotier-cli >/dev/null; then
