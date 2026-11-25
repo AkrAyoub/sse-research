@@ -260,5 +260,39 @@ class TestR238RealNodeConsole(unittest.TestCase):
         self.assertEqual([r["requestId"] for r in result["recentRequests"]],["5","6","7"])
         self.assertEqual(len(calls),9)
 
+    def test_historical_page_and_genesis(self):
+        def h(n): return "0x"+format(n,"064x")
+        def transport(url,method,params):
+            n=20 if params[0]=="finalized" else int(params[0],16)
+            return {"number":hex(n),"hash":h(n+1),"parentHash":h(n),
+                    "stateRoot":h(100),"transactionsRoot":h(101),"receiptsRoot":h(102),
+                    "timestamp":hex(n*12),"gasUsed":"0x0","gasLimit":"0x100000",
+                    "transactions":[],"miner":"0x"+"ab"*20}
+        self.assertEqual([b["number"] for b in mod.recent_blocks(CONFIG,transport,start=4)["blocks"]],[4,3,2,1,0])
+        self.assertEqual(mod.recent_blocks(CONFIG,transport,start=0)["blocks"][0]["feeRecipient"],"0x"+"ab"*20)
+        with self.assertRaises(mod.Refused):
+            mod.recent_blocks(CONFIG,transport,start=21)
+
+    def test_proposer_requires_matching_execution_hash(self):
+        block={"timestamp":1120,"hash":"0x"+"ab"*32}
+        def transport(url,**kwargs):
+            if url.endswith("/genesis"): return {"genesis_time":"1000"}
+            if url.endswith("/blocks/10"):
+                return {"message":{"slot":"10","proposer_index":"7","body":{"execution_payload":{"block_hash":block["hash"]}}}}
+            if url.endswith("/validators/7"):
+                return {"index":"7","validator":{"pubkey":"0x"+"cd"*48}}
+            self.fail("unexpected Beacon path")
+        result=mod.proposer_identity(CONFIG,block,transport)
+        self.assertEqual(result["validatorIndex"],7)
+        self.assertTrue(result["executionHashMatched"])
+        self.assertIsNone(mod.proposer_identity({**CONFIG,"bn":None},block,transport))
+        def wrong(url,**kwargs):
+            result=transport(url,**kwargs)
+            if url.endswith("/blocks/10"):
+                result["message"]["body"]["execution_payload"]["block_hash"]="0x"+"ff"*32
+            return result
+        with self.assertRaises(mod.Refused):
+            mod.proposer_identity(CONFIG,block,wrong)
+
 if __name__=="__main__":
     unittest.main()
