@@ -230,6 +230,8 @@ def install_verified_zerotier_apt(*, runner=call, fetcher=fetch_https,
                 raise Refused("R175_ZEROTIER_APT_CONFIG_CONFLICT")
             existing=location.read_bytes()
             if existing==body:
+                # APT's _apt sandbox must read the public keyring even under umask 077.
+                os.chmod(location,0o644)
                 continue
             if (location!=source or
                     existing!=ZEROTIER_APT_R175_BAD_LINE.encode("ascii")):
@@ -256,6 +258,7 @@ def install_verified_zerotier_apt(*, runner=call, fetcher=fetch_https,
             continue
         fd=os.open(location,os.O_WRONLY|os.O_CREAT|os.O_EXCL|os.O_NOFOLLOW,0o644)
         with os.fdopen(fd,"wb") as out:
+            os.fchmod(out.fileno(),0o644)
             out.write(body)
             out.flush()
             os.fsync(out.fileno())
