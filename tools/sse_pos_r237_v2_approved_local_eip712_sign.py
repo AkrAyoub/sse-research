@@ -165,23 +165,31 @@ def sign_authorized(intent,keystore,manifest,rpc_url,*,confirm,get_password,
               if transport is not None else verify(manifest,rpc_url))
     if verified["deploymentReceiptSuccessfulAndFinalized"] is not True:
         raise Refused("finalized real market runtime not verified")
-    if transport is None:
-        snapshot=inspect_finalized_lease(
-            manifest,rpc_url,intent["typedData"]["message"]["leaseId"],
-            intent["typedData"]["message"]["epochId"],attestation=verified)
+    message=intent["typedData"]["message"]
+    if canonical_confirmations is None:
+        options={"attestation":verified}
+        if transport is not None:
+            options["transport"]=transport
+        snapshot=inspect_finalized_lease(manifest,rpc_url,message["leaseId"],message["epochId"],**options)
     else:
-        snapshot=inspect_finalized_lease(
-            manifest,rpc_url,intent["typedData"]["message"]["leaseId"],
-            intent["typedData"]["message"]["epochId"],
-            transport=transport,attestation=verified)
-    if canonical_confirmations is not None:
-        if intent['kind'] != 'residual-allocation':
-            raise Refused('canonical signing presently limited to bilateral residual allocation')
-        from sse_pos_r350_v2_canonical_lease_snapshot import inspect_canonical
+        if intent["kind"] not in ("provider-response","residual-allocation"):
+            raise Refused("canonical typed signing limited to provider and bilateral allocation")
+        from sse_pos_r350_v2_canonical_lease_snapshot import inspect_canonical,block_identity
         from sse_pos_r206_adaptive_v2_deployment_audit import rpc
+        import time
         ask=transport or rpc
-        message=intent['typedData']['message']
-        snapshot=inspect_canonical(manifest,rpc_url,message['leaseId'],message['epochId'],confirmations=canonical_confirmations,transport=ask)
+        snapshot=inspect_canonical(manifest,rpc_url,message["leaseId"],message["epochId"],confirmations=canonical_confirmations,transport=ask)
+        def recheck():
+            fresh=inspect_canonical(manifest,rpc_url,message["leaseId"],message["epochId"],transport=ask)
+            verify_public_role_state(intent,fresh)
+            height=snapshot["observedExecutionHeight"]
+            if block_identity(ask(rpc_url,"eth_getBlockByNumber",[hex(height),False]))!=(height,snapshot["observedExecutionHash"]):
+                raise Refused("approved canonical anchor reorganized")
+            head=ask(rpc_url,"eth_getBlockByNumber",["latest",False])
+            deadline=message["expiry"] if intent["kind"]=="residual-allocation" else fresh["epoch"]["ledger"]["responseDeadline"]
+            if max(time.time(),int(head["timestamp"],16))>=deadline:
+                raise Refused("signature deadline reached")
+        recheck()
     verify_public_role_state(intent,snapshot)
     document=safe_keystore(keystore)
     print("R237_PUBLIC_TYPED_INTENT="+json.dumps({
@@ -207,13 +215,7 @@ def sign_authorized(intent,keystore,manifest,rpc_url,*,confirm,get_password,
     except ImportError as exc:
         raise Refused("missing pinned eth-account offline signer dependency") from exc
     if canonical_confirmations is not None:
-        fresh=inspect_canonical(manifest,rpc_url,message["leaseId"],message["epochId"],transport=ask)
-        verify_public_role_state(intent,fresh)
-        if ask(rpc_url,"eth_getBlockByNumber",[hex(snapshot["observedExecutionHeight"]),False])["hash"].lower()!=snapshot["observedExecutionHash"]:
-            raise Refused("approved canonical anchor reorganized")
-        head=ask(rpc_url,"eth_getBlockByNumber",["latest",False])
-        if int(head["timestamp"],16)>=message["expiry"]:
-            raise Refused("residual signature expiry reached")
+        recheck()
     try:
         raw_key=Account.decrypt(document,secret)
     except (ValueError,TypeError,KeyError) as exc:
@@ -223,6 +225,8 @@ def sign_authorized(intent,keystore,manifest,rpc_url,*,confirm,get_password,
         account=Account.from_key(raw_key)
         if account.address.lower()!=intent["expectedSigner"]:
             raise Refused("encrypted app wallet does not match public expected signer")
+        if canonical_confirmations is not None:
+            recheck()
         typed=intent["typedData"]
         signed=Account.sign_message(
             encode_typed_data(full_message=typed),private_key=raw_key)
@@ -258,7 +262,7 @@ def main(argv=None):
                    help="owner-only separate encrypted application EOA; no validator wallet")
     p.add_argument("--manifest",type=Path)
     p.add_argument("--rpc",choices=("http://127.0.0.1:18545","http://127.0.0.1:28545"))
-    p.add_argument("--canonical-confirmations",type=int,help="explicit provisional residual signing; reorg risk remains")
+    p.add_argument("--canonical-confirmations",type=int,help="explicit provisional provider or residual signing; reorg risk remains")
     a=p.parse_args(argv)
     try:
         message=json.loads(a.message_json)
