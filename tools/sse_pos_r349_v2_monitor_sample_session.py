@@ -52,8 +52,20 @@ def run(a):
     policy = json.loads(a.policy.read_text())
     ph, sh = resource_hash(profile), policy_hash(policy, profile)
     tls = pinned_tls_context(a.tls_cert, a.tls_fingerprint)
-    snapshot = inspect(manifest, a.rpc, a.lease_id, a.epoch_id)
-    ctx = prepared_monitor(snapshot, a.monitor, profile["origin"], rpc_url=a.rpc)
+    depth = getattr(a,"canonical_confirmations",None)
+    provisional = depth is not None
+    from sse_pos_r350_v2_canonical_lease_snapshot import inspect_canonical,block_identity
+    def snapshot_now():
+        if provisional:
+            return inspect_canonical(manifest,a.rpc,a.lease_id,a.epoch_id,confirmations=depth)
+        return inspect(manifest,a.rpc,a.lease_id,a.epoch_id)
+    def check_anchor(state):
+        if provisional:
+            h=state["observedExecutionHeight"]
+            if block_identity(rpc(a.rpc,"eth_getBlockByNumber",[hex(h),False]))!=(h,state["observedExecutionHash"]):
+                raise ValueError("sample canonical anchor reorganized")
+    snapshot = snapshot_now()
+    ctx = prepared_monitor(snapshot, a.monitor, profile["origin"], rpc_url=a.rpc,allow_canonical=True) if provisional else prepared_monitor(snapshot,a.monitor,profile["origin"],rpc_url=a.rpc)
     lease = snapshot["lease"]
     ep = snapshot["epoch"]["ledger"]
     if (lease["profileHash"] != ph or lease["policyHash"] != sh
@@ -81,12 +93,18 @@ def run(a):
         if i:
             time.sleep(max(0, next_at-time.monotonic()))
         check_window()
-        current = inspect(manifest,a.rpc,a.lease_id,a.epoch_id)
-        prepared_monitor(current,a.monitor,profile["origin"],rpc_url=a.rpc)
+        check_anchor(snapshot)
+        current = snapshot_now()
+        if provisional:
+            prepared_monitor(current,a.monitor,profile["origin"],rpc_url=a.rpc,allow_canonical=True)
+        else:
+            prepared_monitor(current,a.monitor,profile["origin"],rpc_url=a.rpc)
         now_ep = current["epoch"]["ledger"]
         if (not now_ep["responseAuthenticated"] or now_ep["responseHash"] != rh
             or current["epoch"]["market"]["requestHash"] != ctx["requestHash"]
-            or now_ep["monitoringClose"] != ep["monitoringClose"]):
+            or now_ep["monitoringClose"] != ep["monitoringClose"]
+            or current["lease"]["profileHash"] != ph or current["lease"]["policyHash"] != sh
+            or current["lease"]["provider"] != lease["provider"] or current["lease"]["endpointHash"] != lease["endpointHash"]):
             raise ValueError("finalized epoch context changed")
         next_at = time.monotonic() + interval
         observed = http_probe(ctx["origin"],challenge,
@@ -94,26 +112,37 @@ def run(a):
                               tls_context=tls)
         record = {"sampleIndex":i,"observedAtUtc":datetime.now(timezone.utc).isoformat(),
                   "leaseId":a.lease_id,"epochId":a.epoch_id,"monitor":ctx["monitor"],
-                  "requestHash":ctx["requestHash"],"finalizedHeight":current["finalizedExecutionHeight"],
+                  "requestHash":ctx["requestHash"],
+                  **({"canonicalHeight":current["observedExecutionHeight"],"canonicalHash":current["observedExecutionHash"]} if provisional else {"finalizedHeight":current["finalizedExecutionHeight"]}),
                   "elapsedMs":observed["elapsedMs"],"transportStatus":observed["transportStatus"]}
         if observed["body"] is not None:
             raw = observed["body"]
             write_bytes_create_only(root / f"sample-{i:04d}.reply", raw)
             record["rawReplySha256"] = hashlib.sha256(raw).hexdigest()
         try:
-            record.update(inspect_response(observed,current,ctx))
+            record.update(inspect_response(observed,current,ctx,allow_canonical=True) if provisional else inspect_response(observed,current,ctx))
         except (ValueError,TypeError,KeyError) as exc:
             record.update(providerSignatureVerified=False,validationError=type(exc).__name__)
+        check_anchor(current)
         write_create_only(root / f"sample-{i:04d}.json",record)
         records.append(record)
         print(json.dumps({"sample":i+1,"elapsedMs":record["elapsedMs"],
                           "verified":record.get("providerSignatureVerified",False)}),flush=True)
-    report = {"schema":"SSE_R349_FINALIZED_SAMPLE_SESSION_V1",
+    if provisional:
+        check_anchor(snapshot)
+        for record in records:
+            h=record["canonicalHeight"]
+            if block_identity(rpc(a.rpc,"eth_getBlockByNumber",[hex(h),False]))!=(h,record["canonicalHash"]):
+                raise ValueError("archived sample anchor reorganized; no summary issued")
+    report = {"schema":"SSE_R356_CANONICAL_SAMPLE_SESSION_V1" if provisional else "SSE_R349_FINALIZED_SAMPLE_SESSION_V1",
               "chainId":31340,"market":snapshot["market"],"monitor":ctx["monitor"],
               "leaseId":a.lease_id,"epochId":a.epoch_id,"requestHash":ctx["requestHash"],
               "responseHash":rh,"profileHash":ph,"policyHash":sh,
               "records":records,**evaluate(records,policy,rh)}
-    report["evidenceHash"]="0x"+keccak256(b"SSE_R349_SAMPLE_SESSION_V1\x00"+canonical(report)).hex()
+    if provisional:
+        report.update(canonicalConfirmations=depth,initialCanonicalHeight=snapshot["observedExecutionHeight"],initialCanonicalHash=snapshot["observedExecutionHash"],finalizedAuthorization=False)
+    prefix=b"SSE_R356_CANONICAL_SAMPLE_SESSION_V1\x00" if provisional else b"SSE_R349_SAMPLE_SESSION_V1\x00"
+    report["evidenceHash"]="0x"+keccak256(prefix+canonical(report)).hex()
     write_create_only(root / "summary.json",report)
     print(json.dumps({k:v for k,v in report.items() if k!="records"},indent=2),flush=True)
 
@@ -128,6 +157,7 @@ def main():
     p.add_argument("--monitor",required=True)
     p.add_argument("--tls-fingerprint",required=True)
     p.add_argument("--count",type=int,required=True)
+    p.add_argument("--canonical-confirmations",type=int,help="explicit provisional observations; no finalized vote authorization")
     try:
         run(p.parse_args())
     except (ValueError,OSError,TypeError,KeyError) as exc:
