@@ -94,12 +94,17 @@ def signed_reply(payload,signature,provider,market,ledger):
     }
 
 
-def validate_signed_reply(reply, snapshot):
+def validate_signed_reply(reply, snapshot, *, allow_canonical=False):
     if type(reply) is not dict or set(reply)!=(set(WIRE)|{
         "responseHash","providerSignature"}):
         raise Refused("provider response must be signed with exact V2 fields")
+    provisional=(type(snapshot) is dict and
+                 snapshot.get("schema")=="SSE_R350_CANONICAL_V2_LEASE_READONLY_V1" and
+                 snapshot.get("finalizedAuthorization") is False and
+                 snapshot.get("reorganizationPossible") is True)
     if (type(snapshot) is not dict or
-        snapshot.get("schema")!="SSE_R229_FINALIZED_V2_LEASE_READONLY_V1" or
+        (snapshot.get("schema")!="SSE_R229_FINALIZED_V2_LEASE_READONLY_V1" and
+         not (allow_canonical is True and provisional)) or
         snapshot.get("deploymentRuntimeAndWiringAttested") is not True or
         snapshot.get("chainId")!=31340):
         raise Refused("provider cannot be checked without real original-chain lease state")
@@ -137,7 +142,8 @@ def validate_signed_reply(reply, snapshot):
         "leaseId":payload["leaseId"],"epochId":payload["epochId"],
         "responseHash":hash_found,"workResultDigest":payload["workResultDigest"],
         "providerPublicSignatureVerified":True,
-        "realFinalizedLeaseAndEpochBound":True,
+        "realFinalizedLeaseAndEpochBound":not provisional,
+        "provisionalCanonicalLeaseAndEpochBound":provisional,
         "actualDockerContainerVerified":False,
         "remotePhysicalComputeProved":False,
         "objectiveSlaSuccessProved":False,
