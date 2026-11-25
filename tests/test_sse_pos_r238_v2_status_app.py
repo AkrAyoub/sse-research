@@ -183,5 +183,37 @@ class TestR238RealNodeConsole(unittest.TestCase):
             server.server_close()
             thread.join(timeout=4)
 
+    def test_monitor_account_reads_only_at_verified_finalized_height(self):
+        address="0x"+"ab"*20
+        market="0x"+"12"*20
+        ledger="0x"+"34"*20
+        conf={**CONFIG,"bn":None,"declaredRoles":["monitor"],"monitorAddress":address}
+        proof={"finalizedExecutionHeight":42,"contracts":{"market":{"address":market},"ledger":{"address":ledger}}}
+        calls=[]
+        def query(transport,url,contract,signature,args,height):
+            calls.append((contract,signature,height))
+            self.assertEqual(args,[int(address,16)])
+            values=[1000000000000000,2,1] if signature=="monitors(address)" else [7]
+            return "0x"+"".join(format(v,"064x") for v in values)
+        def transport(url,method,params):
+            self.assertEqual(method,"eth_getBalance")
+            self.assertEqual(params,[address,"0x2a"])
+            return "0x123"
+        with patch.object(mod,"query",side_effect=query):
+            account=mod.monitor_account(conf,proof,transport)
+        self.assertEqual(account["balanceWei"],"291")
+        self.assertEqual(account["bondWei"],"1000000000000000")
+        self.assertEqual(account["lockedAssignments"],"2")
+        self.assertTrue(account["active"])
+        self.assertFalse(account["walletOwnershipVerified"])
+        self.assertEqual(account["ledgerWithdrawableWei"],"7")
+        self.assertEqual(calls,[(market,"monitors(address)",42),(market,"withdrawable(address)",42),(ledger,"withdrawable(address)",42)])
+        self.assertIsNone(mod.monitor_account(CONFIG,{},None))
+
+    def test_monitor_address_configuration_rejects_invalid_scope(self):
+        for address in ("bad","0x"+"00"*20,"0x"+"ab"*20):
+            with self.assertRaises(mod.Refused):
+                mod.make_server({**CONFIG,"monitorAddress":address},0)
+
 if __name__=="__main__":
     unittest.main()
