@@ -16,6 +16,7 @@ from __future__ import annotations
 
 import argparse
 import html
+from urllib.parse import urlsplit
 from http.server import BaseHTTPRequestHandler,ThreadingHTTPServer
 import json
 from pathlib import Path
@@ -241,18 +242,22 @@ def make_server(config,port=8766,*,capture=real_node_capture,inspect=finalized_m
             return self.reply(status,raw,"application/json; charset=utf-8")
         def do_GET(self):
             try:
-                if self.path=="/healthz":
+                target=urlsplit(self.path)
+                if target.scheme or target.netloc or not self.path.startswith("/"):
+                    return self.json_reply(400,{"error":"invalid request target"})
+                path=target.path
+                if path=="/healthz":
                     return self.json_reply(200,{
                         "schema":"SSE_R238_LOOPBACK_PROCESS_HEALTH_V1",
                         "alive":True,"chainVerifiedByHealthz":False,
                         "transactionsSubmitted":False})
-                if self.path in ("/","/v2/status"):
+                if path in ("/","/v2/status"):
                     status=cache.read(lambda:node_status(config,capture=capture))
-                    if self.path=="/":
+                    if path=="/":
                         return self.reply(200,status_html(status),
                                           "text/html; charset=utf-8")
                     return self.json_reply(200,status)
-                match=LEASE_PATH.fullmatch(self.path)
+                match=LEASE_PATH.fullmatch(path)
                 if match and not public_readonly:
                     return self.json_reply(200,lease_status(
                         config,int(match.group(1)),inspect=inspect))
