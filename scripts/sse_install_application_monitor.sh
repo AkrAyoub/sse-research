@@ -3,7 +3,7 @@
 set -euo pipefail
 umask 077
 fail(){ echo "R328_REFUSED: $*" >&2; exit 2; }
-[[ $# == 1 && "$1" =~ ^[0-9a-f]{40}$ ]] || fail "exact source commit required"
+[[ ( $# == 1 || ( $# == 2 && "$2" == --approved-monitor ) ) && "$1" =~ ^[0-9a-f]{40}$ ]] || fail "exact source commit required"
 SHA="$1"
 [[ "$(id -u)" != 0 && "$(uname -m)" == x86_64 ]] || fail "nonroot x86_64 operator required"
 source /etc/os-release
@@ -17,6 +17,7 @@ done
 for p in "$HOME/.local/share/sse-r35-chain31340-g2-private" "$HOME/.local/share/sse-r27-bls-operator-private" "$HOME/.local/share/sse-v2-app-only" "$HOME/.venvs/sse-v2-operator" "$HOME/.config/sse/dashboard.env" "$HOME/sse-dashboard-runtime"; do
  [[ ! -e "$p" && ! -L "$p" ]] || fail "existing SSE state: $p"
 done
+if [[ "${2:-}" != --approved-monitor ]]; then
 echo "Select role for this application bootstrap:"
 echo "  1. monitor"
 echo "Other role combinations are not yet supported by this installer."
@@ -25,6 +26,7 @@ read -r -p "Role: " ROLE
 echo "Installs signed Ubuntu dependencies and verified ZeroTier package, joins existing public overlay, creates encrypted monitor wallet. No funds or transactions."
 read -r -p "Type INSTALL-SSE-MONITOR to authorize: " APPROVAL
 [[ "$APPROVAL" == INSTALL-SSE-MONITOR ]] || fail "not authorized"
+fi
 sudo -n true || fail "local administrative permission required"
 # Repair only the exact public keyring/source left by a prior interrupted install.
 # Re-verify fingerprint before granting public read access; never trust an arbitrary key.
