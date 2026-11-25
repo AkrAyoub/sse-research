@@ -21,6 +21,8 @@ import json
 from pathlib import Path
 import re
 import sys
+import threading
+import time
 
 ROOT=Path(__file__).resolve().parents[2]
 sys.path.insert(0,str(ROOT/"tools"))
@@ -166,11 +168,58 @@ def lease_status(config,lease_id,*,inspect=finalized_market_lease):
     return inspect(manifest,config["el"],lease_id)
 
 
-def make_server(config,port=8766,*,capture=real_node_capture,inspect=finalized_market_lease):
+class BoundedConsoleServer(ThreadingHTTPServer):
+    """Bound concurrent connections; overload closes the connection."""
+    request_queue_size=16
+    def __init__(self,*args,**kwargs):
+        self.slots=threading.BoundedSemaphore(8)
+        super().__init__(*args,**kwargs)
+    def get_request(self):
+        sock,addr=super().get_request()
+        sock.settimeout(10)
+        return sock,addr
+    def process_request(self,request,client_address):
+        if not self.slots.acquire(blocking=False):
+            self.shutdown_request(request)
+            return
+        try:
+            super().process_request(request,client_address)
+        except BaseException:
+            self.slots.release()
+            raise
+    def process_request_thread(self,request,client_address):
+        try:
+            super().process_request_thread(request,client_address)
+        finally:
+            self.slots.release()
+
+
+class StatusCache:
+    """Only successful observations are cached; no stale-on-error claims."""
+    def __init__(self,ttl=15,clock=time.monotonic):
+        self.ttl=ttl
+        self.clock=clock
+        self.lock=threading.Lock()
+        self.value=None
+        self.expires=0
+    def read(self,loader):
+        with self.lock:
+            if self.value is not None and self.clock()<self.expires:
+                return self.value
+            self.value=None
+            value=loader()
+            self.value=value
+            self.expires=self.clock()+self.ttl
+            return value
+
+
+def make_server(config,port=8766,*,capture=real_node_capture,inspect=finalized_market_lease,public_readonly=False):
     if type(port) is not int or port!=0 and not 1024<=port<=65535:
         raise Refused("only local unprivileged console port (0 for tests)")
     if type(config) is not dict or set(config)!={"nodeId","declaredRoles","el","bn","manifest"}:
         raise Refused("unexpected node role-local configuration")
+
+    cache=StatusCache()
 
     class Handler(BaseHTTPRequestHandler):
         def reply(self,status,body,content_type):
@@ -198,13 +247,13 @@ def make_server(config,port=8766,*,capture=real_node_capture,inspect=finalized_m
                         "alive":True,"chainVerifiedByHealthz":False,
                         "transactionsSubmitted":False})
                 if self.path in ("/","/v2/status"):
-                    status=node_status(config,capture=capture)
+                    status=cache.read(lambda:node_status(config,capture=capture))
                     if self.path=="/":
                         return self.reply(200,status_html(status),
                                           "text/html; charset=utf-8")
                     return self.json_reply(200,status)
                 match=LEASE_PATH.fullmatch(self.path)
-                if match:
+                if match and not public_readonly:
                     return self.json_reply(200,lease_status(
                         config,int(match.group(1)),inspect=inspect))
                 return self.json_reply(404,{"error":"unknown read-only route"})
@@ -218,7 +267,7 @@ def make_server(config,port=8766,*,capture=real_node_capture,inspect=finalized_m
         def log_message(self,*args):
             return
 
-    return ThreadingHTTPServer(("127.0.0.1",port),Handler)
+    return BoundedConsoleServer(("127.0.0.1",port),Handler)
 
 
 def main(argv=None):
@@ -229,6 +278,7 @@ def main(argv=None):
     p.add_argument("--bn",help="local Beacon endpoint; omit for application-only RPC mode")
     p.add_argument("--v2-manifest",type=Path)
     p.add_argument("--port",type=int,default=8766)
+    p.add_argument("--public-readonly",action="store_true",help="restrict tunnel-facing console to bounded cached status and health; no lease lookups")
     p.add_argument("--serve",action="store_true",
                    help="start owner-local read-only HTTP; TLS proxy is separate")
     a=p.parse_args(argv)
@@ -247,7 +297,7 @@ def main(argv=None):
             return 0
         if not 1024<=a.port<=65535:
             raise Refused("--serve requires explicit owner-local unprivileged port")
-        server=make_server(conf,a.port)
+        server=make_server(conf,a.port,public_readonly=a.public_readonly)
         print("R238_ROLE_LOCAL_PUBLIC_STATUS_HTTP_LOOPBACK_READY=true",flush=True)
         try:
             server.serve_forever()
