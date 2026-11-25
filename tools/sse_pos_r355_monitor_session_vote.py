@@ -31,13 +31,14 @@ def execute(a):
     manifest=load(a.manifest)
     profile=json.loads(a.profile.read_text())
     policy=json.loads(a.policy.read_text())
-    snapshot=inspect(manifest,a.rpc,a.lease_id,a.epoch_id)
+    depth=getattr(a,"canonical_confirmations",None)
+    snapshot=inspect(manifest,a.rpc,a.lease_id,a.epoch_id) if depth is None else inspect_canonical(manifest,a.rpc,a.lease_id,a.epoch_id,confirmations=depth)
     from sse_pos_r232_v2_monitor_probe import prepared_monitor
     from sse_pos_r233_public_v2_compute_terms import resource_hash,policy_hash
-    ctx=prepared_monitor(snapshot,a.monitor,profile["origin"],rpc_url=a.rpc)
+    ctx=prepared_monitor(snapshot,a.monitor,profile["origin"],rpc_url=a.rpc,allow_canonical=depth is not None)
     current=inspect_canonical(manifest,a.rpc,a.lease_id,a.epoch_id)
     ep=current["epoch"]["ledger"]
-    if not ep["responseAuthenticated"] or ep["monitoringSealed"]:
+    if not ep["responseAuthenticated"] or ep["monitoringSealed"] or not snapshot["epoch"]["ledger"]["responseAuthenticated"] or snapshot["epoch"]["ledger"]["responseHash"]!=ep["responseHash"] or current["lease"]["profileHash"]!=snapshot["lease"]["profileHash"] or current["lease"]["policyHash"]!=snapshot["lease"]["policyHash"] or ep["requestHash"]!=ctx["requestHash"]:
         raise ValueError("no authenticated open epoch")
     if snapshot["lease"]["profileHash"]!=resource_hash(profile) or snapshot["lease"]["policyHash"]!=policy_hash(policy,profile):
         raise ValueError("committed SLA terms mismatch")
@@ -48,6 +49,9 @@ def execute(a):
     monitor=ctx["monitor"]
     from sse_pos_r229_v2_finalized_lease_snapshot import query,decode_struct
     voted=decode_struct(query(rpc,a.rpc,current["ledger"],"voted(uint256,uint256,address)",(a.lease_id,a.epoch_id,int(monitor,16)),current["observedExecutionHeight"]),(("voted","bool"),))["voted"]
+    from sse_pos_r350_v2_canonical_lease_snapshot import block_identity
+    if block_identity(rpc(a.rpc,"eth_getBlockByNumber",[hex(current["observedExecutionHeight"]),False]))!=(current["observedExecutionHeight"],current["observedExecutionHash"]):
+        raise ValueError("approval anchor changed")
     if voted:
         raise ValueError("monitor already voted")
     print(json.dumps({"chainId":31340,"market":snapshot["market"],"ledger":snapshot["ledger"],
@@ -56,6 +60,7 @@ def execute(a):
         "requestHash":ctx["requestHash"],"responseHash":ep["responseHash"],
         "sampleCount":a.count,"maximumTransactionSpendWei":a.max_total_wei,
         "onlyPermittedOutcome":1,"monitoringClose":ep["monitoringClose"],
+        "canonicalConfirmations":depth,"reorganizationRiskAccepted":depth is not None,
         "automaticFailureVote":False,"physicalSlaTruthVerified":False},indent=2),flush=True)
     if input("Type "+CONSENT+" to authorize this bounded conditional report: ")!=CONSENT:
         raise ValueError("session not authorized")
@@ -70,12 +75,25 @@ def execute(a):
         finally:
             del key
         run(a)
-        prepared=evidence_plan(manifest,a.rpc,a.output,profile,policy,a.lease_id,a.epoch_id)
-        if prepared["monitor"]!=monitor or prepared["params"]["outcome"]!=1:
-            raise ValueError("evidence outside approved scope")
+        def validated_plan():
+            prepared=evidence_plan(manifest,a.rpc,a.output,profile,policy,a.lease_id,a.epoch_id,canonical_confirmations=depth)
+            if (prepared["monitor"]!=monitor or prepared["params"]["outcome"]!=1
+                or prepared["requestHash"]!=ctx["requestHash"] or prepared["responseHash"]!=ep["responseHash"]
+                or prepared["profileHash"]!=snapshot["lease"]["profileHash"]
+                or prepared["policyHash"]!=snapshot["lease"]["policyHash"]
+                or prepared["monitoringClose"]!=ep["monitoringClose"] or prepared["attempts"]!=a.count):
+                raise ValueError("evidence outside approved scope")
+            if depth is not None and block_identity(rpc(a.rpc,"eth_getBlockByNumber",[hex(snapshot["observedExecutionHeight"]),False]))!=(snapshot["observedExecutionHeight"],snapshot["observedExecutionHash"]):
+                raise ValueError("session approval anchor reorganized")
+            return prepared
+        prepared=validated_plan()
+        def confirm_bound(_):
+            if validated_plan()!=prepared:
+                raise ValueError("evidence changed before signing")
+            return AUTHORIZE
         tx,offer=readonly_quote(manifest,a.rpc,"vote","monitor",prepared["params"],monitor,a.max_total_wei)
         result=submit_once(tx,offer,manifest,a.rpc,a.keystore,
-                           confirm=lambda _: AUTHORIZE,get_password=lambda _: password,
+                           confirm=confirm_bound,get_password=lambda _: password,
                            journal_dir=a.journal_dir)
         print(json.dumps(result,indent=2,sort_keys=True),flush=True)
         return result
@@ -92,6 +110,7 @@ def main():
     p.add_argument("--monitor",required=True)
     p.add_argument("--tls-fingerprint",required=True)
     p.add_argument("--count",type=int,required=True)
+    p.add_argument("--canonical-confirmations",type=int,help="explicit provisional session and vote; reorg risk remains")
     p.add_argument("--max-total-wei",type=int,required=True)
     p.add_argument("--journal-dir",type=Path,default=Path.home()/".local/share/sse-transaction-journal")
     try:
