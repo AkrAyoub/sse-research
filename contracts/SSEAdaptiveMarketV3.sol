@@ -527,15 +527,31 @@ contract SSEAdaptiveMarketV3 is EIP712 {
     function resolveResidual(uint256 leaseId,uint256 epochId,Evidence.Allocation calldata a,
         bytes calldata consumerSig,bytes calldata providerSig) external
     {
+        _verifyResidual(leaseId,epochId,a,consumerSig,providerSig);
+        _allocateResidual(leaseId,epochId,a);
+    }
+
+    function _verifyResidual(uint256 leaseId,uint256 epochId,Evidence.Allocation calldata a,
+        bytes calldata consumerSig,bytes calldata providerSig) private view
+    {
+        Epoch storage e=epochs[leaseId][epochId];
+        if(!e.exists || e.resolved || !accounts[leaseId].epochs[epochId].evidenceClosed)
+            revert InvalidPhase();
+        if(a.unresolvedAmount!=accounts[leaseId].epochs[epochId].unresolved || a.nonce!=e.nonce)
+            revert InvalidPhase();
+        if(block.timestamp>a.expiry) revert Evidence.Expired();
+        bytes32 digest=Evidence.allocationDigest(_domainSeparatorV4(),
+            Evidence.Context(leaseId,epochId,e.requestHash),a);
+        if(ECDSA.recover(digest,providerSig)!=leases[leaseId].provider ||
+            ECDSA.recover(digest,consumerSig)!=leases[leaseId].consumer)
+            revert InvalidSignature();
+    }
+
+    function _allocateResidual(uint256 leaseId,uint256 epochId,Evidence.Allocation calldata a) private {
         Lease storage l=leases[leaseId];
         Epoch storage e=epochs[leaseId][epochId];
-        Accounting.Lease storage account=accounts[leaseId];
-        if(!e.exists || e.resolved || !account.epochs[epochId].evidenceClosed) revert InvalidPhase();
-        Evidence.verifyAllocation(_domainSeparatorV4(),
-            Evidence.Context(leaseId,epochId,e.requestHash),a,l.provider,l.consumer,
-            account.epochs[epochId].unresolved,e.nonce,providerSig,consumerSig);
         ++e.nonce;
-        account.allocateResidual(epochId,a.providerShare,a.consumerShare);
+        accounts[leaseId].allocateResidual(epochId,a.providerShare,a.consumerShare);
         e.resolved=true;
         l.serviceRemaining-=a.unresolvedAmount;
         totalServiceEscrow-=a.unresolvedAmount;
