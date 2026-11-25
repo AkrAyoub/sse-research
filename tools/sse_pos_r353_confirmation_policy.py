@@ -34,7 +34,7 @@ def authorize_observation(manifest,url,lease_id,epoch_id,action,policy,*,exposur
                 "action":action,"automaticSigningAuthorized":False}
     if exposure_wei+prior_exposure_wei>policy.max_unfinalized_wei:
         raise ValueError("unfinalized exposure budget exceeded")
-    state=inspect_canonical(manifest,url,lease_id,epoch_id,transport=transport)
+    state=inspect_canonical(manifest,url,lease_id,epoch_id,confirmations=policy.min_confirmations,transport=transport)
     height=state["observedExecutionHeight"]
     anchor=(height,state["observedExecutionHash"])
     head,_=block_identity(transport(url,"eth_getBlockByNumber",["latest",False]))
