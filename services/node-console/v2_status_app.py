@@ -33,7 +33,7 @@ ROOT=Path(__file__).resolve().parents[2]
 sys.path.insert(0,str(ROOT/"tools"))
 
 from sse_pos_r141_independent_fleet_audit import (
-    Refused as NodeRefused,capture as real_node_capture,
+    Refused as NodeRefused,capture as real_node_capture,http_json as beacon_json,
 )
 from sse_pos_r206_adaptive_v2_deployment_audit import (
     Refused as AuditRefused,load as load_manifest,verify as verify_market,rpc,
@@ -124,15 +124,19 @@ def market_overview(config,proof,transport):
             "recentRequests":recent,"recentRequestLimit":3}
 
 
-def recent_blocks(config,transport=rpc):
+def recent_blocks(config,transport=rpc,start=None):
     """Bounded real canonical execution headers, with transaction hashes."""
     final=transport(config["el"],"eth_getBlockByNumber",["finalized",False])
     height=int(final["number"],16)
+    if start is None:
+        start=height
+    if type(start) is not int or not 0<=start<=height:
+        raise Refused("requested block outside finalized history")
     blocks=[]
-    expected_hash=final["hash"]
-    for number in range(height,max(-1,height-8),-1):
+    expected_hash=final["hash"] if start==height else None
+    for number in range(start,max(-1,start-8),-1):
         block=transport(config["el"],"eth_getBlockByNumber",[hex(number),False])
-        if int(block["number"],16)!=number or block["hash"]!=expected_hash:
+        if int(block["number"],16)!=number or (expected_hash is not None and block["hash"]!=expected_hash):
             raise Refused("inconsistent canonical block sequence")
         txs=block["transactions"]
         if not isinstance(txs,list) or any(not isinstance(t,str) or not re.fullmatch(r"0x[0-9a-fA-F]{64}",t) for t in txs[:16]):
@@ -141,9 +145,34 @@ def recent_blocks(config,transport=rpc):
         if any(not isinstance(v,str) or not re.fullmatch(r"0x[0-9a-fA-F]{64}",v) for v in record.values()):
             raise Refused("malformed block header roots")
         record.update(number=number,timestamp=int(block["timestamp"],16),gasUsed=str(int(block["gasUsed"],16)),gasLimit=str(int(block["gasLimit"],16)),transactionCount=len(txs),transactionHashes=txs[:16],transactionHashesTruncated=len(txs)>16)
+        recipient=block.get("miner")
+        if recipient is not None and (not isinstance(recipient,str) or not re.fullmatch(r"0x[0-9a-fA-F]{40}",recipient)):
+            raise Refused("malformed fee recipient")
+        record["feeRecipient"]=recipient
         blocks.append(record)
         expected_hash=record["parentHash"]
-    return {"finalizedHeight":height,"blocks":blocks,"source":"configured execution RPC","localDiskStorageVerified":False,"transactionHashLimitPerBlock":16}
+    return {"finalizedHeight":height,"pageStart":start,"blocks":blocks,"source":"configured execution RPC","localDiskStorageVerified":False,"transactionHashLimitPerBlock":16}
+
+
+def proposer_identity(config,block,transport=beacon_json):
+    if config["bn"] is None:
+        return None
+    base=config["bn"]
+    genesis=transport(base+"/eth/v1/beacon/genesis")
+    elapsed=block["timestamp"]-int(genesis["genesis_time"])
+    if elapsed<=0 or elapsed%12:
+        return None
+    slot=elapsed//12
+    data=transport(base+"/eth/v2/beacon/blocks/"+str(slot),max_size=4194304)
+    message=data["message"]
+    if int(message["slot"])!=slot or message["body"]["execution_payload"]["block_hash"].lower()!=block["hash"].lower():
+        raise Refused("Beacon block does not match execution hash")
+    index=int(message["proposer_index"])
+    validator=transport(base+"/eth/v1/beacon/states/"+str(slot)+"/validators/"+str(index))
+    pubkey=validator["validator"]["pubkey"]
+    if int(validator["index"])!=index or not re.fullmatch(r"0x[0-9a-fA-F]{96}",pubkey):
+        raise Refused("invalid historical proposer record")
+    return {"slot":slot,"validatorIndex":index,"validatorPublicKey":pubkey,"executionHashMatched":True}
 
 
 def node_status(config,*,capture=real_node_capture,audit=verify_market,transport=rpc):
@@ -249,10 +278,23 @@ def status_html(payload,public_readonly=False):
         tiles=[]
         for block in explorer["blocks"]:
             block_rows="".join(field(label,block[key]) for label,key in (("Block hash","hash"),("Parent hash","parentHash"),("State root","stateRoot"),("Transactions root","transactionsRoot"),("Receipts root","receiptsRoot"),("Timestamp (Unix UTC)","timestamp"),("Gas used","gasUsed"),("Gas limit","gasLimit"),("Transaction count","transactionCount")))
+            block_rows+=field("Execution fee recipient (not proposer)",block.get("feeRecipient") or "Unavailable")
+            proposer=block.get("proposer")
+            if proposer:
+                block_rows+=field("Beacon slot",proposer["slot"])+field("Proposer index",proposer["validatorIndex"])+field("Validator public key",proposer["validatorPublicKey"])
+            else:
+                block_rows+=field("Consensus proposer","Not resolved")
             hashes="".join("<li>"+esc(tx)+"</li>" for tx in block["transactionHashes"])
-            tiles.append("<a class='blocktile' href='#block-"+esc(block["number"])+"'><small>FINALIZED BLOCK</small><strong>#"+esc(block["number"])+"</strong><small>"+esc(block["transactionCount"])+" transactions</small></a>")
+            tiles.append("<a class='blocktile' href='/blocks/"+esc(block["number"])+"'><small>FINALIZED BLOCK</small><strong>#"+esc(block["number"])+"</strong><small>"+esc(block["transactionCount"])+" transactions</small></a>")
             parts.append("<details class='blockdetail' id='block-"+esc(block["number"])+"'><summary>Block "+esc(block["number"])+" / "+esc(block["transactionCount"])+" transactions</summary><table>"+block_rows+"</table><ul>"+hashes+"</ul>"+("<p>Transaction list truncated.</p>" if block["transactionHashesTruncated"] else "")+"</details>")
-        block_panel="<section class='panel' id='blocks'><div class='eyebrow'>Network / Explorer</div><h2>Finalized block explorer</h2><p class='muted'>Eight most recent finalized execution blocks from configured RPC. Local disk storage is not verified.</p><div class='blockstrip'>"+"".join(tiles)+"</div>"+"".join(parts)+"</section>"
+        first=explorer["blocks"][0]["number"]
+        nav_history="<p><a href='/blocks/"+str(explorer["finalizedHeight"])+"'>Latest</a>"
+        if first>=8:
+            nav_history+=" · <a href='/blocks/"+str(first-8)+"'>Older blocks</a>"
+        if first<explorer["finalizedHeight"]:
+            nav_history+=" · <a href='/blocks/"+str(min(first+8,explorer["finalizedHeight"]))+"'>Newer blocks</a>"
+        nav_history+=" · <a href='/blocks/0'>Genesis</a> · <a href='/v2/blocks/"+str(first)+"'>Page JSON</a></p>"
+        block_panel="<section class='panel' id='blocks'><div class='eyebrow'>Network / Explorer</div><h2>Finalized block explorer</h2><p class='muted'>Finalized execution history from configured RPC. Local disk storage is not verified.</p>"+nav_history+"<div class='blockstrip'>"+"".join(tiles)+"</div>"+"".join(parts)+"</section>"
     cards="".join(metric(label,value) for label,value in metrics)
     lease_note=("Lease lookups disabled on this public listener." if public_readonly else
                 "Finalized lease lookup: /v2/lease/{id} requires a verified deployment manifest.")
@@ -345,6 +387,28 @@ def make_server(config,port=8766,*,capture=real_node_capture,inspect=finalized_m
     if config.get("marketOverview") and config["bn"] is not None:
         raise Refused("market overview currently requires application RPC mode")
     cache=StatusCache()
+    history_lock=threading.Lock()
+    history_cache={}
+    last_history_read=[-100.0]
+    def historical(start):
+        with history_lock:
+            now=time.monotonic()
+            if start in history_cache and now-history_cache[start][0]<60:
+                return history_cache[start][1]
+            if now-last_history_read[0]<3:
+                return None
+            last_history_read[0]=now
+            cache.read(load_status)
+            result=recent_blocks(config,start=start)
+            if config["bn"] is not None:
+                try:
+                    result["blocks"][0]["proposer"]=proposer_identity(config,result["blocks"][0])
+                except (NodeRefused,Refused,KeyError,ValueError,TypeError,OSError):
+                    result["blocks"][0]["proposer"]=None
+            if len(history_cache)>=32:
+                history_cache.pop(next(iter(history_cache)))
+            history_cache[start]=(now,result)
+            return result
     def load_status():
         status=node_status(config,capture=capture)
         if config.get("blockExplorer"):
@@ -386,6 +450,17 @@ def make_server(config,port=8766,*,capture=real_node_capture,inspect=finalized_m
                         return self.reply(200,status_html(status,public_readonly=public_readonly),
                                           "text/html; charset=utf-8")
                     return self.json_reply(200,status)
+                history=re.fullmatch(r"/(?:v2/)?blocks/([0-9]{1,12})",path)
+                if history and config.get("blockExplorer"):
+                    start=int(history.group(1))
+                    result=historical(start)
+                    if result is None:
+                        return self.json_reply(429,{"error":"historical reader busy; retry shortly"})
+                    if path.startswith("/v2/"):
+                        return self.json_reply(200,result)
+                    status=dict(cache.read(load_status))
+                    status["blockExplorer"]=result
+                    return self.reply(200,status_html(status,public_readonly=public_readonly),"text/html; charset=utf-8")
                 match=LEASE_PATH.fullmatch(path)
                 if match and not public_readonly:
                     return self.json_reply(200,lease_status(
