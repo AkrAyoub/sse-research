@@ -152,7 +152,7 @@ def verify_public_role_state(intent,snapshot):
 
 
 def sign_authorized(intent,keystore,manifest,rpc_url,*,confirm,get_password,
-                    expected_tty=True,transport=None):
+                    expected_tty=True,transport=None,canonical_confirmations=None):
     if expected_tty and (not sys.stdin.isatty() or not sys.stderr.isatty()):
         raise Refused("interactive controlling terminal required for encrypted app signer")
     if checked_addr(manifest["market"]["address"])!=intent["typedData"]["domain"]["verifyingContract"].lower() and intent["kind"]!="monitor-vote":
@@ -174,6 +174,14 @@ def sign_authorized(intent,keystore,manifest,rpc_url,*,confirm,get_password,
             manifest,rpc_url,intent["typedData"]["message"]["leaseId"],
             intent["typedData"]["message"]["epochId"],
             transport=transport,attestation=verified)
+    if canonical_confirmations is not None:
+        if intent['kind'] != 'residual-allocation':
+            raise Refused('canonical signing presently limited to bilateral residual allocation')
+        from sse_pos_r350_v2_canonical_lease_snapshot import inspect_canonical
+        from sse_pos_r206_adaptive_v2_deployment_audit import rpc
+        ask=transport or rpc
+        message=intent['typedData']['message']
+        snapshot=inspect_canonical(manifest,rpc_url,message['leaseId'],message['epochId'],confirmations=canonical_confirmations,transport=ask)
     verify_public_role_state(intent,snapshot)
     document=safe_keystore(keystore)
     print("R237_PUBLIC_TYPED_INTENT="+json.dumps({
@@ -184,6 +192,8 @@ def sign_authorized(intent,keystore,manifest,rpc_url,*,confirm,get_password,
         "ledger":manifest["ledger"]["address"],
         "deploymentTxHash":manifest["deploymentTxHash"],
         "transactionSignedOrSubmitted":False,
+        "message":intent["typedData"]["message"],
+        "leaseStateAssurance":"FINALIZED" if canonical_confirmations is None else "PROVISIONAL_CANONICAL",
     },sort_keys=True),flush=True)
     response=confirm("Type "+CONFIRM+" to sign ONLY this public typed data: ")
     if response!=CONFIRM:
@@ -196,6 +206,14 @@ def sign_authorized(intent,keystore,manifest,rpc_url,*,confirm,get_password,
         from eth_account.messages import encode_typed_data
     except ImportError as exc:
         raise Refused("missing pinned eth-account offline signer dependency") from exc
+    if canonical_confirmations is not None:
+        fresh=inspect_canonical(manifest,rpc_url,message["leaseId"],message["epochId"],transport=ask)
+        verify_public_role_state(intent,fresh)
+        if ask(rpc_url,"eth_getBlockByNumber",[hex(snapshot["observedExecutionHeight"]),False])["hash"].lower()!=snapshot["observedExecutionHash"]:
+            raise Refused("approved canonical anchor reorganized")
+        head=ask(rpc_url,"eth_getBlockByNumber",["latest",False])
+        if int(head["timestamp"],16)>=message["expiry"]:
+            raise Refused("residual signature expiry reached")
     try:
         raw_key=Account.decrypt(document,secret)
     except (ValueError,TypeError,KeyError) as exc:
@@ -216,6 +234,7 @@ def sign_authorized(intent,keystore,manifest,rpc_url,*,confirm,get_password,
             "chainId":31340,
             "signingDomain":typed["domain"],
             "finalizedRuntimeVerified":True,
+            "leaseStateFinalized":canonical_confirmations is None,
             "passwordPrinted":False,"privateKeyPrinted":False,
             "blockchainTransactionSignedOrSubmitted":False,
             "physicalSlaProven":False,
@@ -239,12 +258,13 @@ def main(argv=None):
                    help="owner-only separate encrypted application EOA; no validator wallet")
     p.add_argument("--manifest",type=Path)
     p.add_argument("--rpc",choices=("http://127.0.0.1:18545","http://127.0.0.1:28545"))
+    p.add_argument("--canonical-confirmations",type=int,help="explicit provisional residual signing; reorg risk remains")
     a=p.parse_args(argv)
     try:
         message=json.loads(a.message_json)
         intent=public_intent(a.kind,message,a.market,a.ledger,a.expected_signer,a.role)
         if not a.sign:
-            if a.keystore is not None or a.rpc or a.manifest:
+            if a.keystore is not None or a.rpc or a.manifest or a.canonical_confirmations is not None:
                 raise Refused("dry-run must not accept keystore or RPC inputs")
             print(json.dumps(intent,sort_keys=True,indent=2))
             return 0
@@ -252,7 +272,7 @@ def main(argv=None):
             raise Refused("explicit signed mode requires private app keystore and R206 manifest/RPC")
         manifest=load_manifest(a.manifest)
         result=sign_authorized(intent,a.keystore,manifest,a.rpc,
-                               confirm=input,get_password=getpass)
+                               confirm=input,get_password=getpass,canonical_confirmations=a.canonical_confirmations)
         print(json.dumps(result,sort_keys=True,indent=2))
         return 0
     except (Refused,TypedRefused,AuditRefused,LeaseRefused,OSError,
