@@ -101,7 +101,11 @@ def verify_config(profile,policy,signed_payload,snapshot):
     }
 
 
-def make_docker_executor(profile,endpoint,container_name,*,rootless_docker=False):
+def make_docker_executor(profile,endpoint,container_name,*,rootless_docker=False,dedicated_vm4714_sudo_docker=False):
+    if rootless_docker and dedicated_vm4714_sudo_docker:
+        raise Refused("Docker inspection modes are mutually exclusive")
+    if dedicated_vm4714_sudo_docker and (os.geteuid()==0 or container_name!="sse-compute-vm4714" or endpoint!="http://127.0.0.1:8877"):
+        raise Refused("dedicated inspection requires exact nonroot local worker")
     validate_profile(profile)
     local_endpoint(endpoint)
     if type(container_name) is not str or not NAME.fullmatch(container_name):
@@ -116,6 +120,8 @@ def make_docker_executor(profile,endpoint,container_name,*,rootless_docker=False
             if os.geteuid()==0:
                 raise Refused("rootless worker inspection forbids root process")
             inspection_options["docker_socket"]=f"/run/user/{os.geteuid()}/docker.sock"
+        if dedicated_vm4714_sudo_docker:
+            inspection_options["dedicated_vm4714_sudo_docker"]=True
         verified=inspect_container(local_profile,endpoint,container_name,
                                    **inspection_options)
         if verified["runtimeReportedRunning"] is not True:
@@ -221,8 +227,11 @@ def main(argv=None):
     p.add_argument("--port",type=int,default=8879)
     p.add_argument("--serve",action="store_true",
                    help="explicitly serve local HTTP after real Docker policy check")
-    p.add_argument("--rootless-docker",action="store_true",
+    modes=p.add_mutually_exclusive_group()
+    modes.add_argument("--rootless-docker",action="store_true",
                    help="use ONLY private /run/user/<uid>/docker.sock for per-request Docker inspect; no privileged daemon fallback")
+    modes.add_argument("--dedicated-vm4714-sudo-docker",action="store_true",
+                       help="explicit existing nonroot VM4714 local strict inspect only; no socket permission changes")
     a=p.parse_args(argv)
     try:
         profile=load_public_json(a.profile)
@@ -237,7 +246,8 @@ def main(argv=None):
         if not a.container or not 1024<=a.port<=65535:
             raise Refused("--serve requires actual Docker worker and explicit unprivileged port")
         executor=make_docker_executor(profile,a.worker_endpoint,a.container,
-                                      rootless_docker=a.rootless_docker)
+                                      rootless_docker=a.rootless_docker,
+                                      dedicated_vm4714_sudo_docker=a.dedicated_vm4714_sudo_docker)
         context={
             **report,"profileHash":snapshot["lease"]["profileHash"],
             "policyHash":snapshot["lease"]["policyHash"],
