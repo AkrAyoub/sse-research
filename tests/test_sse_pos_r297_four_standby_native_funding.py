@@ -53,5 +53,32 @@ class TestR297(unittest.TestCase):
             with self.assertRaises(m.Refused):
                 m.require_new_role(m.NEW_ROLES[0])
 
+    def test_finalized_grant_remains_valid_after_recipient_spends(self):
+        role=m.NEW_ROLES[0]
+        _,recipient,value=m.RECIPIENTS[m.role_index(role)]
+        h="0x"+"ab"*32
+        block="0x"+"cd"*32
+        doc={"txHash":h,"recipient":recipient,"valueWei":str(value),"nonce":4}
+        tx={"hash":h,"from":m.APP,"to":recipient,"value":hex(value),
+            "nonce":"0x4","gas":hex(m.GAS_LIMIT),"gasPrice":hex(m.GAS_PRICE),
+            "input":"0x","chainId":hex(m.CHAIN)}
+        receipt={"transactionHash":h,"status":"0x1","from":m.APP,
+                 "to":recipient,"contractAddress":None,"gasUsed":hex(m.GAS_LIMIT),
+                 "blockNumber":hex(30304),"blockHash":block}
+        def transport(url,method,params):
+            if method=="eth_getTransactionByHash": return tx
+            if method=="eth_getTransactionReceipt": return receipt
+            if method=="eth_getBlockByNumber": return {"hash":block}
+            self.fail("historical grant must not depend on current recipient balance: "+method)
+        self.assertEqual(m.check_previous_role_finalized(m.RPC,role,30354,
+            transport=transport,read_marker_fn=lambda _:doc),doc)
+        with self.assertRaises(m.Pending):
+            m.check_previous_role_finalized(m.RPC,role,30303,
+                transport=transport,read_marker_fn=lambda _:doc)
+        receipt["status"]="0x0"
+        with self.assertRaises(m.Refused):
+            m.check_previous_role_finalized(m.RPC,role,30354,
+                transport=transport,read_marker_fn=lambda _:doc)
+
 if __name__=="__main__":
     unittest.main()
