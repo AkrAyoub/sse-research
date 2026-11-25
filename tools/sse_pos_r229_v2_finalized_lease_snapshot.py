@@ -134,6 +134,11 @@ def inspect(manifest,rpc_url,lease_id,epoch_id=None,*,transport=rpc,attestation=
         raise Refused("invalid epoch ID")
     proof=attestation if attestation is not None else verify(manifest,rpc_url,transport=transport)
     height=proof["finalizedExecutionHeight"]
+    return _inspect_at_height(manifest,rpc_url,lease_id,epoch_id,height,transport=transport)
+
+
+def _inspect_at_height(manifest,rpc_url,lease_id,epoch_id,height,*,transport=rpc):
+    """Internal shared ABI checks; caller must establish block provenance."""
     market=manifest["market"]["address"]
     ledger=manifest["ledger"]["address"]
     m=lambda sig,*args: query(transport,rpc_url,market,sig,args,height)
