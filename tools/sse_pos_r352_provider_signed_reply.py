@@ -25,7 +25,7 @@ def read_public(path):
         raise ValueError("bounded regular public JSON required")
     return json.loads(path.read_text("utf-8"))
 
-def prepare(manifest,url,root,keystore,*,sign=False):
+def prepare(manifest,url,root,keystore,*,sign=False,canonical_confirmations=None):
     if not root.is_absolute() or root.is_symlink() or not root.is_dir() or root.stat().st_uid!=os.geteuid() or root.stat().st_mode & 0o077:
         raise ValueError("owner-private response directory required")
     payload=read_public(root/"provider-payload.json")
@@ -57,7 +57,8 @@ def prepare(manifest,url,root,keystore,*,sign=False):
             "signedReplyAvailable":False,"transactionSubmitted":False}
     if not sign:
         return result
-    final=inspect(manifest,url,lease_id,epoch_id)
+    provisional=canonical_confirmations is not None
+    final=inspect_canonical(manifest,url,lease_id,epoch_id,confirmations=canonical_confirmations) if provisional else inspect(manifest,url,lease_id,epoch_id)
     if path.exists():
         reply=read_public(path)
     else:
@@ -66,19 +67,31 @@ def prepare(manifest,url,root,keystore,*,sign=False):
         if int(rpc(url,"eth_getBlockByNumber",["latest",False])["timestamp"],16)>=ep["responseDeadline"]:
             raise ValueError("response deadline reached")
         intent=public_intent("provider-response",message,current["market"],current["ledger"],lease["provider"],"provider")
-        signed=sign_authorized(intent,keystore,manifest,url,confirm=input,get_password=getpass)
+        signed=sign_authorized(intent,keystore,manifest,url,confirm=input,get_password=getpass,canonical_confirmations=canonical_confirmations)
         reply=signed_reply(payload,signed["signature"],lease["provider"],current["market"],current["ledger"])
-        validate_signed_reply(reply,final)
+        validate_signed_reply(reply,final,allow_canonical=provisional)
+        fresh=inspect_canonical(manifest,url,lease_id,epoch_id)
+        validate_signed_reply(reply,fresh,allow_canonical=True)
+        latest=fresh["epoch"]["ledger"]
+        from sse_pos_r350_v2_canonical_lease_snapshot import block_identity
+        height=current["observedExecutionHeight"]
+        if block_identity(rpc(url,"eth_getBlockByNumber",[hex(height),False]))!=(height,current["observedExecutionHash"]):
+            raise ValueError("provider preparation anchor reorganized")
+        import time
+        if (fresh["lease"]["phase"]!=4 or not fresh["lease"]["providerAccepted"] or
+            not fresh["committee"]["ready"] or latest["monitoringSealed"] or
+            latest["responseAuthenticated"] or max(time.time(),int(rpc(url,"eth_getBlockByNumber",["latest",False])["timestamp"],16))>=latest["responseDeadline"]):
+            raise ValueError("provider response authorization expired or changed")
         write_create_only(path,reply)
         fd=os.open(root,os.O_RDONLY|os.O_DIRECTORY)
         try:
             os.fsync(fd)
         finally:
             os.close(fd)
-    check=validate_signed_reply(reply,final)
+    check=validate_signed_reply(reply,final,allow_canonical=provisional)
     if check["responseHash"]!=message["responseHash"]:
         raise ValueError("stored reply differs from intended response")
-    return {**result,"signedReplyAvailable":True,"signedReplyPath":str(path),
+    return {**result,"leaseStateFinalized":not provisional,"signedReplyAvailable":True,"signedReplyPath":str(path),
             "authenticateParams":{"leaseId":lease_id,"epochId":epoch_id,
                                   "responseHash":reply["responseHash"],"signature":reply["providerSignature"]}}
 
@@ -89,11 +102,12 @@ def main():
     p.add_argument("--directory",type=Path,required=True)
     p.add_argument("--keystore",type=Path)
     p.add_argument("--sign",action="store_true")
+    p.add_argument("--canonical-confirmations",type=int,help="explicit provisional signing; reorg risk remains")
     a=p.parse_args()
     try:
         if a.sign!=bool(a.keystore):
             raise ValueError("sign mode requires local encrypted keystore")
-        print(json.dumps(prepare(load(a.manifest),a.rpc,a.directory,a.keystore,sign=a.sign),indent=2,sort_keys=True))
+        print(json.dumps(prepare(load(a.manifest),a.rpc,a.directory,a.keystore,sign=a.sign,canonical_confirmations=a.canonical_confirmations),indent=2,sort_keys=True))
     except (ValueError,TypeError,KeyError,OSError) as exc:
         p.exit(2,"R352_REFUSED: "+str(exc)+"\n")
 
