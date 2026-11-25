@@ -1,3 +1,11 @@
+# R297 — owner authorized exact four additional TEST ETH grants; one-by-one sender and tests committed, NOT executed (2026-11-25)
+
+Owner explicitly approved four 0.005 native TEST ETH transfers on original chain31340 with maximum combined debit 0.020000000084 TEST ETH (20000000084000000 wei). Scope is only VM4711 monitor, VM4712 monitor, VM4713 monitor and VM4714 provider, exact R282 addresses, existing VM4707 app-only deployer, nonces 4–7, legacy gas 21000 at 1000 wei/gas. No extra transaction, bond, lease or other funds authorized by this approval.
+
+New source: tools/sse_pos_r297_four_standby_native_funding.py; regression tests: tests/test_sse_pos_r297_four_standby_native_funding.py. Source derived from actual tested R267 one-shot logic, preserves original three R267 markers, requires all earlier grants to be canonical and finalized, uses separate R297 create-exclusive private markers before one RPC send, local interactive exact consent and encrypted app-only signer. No automatic retry or nonce replacement. Default read-only preview; --status checks actual matching finalized transaction after --send; pending exit code 3 means inspect later, NEVER resend. Fresh exact-source tests and live preview required before first send. Seven new test functions authored, not run on VM or CI yet. No funding transactions signed or sent by GitHub operations. Do not touch original genesis, native clients, validators or raw worker. Application endpoints/role registration/paid lease remain separate gates.
+
+---
+
 # R296 — ALL THREE real monitor-to-provider overlay TCP/UDP pairs verified (2026-11-25)
 
 Owner supplied both VM4713 client and VM4714 server terminal results. VM4713 local IPv6 fca0:2328:7768:1f76:8561::1 to VM4714 fca0:2328:77f8:9326:689f::1: real TCP and UDP payload round trips both true; TCP RTT 3.16 ms, UDP RTT 0.27 ms. VM4714 independently reported bothTransportRequestsReceived=true, realRemoteTcpRequestReceived=true, realRemoteUdpRequestReceived=true on public controllerless network ff2328775f000000. Together with R294/R295, all three monitor-to-provider transport pairs passed. The earlier VM4707↔VM4711 cross-generation test remains valid. These are observed overlay packets, not evidence of independent ISP underlay, native EL/CL peer admission, signed service delivery or a paid SLA.
