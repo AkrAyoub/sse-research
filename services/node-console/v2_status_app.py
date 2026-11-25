@@ -123,6 +123,28 @@ def market_overview(config,proof,transport):
             "recentRequests":recent,"recentRequestLimit":3}
 
 
+def recent_blocks(config,transport=rpc):
+    """Bounded real canonical execution headers, with transaction hashes."""
+    final=transport(config["el"],"eth_getBlockByNumber",["finalized",False])
+    height=int(final["number"],16)
+    blocks=[]
+    expected_hash=final["hash"]
+    for number in range(height,max(-1,height-8),-1):
+        block=transport(config["el"],"eth_getBlockByNumber",[hex(number),False])
+        if int(block["number"],16)!=number or block["hash"]!=expected_hash:
+            raise Refused("inconsistent canonical block sequence")
+        txs=block["transactions"]
+        if not isinstance(txs,list) or any(not isinstance(t,str) or not re.fullmatch(r"0x[0-9a-fA-F]{64}",t) for t in txs[:16]):
+            raise Refused("malformed block transactions")
+        record={key:block[key] for key in ("hash","parentHash","stateRoot","transactionsRoot","receiptsRoot")}
+        if any(not isinstance(v,str) or not re.fullmatch(r"0x[0-9a-fA-F]{64}",v) for v in record.values()):
+            raise Refused("malformed block header roots")
+        record.update(number=number,timestamp=int(block["timestamp"],16),gasUsed=str(int(block["gasUsed"],16)),gasLimit=str(int(block["gasLimit"],16)),transactionCount=len(txs),transactionHashes=txs[:16],transactionHashesTruncated=len(txs)>16)
+        blocks.append(record)
+        expected_hash=record["parentHash"]
+    return {"finalizedHeight":height,"blocks":blocks,"source":"configured execution RPC","localDiskStorageVerified":False,"transactionHashLimitPerBlock":16}
+
+
 def node_status(config,*,capture=real_node_capture,audit=verify_market,transport=rpc):
     if config["bn"] is None:
         manifest=load_manifest(config["manifest"])
@@ -214,6 +236,15 @@ def status_html(payload,public_readonly=False):
         for request in reversed(overview["recentRequests"]):
             market_rows+=field("Request #"+request["requestId"],"Bids: "+request["bidCount"]+" | Selected: "+str(request["selected"])+" | Max fee (wei): "+request["maxEpochFeeWei"]+" | Bidding close (Unix UTC): "+str(request["biddingClose"]))
         market_panel="<section class='panel'><h2>Finalized marketplace</h2><table>"+market_rows+"</table><p class='muted'>Latest three requests at most. Counts do not establish independent hosts or active service delivery.</p></section>"
+    explorer=payload.get("blockExplorer")
+    block_panel=""
+    if explorer is not None:
+        parts=[]
+        for block in explorer["blocks"]:
+            block_rows="".join(field(label,block[key]) for label,key in (("Block hash","hash"),("Parent hash","parentHash"),("State root","stateRoot"),("Transactions root","transactionsRoot"),("Receipts root","receiptsRoot"),("Timestamp (Unix UTC)","timestamp"),("Gas used","gasUsed"),("Gas limit","gasLimit"),("Transaction count","transactionCount")))
+            hashes="".join("<li>"+esc(tx)+"</li>" for tx in block["transactionHashes"])
+            parts.append("<details><summary>Block "+esc(block["number"])+" / "+esc(block["transactionCount"])+" transactions</summary><table>"+block_rows+"</table><ul>"+hashes+"</ul>"+("<p>Transaction list truncated.</p>" if block["transactionHashesTruncated"] else "")+"</details>")
+        block_panel="<section class='panel'><h2>Finalized block explorer</h2><p class='muted'>Eight most recent finalized execution blocks from configured RPC. Local disk storage is not verified.</p>"+"".join(parts)+"</section>"
     cards="".join(metric(label,value) for label,value in metrics)
     lease_note=("Lease lookups disabled on this public listener." if public_readonly else
                 "Finalized lease lookup: /v2/lease/{id} requires a verified deployment manifest.")
@@ -224,7 +255,7 @@ def status_html(payload,public_readonly=False):
             "<p class='muted'>"+esc(detail)+"</p></section><div class='grid'>"+cards+"</div>"
             "<section class='panel'><h2>Selected roles</h2><p>"+esc(roles)+"</p><table>"+checks+"</table>"
             "<p class='notice'>Declared roles do not establish authorization, eligibility or completed work.</p></section>"
-            +account_panel+market_panel+"<section class='panel'><h2>Blockchain evidence</h2><table>"+rows+"</table></section>"
+             +account_panel+market_panel+block_panel+"<section class='panel'><h2>Blockchain evidence</h2><table>"+rows+"</table></section>"
             "<section class='panel'><h2>Public data</h2><p><a href='/'>Refresh observation</a> &middot; <a href='/v2/status'>Live JSON</a></p>"
             "<p class='muted'>"+esc(lease_note)+" Successful observations may be cached for 15 seconds.</p></section>"
             "<footer>No wallet keys, transaction signing or privileged host controls exposed by this console.</footer></main></body></html>").encode("utf-8")
@@ -288,7 +319,7 @@ class StatusCache:
 def make_server(config,port=8766,*,capture=real_node_capture,inspect=finalized_market_lease,public_readonly=False):
     if type(port) is not int or port!=0 and not 1024<=port<=65535:
         raise Refused("only local unprivileged console port (0 for tests)")
-    if type(config) is not dict or set(config)-{"monitorAddress","marketOverview"}!={"nodeId","declaredRoles","el","bn","manifest"}:
+    if type(config) is not dict or set(config)-{"monitorAddress","marketOverview","blockExplorer"}!={"nodeId","declaredRoles","el","bn","manifest"}:
         raise Refused("unexpected node role-local configuration")
 
     address=config.get("monitorAddress")
@@ -297,6 +328,11 @@ def make_server(config,port=8766,*,capture=real_node_capture,inspect=finalized_m
     if config.get("marketOverview") and config["bn"] is not None:
         raise Refused("market overview currently requires application RPC mode")
     cache=StatusCache()
+    def load_status():
+        status=node_status(config,capture=capture)
+        if config.get("blockExplorer"):
+            status["blockExplorer"]=recent_blocks(config)
+        return status
 
     class Handler(BaseHTTPRequestHandler):
         def reply(self,status,body,content_type):
@@ -328,7 +364,7 @@ def make_server(config,port=8766,*,capture=real_node_capture,inspect=finalized_m
                         "alive":True,"chainVerifiedByHealthz":False,
                         "transactionsSubmitted":False})
                 if path in ("/","/v2/status"):
-                    status=cache.read(lambda:node_status(config,capture=capture))
+                    status=cache.read(load_status)
                     if path=="/":
                         return self.reply(200,status_html(status,public_readonly=public_readonly),
                                           "text/html; charset=utf-8")
@@ -358,6 +394,7 @@ def main(argv=None):
     p.add_argument("--el",required=True)
     p.add_argument("--bn",help="local Beacon endpoint; omit for application-only RPC mode")
     p.add_argument("--v2-manifest",type=Path)
+    p.add_argument("--block-explorer",action="store_true",default=os.environ.get("SSE_BLOCK_EXPLORER")=="1",help="bounded finalized execution block inspection")
     p.add_argument("--market-overview",action="store_true",default=os.environ.get("SSE_MARKET_OVERVIEW")=="1",help="bounded finalized marketplace observation")
     p.add_argument("--monitor-address",default=os.environ.get("SSE_MONITOR_ADDRESS"),help="explicit public monitor account to display; no ownership claim")
     p.add_argument("--port",type=int,default=8766)
@@ -367,6 +404,8 @@ def main(argv=None):
     a=p.parse_args(argv)
     try:
         conf=approved_options(a.node_id,a.roles.split(","),a.el,a.bn,a.v2_manifest)
+        if a.block_explorer:
+            conf["blockExplorer"]=True
         if a.market_overview:
             conf["marketOverview"]=True
         if a.monitor_address:
