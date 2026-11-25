@@ -63,9 +63,13 @@ def load_public_json(path,maxbytes=8192):
     return json.loads(path.read_text("utf-8"),object_pairs_hook=unique_pairs)
 
 
-def verify_config(profile,policy,signed_payload,snapshot):
+def verify_config(profile,policy,signed_payload,snapshot,*,allow_canonical=False):
     validate_policy(policy,profile)
-    if (snapshot.get("schema")!="SSE_R229_FINALIZED_V2_LEASE_READONLY_V1" or
+    provisional=(snapshot.get("schema")=="SSE_R350_CANONICAL_V2_LEASE_READONLY_V1" and
+                 snapshot.get("finalizedAuthorization") is False and
+                 snapshot.get("reorganizationPossible") is True)
+    if ((snapshot.get("schema")!="SSE_R229_FINALIZED_V2_LEASE_READONLY_V1" and
+         not (allow_canonical is True and provisional)) or
         snapshot.get("deploymentRuntimeAndWiringAttested") is not True or
         snapshot.get("chainId")!=31340):
         raise Refused("R206/R229 original-chain finalized attestation absent")
@@ -74,7 +78,8 @@ def verify_config(profile,policy,signed_payload,snapshot):
     if (ep is None or ep["market"]["exists"] is not True or
         ep["ledger"]["exists"] is not True or
         lease["phase"]!=4 or lease["providerAccepted"] is not True or
-        snapshot["committee"]["ready"] is not True):
+        snapshot["committee"]["ready"] is not True or
+        ep["ledger"].get("monitoringSealed") is True or ep["market"].get("resolved") is True):
         raise Refused("not active finalized paid provider compute epoch")
     if (lease["profileHash"]!=resource_hash(profile) or
         lease["policyHash"]!=policy_hash(policy,profile) or
@@ -83,7 +88,7 @@ def verify_config(profile,policy,signed_payload,snapshot):
     from sse_challenge import keccak256
     if lease["endpointHash"]!="0x"+keccak256(profile["origin"].encode("ascii")).hex():
         raise Refused("public TLS provider endpoint origin not lease-committed")
-    check=validate_signed_reply(signed_payload,snapshot)
+    check=validate_signed_reply(signed_payload,snapshot,allow_canonical=True) if provisional else validate_signed_reply(signed_payload,snapshot)
     if check["providerPublicSignatureVerified"] is not True:
         raise Refused("provider pre-signed V2 payload cannot be authenticated")
     return {
@@ -94,6 +99,7 @@ def verify_config(profile,policy,signed_payload,snapshot):
         "publicOrigin":profile["origin"],
         "signedResponseHash":check["responseHash"],
         "sourceManifestAndActualLeaseAttested":True,
+        "leaseStateFinalized":not provisional,
         "localDockerInspectedOrStarted":False,
         "externalProviderHttpServerStarted":False,
         "transactionSignedOrSubmitted":False,
@@ -236,15 +242,17 @@ def main(argv=None):
                    help="use ONLY private /run/user/<uid>/docker.sock for per-request Docker inspect; no privileged daemon fallback")
     modes.add_argument("--dedicated-vm4714-sudo-docker",action="store_true",
                        help="explicit existing nonroot VM4714 local strict inspect only; no socket permission changes")
+    p.add_argument("--canonical-confirmations",type=int,help="explicit provisional provider startup; reorg risk remains")
     a=p.parse_args(argv)
     try:
         profile=load_public_json(a.profile)
         policy=load_public_json(a.policy)
         signed=load_public_json(a.signed_reply)
         manifest=load_manifest(a.manifest)
-        snapshot=inspect_lease(manifest,a.rpc,
-                               a.lease_id,a.epoch_id)
-        report=verify_config(profile,policy,signed,snapshot)
+        from sse_pos_r350_v2_canonical_lease_snapshot import inspect_canonical,block_identity
+        provisional=a.canonical_confirmations is not None
+        snapshot=inspect_canonical(manifest,a.rpc,a.lease_id,a.epoch_id,confirmations=a.canonical_confirmations) if provisional else inspect_lease(manifest,a.rpc,a.lease_id,a.epoch_id)
+        report=verify_config(profile,policy,signed,snapshot,allow_canonical=provisional)
         if not a.serve:
             print(json.dumps(report,sort_keys=True,indent=2))
             return 0
@@ -261,6 +269,10 @@ def main(argv=None):
         from sse_pos_r206_adaptive_v2_deployment_audit import rpc
         import time
         def authorize_request():
+            if provisional:
+                height=snapshot["observedExecutionHeight"]
+                if block_identity(rpc(a.rpc,"eth_getBlockByNumber",[hex(height),False]))!=(height,snapshot["observedExecutionHash"]):
+                    raise Refused("provider startup anchor reorganized; restart with reviewed state")
             state=inspect_canonical(manifest,a.rpc,a.lease_id,a.epoch_id)
             ep=state["epoch"]["ledger"]
             if (state["lease"]["phase"]!=4 or not state["lease"]["providerAccepted"]
