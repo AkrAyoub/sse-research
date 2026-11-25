@@ -170,12 +170,12 @@ class TestR238RealNodeConsole(unittest.TestCase):
         thread.start()
         base="http://127.0.0.1:"+str(server.server_port)
         try:
-            for path in ("/","/v2/status","/v2/status"):
+            for path in ("/","/v2/status","/v2/status?utm_source=chatgpt.com","/?utm_source=chatgpt.com"):
                 with urlopen(base+path,timeout=4) as response:
                     self.assertEqual(response.status,200)
             self.assertEqual(len(calls),1)
             with self.assertRaises(HTTPError) as error:
-                urlopen(base+"/v2/lease/1",timeout=4)
+                urlopen(base+"/v2/lease/1?utm_source=chatgpt.com",timeout=4)
             self.assertEqual(error.exception.code,404)
             self.assertEqual(server.request_queue_size,16)
         finally:
