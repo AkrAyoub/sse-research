@@ -36,4 +36,10 @@ chmod 700 "$BIN"
 echo "Installed $BIN"
 echo 'New Ubuntu login shells normally include ~/.local/bin on PATH.'
 echo 'For this shell: export PATH="$HOME/.local/bin:$PATH"'
-"$BIN" status
+if "$BIN" status; then
+  :
+else
+  rc=$?
+  [[ "$rc" == 3 ]] || exit "$rc"
+  echo "CLI installed; public HTTPS not yet verified. Use sse status later."
+fi
