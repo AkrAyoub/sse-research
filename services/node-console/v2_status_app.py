@@ -271,7 +271,7 @@ def status_html(payload,public_readonly=False):
         for request in reversed(overview["recentRequests"]):
             market_rows+=field("Request #"+request["requestId"],"Bids: "+request["bidCount"]+" | Selected: "+str(request["selected"])+" | Max fee: "+eth(request["maxEpochFeeWei"])+" | Bidding close: "+utc(request["biddingClose"]))
         market_panel="<section class='panel' id='market'><div class='eyebrow'>Network / Marketplace</div><h2>Finalized marketplace</h2><table>"+market_rows+"</table><p class='muted'>Latest three requests at most. Counts do not establish independent hosts or active service delivery.</p></section>"
-    explorer=payload.get("blockExplorer")
+    explorer=payload.get("blockExplorer") if not app and set(payload["declaredRoles"]) & {"observer","full_node","validator"} else None
     block_panel=""
     if explorer is not None:
         parts=[]
@@ -375,6 +375,11 @@ class StatusCache:
             return value
 
 
+def block_explorer_allowed(config):
+    return (config.get('blockExplorer') is True and config.get('bn') is not None
+            and bool(set(config['declaredRoles']) & {'observer','full_node','validator'}))
+
+
 def make_server(config,port=8766,*,capture=real_node_capture,inspect=finalized_market_lease,public_readonly=False):
     if type(port) is not int or port!=0 and not 1024<=port<=65535:
         raise Refused("only local unprivileged console port (0 for tests)")
@@ -411,7 +416,7 @@ def make_server(config,port=8766,*,capture=real_node_capture,inspect=finalized_m
             return result
     def load_status():
         status=node_status(config,capture=capture)
-        if config.get("blockExplorer"):
+        if block_explorer_allowed(config):
             status["blockExplorer"]=recent_blocks(config)
         return status
 
@@ -451,7 +456,7 @@ def make_server(config,port=8766,*,capture=real_node_capture,inspect=finalized_m
                                           "text/html; charset=utf-8")
                     return self.json_reply(200,status)
                 history=re.fullmatch(r"/(?:v2/)?blocks/([0-9]{1,12})",path)
-                if history and config.get("blockExplorer"):
+                if history and block_explorer_allowed(config):
                     start=int(history.group(1))
                     result=historical(start)
                     if result is None:
