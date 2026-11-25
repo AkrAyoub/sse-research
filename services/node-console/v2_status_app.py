@@ -15,6 +15,8 @@ deployment alone makes a public dashboard reachable.
 from __future__ import annotations
 
 import argparse
+import base64
+import hashlib
 import html
 from urllib.parse import urlsplit
 from http.server import BaseHTTPRequestHandler,ThreadingHTTPServer
@@ -111,52 +113,59 @@ def node_status(config,*,capture=real_node_capture,audit=verify_market,transport
     }
 
 
-def status_html(payload):
-    # All node IDs/values are escaped, not interpolated into JS or DOM
-    # attributes; CSP explicitly disables inline script and active assets.
-    if payload["schema"]=="SSE_R314_APPLICATION_RPC_STATUS_V1":
-        esc=lambda x:html.escape(str(x),quote=True)
-        fields=(("Node",payload["nodeId"]),("Selected roles",", ".join(payload["declaredRoles"])),
-                ("Chain",payload["chainId"]),("Execution head",payload["executionBlockNumber"]),
-                ("Finalized execution height",payload["finalizedExecutionHeight"]),
-                ("Head/finality timestamp gap (s)",payload["finalityLagSeconds"]))
-        rows="".join("<tr><th>"+esc(k)+"</th><td>"+esc(v)+"</td></tr>" for k,v in fields)
-        return ("<!doctype html><html lang='en'><meta charset='utf-8'><title>SSE application node</title>"
-                "<h1>SSE application node</h1><p>Verified deployment via configured RPC. "
-                "Not independent consensus verification or role activation.</p><table>"+rows+
-                "</table><p><a href='/v2/status'>Live JSON</a> | Finalized lease: /v2/lease/{id}</p></html>").encode("utf-8")
-    chain=payload["executionAndConsensusLocalObservation"]
-    name=html.escape(payload["nodeId"],quote=True)
-    roles=", ".join(html.escape(x,quote=True) for x in payload["declaredRoles"])
+DASHBOARD_CSS="""*{box-sizing:border-box}body{margin:0;background:#0c1424;color:#e7edf7;font:15px/1.6 system-ui,sans-serif}main{max-width:1120px;margin:auto;padding:32px 24px 56px}header{display:flex;justify-content:space-between;align-items:center;gap:16px;flex-wrap:wrap;border-bottom:1px solid #28364b;padding-bottom:20px}h1,h2,p{margin:0}h1{font-size:32px;letter-spacing:-1px}h2{font-size:19px;margin-bottom:12px}.brand{color:#5eead4;font-size:12px;font-weight:700;letter-spacing:2px}.muted{color:#aabbd1}.tag{background:#20374a;color:#b9e7ee;border-radius:6px;padding:6px 12px}a{color:#5eead4;text-decoration:none}a:hover{text-decoration:underline}.intro{margin:28px 0}.grid{display:grid;grid-template-columns:repeat(auto-fit,minmax(180px,1fr));gap:12px}.metric,.panel{background:#142136;border:1px solid #28364b;border-radius:12px;padding:20px}.metric span{display:block;color:#aabbd1;font-size:13px}.metric strong{font-size:28px;font-variant-numeric:tabular-nums;overflow-wrap:anywhere}.panel{margin-top:16px}table{width:100%;border-collapse:collapse}th,td{text-align:left;padding:10px 0;border-bottom:1px solid #28364b;vertical-align:top;overflow-wrap:anywhere}th{color:#aabbd1;font-weight:500;width:40%}td{font-variant-numeric:tabular-nums}.good{color:#5eead4}.caution{color:#f5cc80}.notice{border-left:3px solid #f5cc80;padding-left:14px;margin:16px 0;color:#f5cc80}footer{margin-top:24px;color:#aabbd1;font-size:13px} @media(max-width:550px){main{padding:20px 14px}.metric,.panel{padding:14px}h1{font-size:25px}th{width:36%}}"""
+DASHBOARD_STYLE_HASH=base64.b64encode(hashlib.sha256(DASHBOARD_CSS.encode("utf-8")).digest()).decode("ascii")
+
+
+def status_html(payload,public_readonly=False):
+    esc=lambda x:html.escape(str(x),quote=True)
     def field(label,value):
-        return "<tr><th>"+html.escape(label)+"</th><td>"+html.escape(str(value))+"</td></tr>"
-    rows="".join((
-        field("Chain ID",chain["chainId"]),
-        field("Execution block",chain["executionBlockNumber"]),
-        field("Beacon head slot",chain["beaconHeadSlot"]),
-        field("Finalized epoch",chain["finalizedEpoch"]),
-        field("Finalized root",chain["finalizedRoot"]),
-        field("EL native peers",chain["executionNativePeers"]),
-        field("CL native peers",chain["beaconNativePeers"]),
-        field("EL syncing",chain["executionSyncing"]),
-        field("CL syncing",chain["beaconSyncing"]),
-        field("Captured at UTC",chain["capturedAtUtc"]),
-    ))
-    return ("<!doctype html><html lang='en'><head><meta charset='utf-8'>"
-            "<meta name='viewport' content='width=device-width,initial-scale=1'>"
-            "<title>SSE node / "+name+"</title></head>"
-            "<body><main><h1>SSE / "+name+"</h1>"
-            "<p>Declared local roles: "+roles+"</p>"
-            "<p>Read-only observed original-chain node health. No operator "
-            "admission or global authority; declarations are not on-chain "
-            "registrations, physical SLA proof or active validator status.</p>"
-            "<table>"+rows+"</table>"
-            "<p>Read-only <a href='/v2/status'>raw node status JSON</a>. "
-            "Finalized market lease lookup: /v2/lease/{id}, only once a "
-            "verified V2 deployment manifest is installed by the operator.</p>"
-            "<p>HTTPS reachability, funding, independent operators, real "
-            "compute and live SSE transactions are not implied.</p>"
-            "</main></body></html>").encode("utf-8")
+        return "<tr><th>"+esc(label)+"</th><td>"+esc(value)+"</td></tr>"
+    def metric(label,value):
+        return "<div class='metric'><span>"+esc(label)+"</span><strong>"+esc(value)+"</strong></div>"
+    def check(label,value):
+        return field(label,"Verified" if value is True else "Not verified")
+    name=esc(payload["nodeId"])
+    roles=", ".join(payload["declaredRoles"])
+    app=payload["schema"]=="SSE_R314_APPLICATION_RPC_STATUS_V1"
+    if app:
+        audit=payload["deploymentAudit"]
+        metrics=(("Chain ID",payload["chainId"]),("Execution head",payload["executionBlockNumber"]),
+                 ("Finalized block",payload["finalizedExecutionHeight"]),("Finality timestamp gap (s)",payload["finalityLagSeconds"]))
+        rows="".join(check(label,audit.get(key)) for label,key in (
+            ("Original genesis","originalGenesisVerified"),("Contract runtime code","runtimeCodeSha256Verified"),
+            ("Market / ledger bindings","mutualMarketLedgerBindingsVerified"),
+            ("Deployment receipt finalized","deploymentReceiptSuccessfulAndFinalized")))
+        for key in ("market","ledger"):
+            contract=audit.get("contracts",{}).get(key,{})
+            rows+=field(key.title()+" contract",contract.get("address","Not available"))
+        detail="Verified deployment via configured RPC. Not independent consensus verification or role activation."
+        scope="Application RPC observation"
+        checks=check("Independent local consensus",payload.get("independentLocalConsensusVerified"))+check("Role activation",payload.get("roleActivationVerified"))+check("Physical SLA",audit.get("independentPhysicalSlaVerified"))
+    else:
+        chain=payload["executionAndConsensusLocalObservation"]
+        metrics=(("Chain ID",chain["chainId"]),("Execution block",chain["executionBlockNumber"]),
+                 ("Beacon head slot",chain["beaconHeadSlot"]),("Finalized epoch",chain["finalizedEpoch"]))
+        rows="".join(field(label,chain[key]) for label,key in (
+            ("Finalized root","finalizedRoot"),("EL native peers","executionNativePeers"),("CL native peers","beaconNativePeers"),
+            ("EL syncing","executionSyncing"),("CL syncing","beaconSyncing"),("Captured at UTC","capturedAtUtc")))
+        detail="Read-only observed original-chain node health. Declarations are not on-chain registrations or active validator status."
+        scope="Local execution and consensus observation"
+        checks=check("Active validator",payload.get("stakingValidatorActuallyActiveVerified"))+check("Physical resources",payload.get("providerPhysicalResourceVerified"))+check("Monitor eligibility",payload.get("monitorEligibilityActuallyFundedVerified"))+check("Consumer lease funding",payload.get("consumerLeaseActuallyFundedVerified"))
+    cards="".join(metric(label,value) for label,value in metrics)
+    lease_note=("Lease lookups disabled on this public listener." if public_readonly else
+                "Finalized lease lookup: /v2/lease/{id} requires a verified deployment manifest.")
+    return ("<!doctype html><html lang='en'><head><meta charset='utf-8'><meta name='viewport' content='width=device-width,initial-scale=1'>"
+            "<title>SSE Intercloud / "+name+"</title><style>"+DASHBOARD_CSS+"</style></head><body><main>"
+            "<header><div><div class='brand'>SSE INTERCLOUD</div><h1>"+name+"</h1><p class='muted'>"+esc(scope)+"</p></div>"
+            "<span class='tag'>Read-only / TEST ETH</span></header><section class='intro'><h2>Network overview</h2>"
+            "<p class='muted'>"+esc(detail)+"</p></section><div class='grid'>"+cards+"</div>"
+            "<section class='panel'><h2>Selected roles</h2><p>"+esc(roles)+"</p><table>"+checks+"</table>"
+            "<p class='notice'>Declared roles do not establish authorization, eligibility or completed work.</p></section>"
+            "<section class='panel'><h2>Blockchain evidence</h2><table>"+rows+"</table></section>"
+            "<section class='panel'><h2>Public data</h2><p><a href='/'>Refresh observation</a> &middot; <a href='/v2/status'>Live JSON</a></p>"
+            "<p class='muted'>"+esc(lease_note)+" Successful observations may be cached for 15 seconds.</p></section>"
+            "<footer>No wallet keys, transaction signing or privileged host controls exposed by this console.</footer></main></body></html>").encode("utf-8")
 
 
 def lease_status(config,lease_id,*,inspect=finalized_market_lease):
@@ -232,7 +241,7 @@ def make_server(config,port=8766,*,capture=real_node_capture,inspect=finalized_m
             self.send_header("Cache-Control","no-store")
             self.send_header("X-Content-Type-Options","nosniff")
             self.send_header("Content-Security-Policy",
-                             "default-src 'none'; base-uri 'none'; frame-ancestors 'none'")
+                             "default-src 'none'; base-uri 'none'; frame-ancestors 'none'; style-src 'sha256-"+DASHBOARD_STYLE_HASH+"'")
             self.send_header("Referrer-Policy","no-referrer")
             self.end_headers()
             self.wfile.write(body)
@@ -254,7 +263,7 @@ def make_server(config,port=8766,*,capture=real_node_capture,inspect=finalized_m
                 if path in ("/","/v2/status"):
                     status=cache.read(lambda:node_status(config,capture=capture))
                     if path=="/":
-                        return self.reply(200,status_html(status),
+                        return self.reply(200,status_html(status,public_readonly=public_readonly),
                                           "text/html; charset=utf-8")
                     return self.json_reply(200,status)
                 match=LEASE_PATH.fullmatch(path)
