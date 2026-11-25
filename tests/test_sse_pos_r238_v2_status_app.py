@@ -215,5 +215,50 @@ class TestR238RealNodeConsole(unittest.TestCase):
             with self.assertRaises(mod.Refused):
                 mod.make_server({**CONFIG,"monitorAddress":address},0)
 
+    def test_recent_blocks_checks_parent_continuity_and_bounds(self):
+        def h(n):
+            return "0x"+format(n,"064x")
+        calls=[]
+        def transport(url,method,params):
+            self.assertEqual(method,"eth_getBlockByNumber")
+            self.assertFalse(params[1])
+            n=20 if params[0]=="finalized" else int(params[0],16)
+            calls.append(n)
+            return {"number":hex(n),"hash":h(n+1),"parentHash":h(n),
+                    "stateRoot":h(100),"transactionsRoot":h(101),"receiptsRoot":h(102),
+                    "timestamp":hex(n*12),"gasUsed":"0x5208","gasLimit":"0x100000",
+                    "transactions":[h(i+200) for i in range(18)]}
+        result=mod.recent_blocks(CONFIG,transport)
+        self.assertEqual(calls,[20,20,19,18,17,16,15,14,13])
+        self.assertEqual(len(result["blocks"]),8)
+        self.assertEqual(result["blocks"][0]["transactionCount"],18)
+        self.assertEqual(len(result["blocks"][0]["transactionHashes"]),16)
+        self.assertTrue(result["blocks"][0]["transactionHashesTruncated"])
+        self.assertFalse(result["localDiskStorageVerified"])
+        def broken(url,method,params):
+            record=transport(url,method,params)
+            if params[0]=="0x13":
+                record["hash"]=h(999)
+            return record
+        with self.assertRaises(mod.Refused):
+            mod.recent_blocks(CONFIG,broken)
+
+    def test_market_overview_bounds_finalized_request_reads(self):
+        proof={"finalizedExecutionHeight":42,"contracts":{"market":{"address":"0x"+"12"*20}}}
+        calls=[]
+        def query(transport,url,contract,signature,args,height):
+            self.assertEqual(height,42)
+            calls.append((signature,args))
+            values={"nextRequestId()":[8],"nextLeaseId()":[2],
+                    "activeMonitorCount()":[4],"requests(uint256)":[1,2,3,1000,1795620522,0],
+                    "bidCount(uint256)":[2]}[signature]
+            return "0x"+"".join(format(v,"064x") for v in values)
+        with patch.object(mod,"query",side_effect=query):
+            result=mod.market_overview(CONFIG,proof,None)
+        self.assertEqual(result["requestsCreated"],"7")
+        self.assertEqual(result["leasesCreated"],"1")
+        self.assertEqual([r["requestId"] for r in result["recentRequests"]],["5","6","7"])
+        self.assertEqual(len(calls),9)
+
 if __name__=="__main__":
     unittest.main()
