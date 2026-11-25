@@ -14,6 +14,10 @@ never private key, password, keystore JSON or raw signed tx bytes.
 from __future__ import annotations
 
 import argparse
+import fcntl
+import os
+import stat
+from contextlib import contextmanager
 from getpass import getpass
 import json
 from pathlib import Path
@@ -34,6 +38,8 @@ from sse_pos_r206_adaptive_v2_deployment_audit import (
     Refused as AuditRefused,load as load_manifest,
     rpc as rpc_transport,verify as verify_deployment,
 )
+
+from sse_pos_r351_transaction_journal import record_intent, reconcile
 
 AUTHORIZE="AUTHORIZE-ONE-V2-CHAIN31340-TRANSACTION"
 MAX_RECEIPT_POLLS=24
@@ -57,8 +63,55 @@ def readonly_quote(manifest,rpc_url,action,role,params,from_address,max_wei,
     return plan,offer
 
 
+@contextmanager
+def journal_lock(root,sender):
+    root=Path(root)
+    if not root.is_absolute():
+        raise Refused("absolute journal path required")
+    root.mkdir(mode=0o700,parents=True,exist_ok=True)
+    if root.is_symlink() or not root.is_dir() or root.stat().st_uid!=os.geteuid() or root.stat().st_mode & 0o077:
+        raise Refused("owner-private journal directory required")
+    if len(sender)!=42 or not sender.startswith("0x") or any(c not in "0123456789abcdef" for c in sender[2:]):
+        raise Refused("invalid journal sender")
+    fd=os.open(root/(sender+".lock"),os.O_CREAT|os.O_RDWR|os.O_NOFOLLOW|os.O_NONBLOCK,0o600)
+    try:
+        info=os.fstat(fd)
+        if not stat.S_ISREG(info.st_mode) or info.st_uid!=os.geteuid() or info.st_mode & 0o077:
+            raise Refused("unsafe wallet lock")
+        try:
+            fcntl.flock(fd,fcntl.LOCK_EX|fcntl.LOCK_NB)
+        except BlockingIOError as exc:
+            raise Refused("another local journaled wallet operation is active") from exc
+        yield root
+    finally:
+        os.close(fd)
+
+
 def submit_once(plan,offer,manifest,rpc_url,app_keystore,*,confirm,get_password,
-                transport=rpc_transport,tty=True,sleep=time.sleep):
+                transport=rpc_transport,tty=True,sleep=time.sleep,journal_dir=None):
+    if journal_dir is None:
+        return _submit_once(plan,offer,manifest,rpc_url,app_keystore,confirm=confirm,
+                            get_password=get_password,transport=transport,tty=tty,sleep=sleep)
+    sender=offer["applicationSignerPublic"].lower()
+    with journal_lock(journal_dir,sender) as root:
+        for path in sorted(root.glob(sender+"-*.json")):
+            if path.is_symlink() or not path.is_file() or path.stat().st_size>65536:
+                raise Refused("unsafe prior journal entry")
+            entry=json.loads(path.read_text())
+            if entry.get("sender")!=sender or path.name!=sender+"-"+str(entry.get("nonce"))+".json":
+                raise Refused("prior journal identity mismatch")
+            result=reconcile(entry,manifest,rpc_url,transport=transport)
+            if result["status"] not in ("CANONICAL_SUCCESS","CANONICAL_REVERTED","FINALIZED_SUCCESS","FINALIZED_REVERTED"):
+                raise Refused("unresolved prior transaction: "+entry["transactionHash"])
+            if (entry["target"].lower()==plan.target.lower() and entry["calldata"].lower()==plan.calldata.lower()
+                    and entry["valueWei"]==plan.value_wei and not result["terminal"]):
+                raise Refused("identical provisional action already recorded")
+        return _submit_once(plan,offer,manifest,rpc_url,app_keystore,confirm=confirm,
+                            get_password=get_password,transport=transport,tty=tty,sleep=sleep,journal_dir=root)
+
+
+def _submit_once(plan,offer,manifest,rpc_url,app_keystore,*,confirm,get_password,
+                transport=rpc_transport,tty=True,sleep=time.sleep,journal_dir=None):
     if tty and (not sys.stdin.isatty() or not sys.stderr.isatty()):
         raise Refused("owner-interactive terminal required for any signed transaction")
     if (offer.get("transactionSignedOrSubmitted") is not False or
@@ -127,6 +180,9 @@ def submit_once(plan,offer,manifest,rpc_url,app_keystore,*,confirm,get_password,
         }
         signed=account.sign_transaction(tx)
         txhash="0x"+bytes(signed.hash).hex()
+        if journal_dir is not None:
+            intent=record_intent(journal_dir,manifest,sender,nonce,txhash,plan.action,plan.target,plan.calldata,plan.value_wei)
+            print("R351_DURABLE_INTENT="+str(intent),flush=True)
         # Single explicit send; no automatic retry or rebroadcast.
         returned=transport(rpc_url,"eth_sendRawTransaction",[
             "0x"+bytes(signed.raw_transaction).hex()])
@@ -196,8 +252,11 @@ def main(argv=None):
                    help="owner-only interactive APPROVED actual native transaction")
     p.add_argument("--keystore",type=Path,
                    help="private encrypted application V3 EOA, --send only")
+    p.add_argument("--journal-dir",type=Path,help="owner-private durable intent journal; defaults to local application journal in send mode")
     a=p.parse_args(argv)
     try:
+        if a.journal_dir is not None and not a.send:
+            raise Refused("journal option requires send mode")
         if bool(a.send)!=bool(a.keystore):
             raise Refused("--send and encrypted application keystore required together")
         manifest=load_manifest(a.manifest)
@@ -212,7 +271,8 @@ def main(argv=None):
             },sort_keys=True,indent=2))
             return 0
         result=submit_once(plan,offer,manifest,a.rpc,a.keystore,
-                           confirm=input,get_password=getpass)
+                           confirm=input,get_password=getpass,
+                           journal_dir=a.journal_dir or (Path.home()/".local/share/sse-transaction-journal"))
         print(json.dumps(result,sort_keys=True,indent=2))
         return 0
     except (Refused,PlannerRefused,WalletRefused,QuoteRefused,AuditRefused,
