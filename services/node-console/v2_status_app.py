@@ -61,7 +61,7 @@ def approved_options(node_id,roles,el,bn,market_manifest=None):
         raise Refused("local client RPC/REST port pair not verified for known node")
     if bn is None and (set(roles).intersection({"observer","full_node","validator"}) or market_manifest is None):
         raise Refused("RPC-only console requires application roles and a deployment manifest")
-    if market_manifest is not None and (type(market_manifest) is not Path or
+    if market_manifest is not None and (not isinstance(market_manifest, Path) or
         not market_manifest.is_absolute()):
         raise Refused("public R206 manifest must be an explicit absolute file path")
     return {
