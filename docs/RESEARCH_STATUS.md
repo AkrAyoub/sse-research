@@ -1,3 +1,83 @@
+# R295 — REAL old native full-node VM4707 ↔ new monitor VM4711 controllerless public IPv6 packet ACKs BOTH; new VM4712 ↔ provider VM4714 both; VM4713 transport and REAL V2 paid lease still pending
+
+Real owner terminal logs prove
+NEW VM4711 (`fca0:2328:77a9:8951:acf0::1`)
+⇄ OLD original chain31340 genuine
+nonsigning Besu/Lighthouse full node
+VM4707 (`fca0:2328:77b8:6578:a55::1`)
+on SAME public controllerless ZeroTier
+network `ff2328775f000000`.
+On VM4711 original real R55 check:
+`realBothTransportPayloadRoundTrips=true`,
+TCP 356.75ms, UDP 0.85ms.
+Independently VM4707 R55 short-lived
+socket server on its OWN overlay IPv6
+reported BOTH real TCP and UDP payloads
+received and ACKs; it stopped after
+first pair. NO original native EL/CL/
+validator restart, Docker change,
+RPC mutation or SSH/private-IP route.
+This is contemporaneous **OLD ↔ NEW
+ACTUAL PACKET CONNECTIVITY**,
+not merely both being on one network;
+but the new VM4711 is still an
+application-role monitor, not an
+authenticated native EL/CL peer.
+
+VM4712 new monitor
+(`fca0:2328:77b9:dc2a:748a::1`)
+⇄ VM4714 original capped real CPU
+worker provider host
+(`fca0:2328:77f8:9326:689f::1`)
+also reported BOTH real R55 TCP/UDP
+ACKs, TCP 349.99ms and UDP 0.60ms.
+VM4714 separate server output
+reported receiving BOTH real
+payloads. Earlier new
+VM4711↔VM4714 TCP346.55ms
+UDP0.91ms also passed.
+**VM4713↔VM4714 real R55
+roundtrip not yet owner-observed**;
+one more sequential R55 pair.
+
+Evidence:
+`evidence/r295_actual_old_vm4707_new_vm4711_and_vm4712_vm4714_ipv6_tcp_udp_ack.json`.
+Runbook:
+`docs/R295_REAL_NEW_TO_OLD_NATIVE_HOST_IPV6_AND_TWO_MONITORS_PACKET_PROOF.md`.
+
+Critical current next engineering gate:
+Existing source
+`tools/sse_pos_r232_v2_monitor_probe.py`
+requires actual finalized leased profile
+HTTPS origin, selected/confirmed monitor
+and valid provider EIP712 signature;
+`services/provider-agent/v2_compute_response_server.py`
+enforces finalized funded lease,
+committee, actual same capped Docker
+CPU worker, and loopback-only local
+HTTP8879 pending authenticated TLS
+reverse proxy. DO NOT bypass
+these guards or expose original
+VM4714 raw unsigned worker
+`127.0.0.1:8877` to public overlay.
+No new onchain V2 paid lease or
+signed provider remote CPU result
+is owner-observed. Four new
+VM4711–14 encrypted app EOA wallets
+still UNFUNDED; four 0.005 native
+TEST ETH grants at total maximum
+0.020000000084 TEST ETH including
+gas were previously owner-VM quoted
+READ-ONLY, **NOT owner-approved**.
+No R295 native transactions signed/sent.
+Original three grants finalized.
+Physical ISP independence and
+direct nonrelayed paths remain
+unverified; three new VM daemons
+previously reported TCP fallback.
+
+---
+
 # R294 — ACTUAL VM4711 ↔ VM4714 open public ZeroTier IPv6 TCP+UDP ACKs BOTH VERIFIED; stage old↔new direct R55 cross-generation packets without touching native PoS
 
 At immutable reviewed Git SHA
