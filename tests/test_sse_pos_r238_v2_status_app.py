@@ -141,5 +141,47 @@ class TestR238RealNodeConsole(unittest.TestCase):
         with self.assertRaises(mod.Refused):
             mod.approved_options("node-app",["monitor"],"http://127.0.0.1:28545",None)
 
+    def test_status_cache_expiry_and_failure(self):
+        now=[0]
+        cache=mod.StatusCache(ttl=15,clock=lambda:now[0])
+        calls=[]
+        def load():
+            calls.append(1)
+            return {"observed":len(calls)}
+        self.assertEqual(cache.read(load),{"observed":1})
+        now[0]=14
+        self.assertEqual(cache.read(load),{"observed":1})
+        now[0]=15
+        def fail():
+            raise ValueError("RPC unavailable")
+        with self.assertRaises(ValueError):
+            cache.read(fail)
+        self.assertIsNone(cache.value)
+        self.assertEqual(cache.read(load),{"observed":2})
+
+    def test_public_mode_restricts_lease_lookups_and_caches_status(self):
+        calls=[]
+        def capture(*args):
+            calls.append(1)
+            return observed(*args)
+        server=mod.make_server(CONFIG,0,capture=capture,
+            inspect=lambda *a:self.fail("lease lookup exposed"),public_readonly=True)
+        thread=threading.Thread(target=server.serve_forever,daemon=True)
+        thread.start()
+        base="http://127.0.0.1:"+str(server.server_port)
+        try:
+            for path in ("/","/v2/status","/v2/status"):
+                with urlopen(base+path,timeout=4) as response:
+                    self.assertEqual(response.status,200)
+            self.assertEqual(len(calls),1)
+            with self.assertRaises(HTTPError) as error:
+                urlopen(base+"/v2/lease/1",timeout=4)
+            self.assertEqual(error.exception.code,404)
+            self.assertEqual(server.request_queue_size,16)
+        finally:
+            server.shutdown()
+            server.server_close()
+            thread.join(timeout=4)
+
 if __name__=="__main__":
     unittest.main()
