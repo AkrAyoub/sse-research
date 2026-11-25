@@ -117,5 +117,29 @@ class TestR238RealNodeConsole(unittest.TestCase):
         self.assertFalse(result["httpServerStarted"])
         self.assertFalse(result["publicInternetHttpsVerified"])
 
+    def test_application_only_console_uses_real_rpc_interface_without_beacon(self):
+        conf=mod.approved_options("node-app",["monitor","provider"],
+            "http://127.0.0.1:28545",None,Path("/tmp/manifest.json"))
+        def transport(url,method,params):
+            self.assertEqual(method,"eth_getBlockByNumber")
+            return {"number":"0x7800","timestamp":"0x1000"} if params[0]=="latest" else {"number":"0x7700","timestamp":"0x0800"}
+        with patch.object(mod,"load_manifest",return_value={}):
+            result=mod.node_status(conf,capture=lambda *a:self.fail("Beacon queried"),
+                audit=lambda *a,**kw:{"chainId":31340,"finalizedExecutionHeight":0x7700},
+                transport=transport)
+        self.assertEqual(result["finalityLagSeconds"],2048)
+        self.assertFalse(result["independentLocalConsensusVerified"])
+        self.assertFalse(result["roleActivationVerified"])
+        self.assertIn(b"Selected roles",mod.status_html(result))
+        self.assertIn(b"monitor, provider",mod.status_html(result))
+
+    def test_rpc_only_cannot_claim_native_roles_or_omit_manifest(self):
+        for role in ("validator","observer","full_node"):
+            with self.assertRaises(mod.Refused):
+                mod.approved_options("node-app",[role],"http://127.0.0.1:28545",
+                    None,Path("/tmp/manifest.json"))
+        with self.assertRaises(mod.Refused):
+            mod.approved_options("node-app",["monitor"],"http://127.0.0.1:28545",None)
+
 if __name__=="__main__":
     unittest.main()
