@@ -294,5 +294,36 @@ class TestR238RealNodeConsole(unittest.TestCase):
         with self.assertRaises(mod.Refused):
             mod.proposer_identity(CONFIG,block,wrong)
 
+    def test_explorer_requires_native_role_and_consensus_endpoint(self):
+        for roles in (["monitor"],["provider"],["consumer"],["monitor","provider"]):
+            conf={**CONFIG,"declaredRoles":roles,"bn":None,"blockExplorer":True}
+            self.assertFalse(mod.block_explorer_allowed(conf))
+            self.assertFalse(mod.block_explorer_allowed({**conf,"bn":CONFIG["bn"]}))
+        for role in ("observer","full_node","validator"):
+            conf={**CONFIG,"declaredRoles":[role,"monitor"],"blockExplorer":True}
+            self.assertTrue(mod.block_explorer_allowed(conf))
+            self.assertFalse(mod.block_explorer_allowed({**conf,"bn":None}))
+            self.assertFalse(mod.block_explorer_allowed({**conf,"blockExplorer":False}))
+
+    def test_application_monitor_explorer_routes_denied_even_if_enabled(self):
+        conf={**CONFIG,"declaredRoles":["monitor"],"bn":None,"blockExplorer":True}
+        server=mod.make_server(conf,0,public_readonly=True)
+        thread=threading.Thread(target=server.serve_forever,daemon=True)
+        thread.start()
+        base="http://127.0.0.1:"+str(server.server_port)
+        try:
+            with patch.object(mod,"recent_blocks",side_effect=AssertionError("forbidden block read")):
+                for path in ("/blocks/0","/v2/blocks/25339?utm_source=chatgpt.com"):
+                    with self.assertRaises(HTTPError) as error:
+                        urlopen(base+path,timeout=4)
+                    self.assertEqual(error.exception.code,404)
+                with patch.object(mod,"node_status",return_value={"schema":"test","declaredRoles":["monitor"]}):
+                    with urlopen(base+"/v2/status",timeout=4) as response:
+                        self.assertNotIn("blockExplorer",json.loads(response.read()))
+        finally:
+            server.shutdown()
+            server.server_close()
+            thread.join(timeout=4)
+
 if __name__=="__main__":
     unittest.main()
