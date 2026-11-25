@@ -1,3 +1,9 @@
+# R298 — VM4711 exact native grant submitted; finality pending (2026-11-25)
+
+Actual VM4707 owner terminal output at pinned ff90a5bcd9d248c20e6c01d4fd62a3edcdaa8877: all 7 R297 tests passed. R206 original deployment verified, finalized execution block 30162, all three historical role grants canonical and finalized. Exact recipient VM4711 0x1a89D81288522912643e15D8e06a2a7D9dc4bc08 was unfunded, zero nonce, no code. Source 0xED0ED5E0526898c6E0e3C83140efcA12672E7ff0 nonce 4, balance 979999993320597000 wei. Real gas estimate 21000, gas price cap 1000 wei, four-grant maximum 20000000084000000 wei. Owner entered exact consent and local hidden keystore password; attempt consumed marker created; one raw transaction acknowledged with hash 0x7404585a763ec3335dac11461b879a74f8e1d5ce3c39a317511b821e710729ab, value 5000000000000000 wei, nonce 4. **Submission observed, receipt/finality not yet observed. Never resend nonce 4.** Remaining three grants already authorized, but each requires predecessor canonical finality and live preflight. No new contract, chain, validator or Docker changes.
+
+---
+
 # R297 — owner authorized exact four additional TEST ETH grants; one-by-one sender and tests committed, NOT executed (2026-11-25)
 
 Owner explicitly approved four 0.005 native TEST ETH transfers on original chain31340 with maximum combined debit 0.020000000084 TEST ETH (20000000084000000 wei). Scope is only VM4711 monitor, VM4712 monitor, VM4713 monitor and VM4714 provider, exact R282 addresses, existing VM4707 app-only deployer, nonces 4–7, legacy gas 21000 at 1000 wei/gas. No extra transaction, bond, lease or other funds authorized by this approval.
