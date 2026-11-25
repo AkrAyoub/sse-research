@@ -54,9 +54,19 @@ def prepare(record,url,sender):
     if any(sync.get(k) is not False for k in ("is_syncing","is_optimistic","el_offline")) or int(sync["sync_distance"])!=0:
         raise ValueError("local beacon not synchronized and execution-verified")
     code=standard_reference()["code"].lower()
-    for block in ("0x0","latest","finalized"):
-        if rpc(url,"eth_getCode",[CONTRACT,block]).lower()!=code:
-            raise ValueError("deposit runtime mismatch")
+    genesis_code=rpc(url,"eth_getCode",[CONTRACT,"0x0"])
+    if genesis_code is not None and (not isinstance(genesis_code,str) or genesis_code.lower()!=code):
+        raise ValueError("genesis deposit runtime mismatch")
+    finalized=rpc(url,"eth_getBlockByNumber",["finalized",False])
+    if not isinstance(finalized,dict) or int(finalized["number"],16)<=0:
+        raise ValueError("finalized execution anchor unavailable")
+    height=finalized["number"]
+    for block in (height,"latest"):
+        actual=rpc(url,"eth_getCode",[CONTRACT,block])
+        if not isinstance(actual,str) or actual.lower()!=code:
+            raise ValueError("deposit runtime unavailable or mismatched at "+block)
+    if rpc(url,"eth_getBlockByNumber",[height,False])["hash"]!=finalized["hash"]:
+        raise ValueError("finalized deposit runtime anchor changed")
     validators=beacon("/eth/v1/beacon/states/head/validators")
     if any(v["validator"]["pubkey"].lower()==plan["validatorBlsPubkey"] for v in validators):
         raise ValueError("validator already registered; never duplicate deposit")
@@ -65,7 +75,9 @@ def prepare(record,url,sender):
     gas=int(rpc(url,"eth_estimateGas",[call]),16) if balance>=VALUE_WEI else None
     price=int(rpc(url,"eth_gasPrice",[]),16)
     return {**plan,"sender":sender,"originalELCLGenesisVerified":True,
-            "standardDepositRuntimeVerified":True,"registeredValidatorCount":len(validators),
+            "standardDepositRuntimeVerified":True,
+            "historicalGenesisDepositCodeAvailable":genesis_code is not None,
+            "finalizedDepositRuntimeHeight":int(height,16),"registeredValidatorCount":len(validators),
             "senderBalanceWei":str(balance),"gasEstimate":gas,"gasPriceWei":str(price),
             "fundingRequiredWei":str(max(0,VALUE_WEI+(gas or 0)*price-balance)),
             "readyForOwnerDeposit":gas is not None and balance>=VALUE_WEI+gas*price,
