@@ -22,16 +22,24 @@ def block_identity(block):
     return int(n,16),h.lower()
 
 
-def inspect_canonical(manifest,url,lease_id,epoch_id=None,*,transport=rpc):
+def inspect_canonical(manifest,url,lease_id,epoch_id=None,*,confirmations=1,transport=rpc):
     if type(lease_id) is not int or not 1<=lease_id<2**256:
         raise ValueError("invalid lease ID")
     if epoch_id is not None and (type(epoch_id) is not int or not 0<=epoch_id<2**256):
         raise ValueError("invalid epoch ID")
+    if type(confirmations) is not int or not 1<=confirmations<=256:
+        raise ValueError("invalid confirmation depth")
     ask=lambda method,params: transport(url,method,params)
     proof=verify(manifest,url,transport=transport)
-    height,digest=block_identity(ask("eth_getBlockByNumber",["latest",False]))
-    if height<proof["finalizedExecutionHeight"]:
+    head,head_hash=block_identity(ask("eth_getBlockByNumber",["latest",False]))
+    if head<proof["finalizedExecutionHeight"]:
         raise ValueError("head behind verified finality")
+    height=head-confirmations+1
+    if height<0:
+        raise ValueError("insufficient chain history")
+    actual,digest=block_identity(ask("eth_getBlockByNumber",[hex(height),False]))
+    if actual!=height or (confirmations==1 and digest!=head_hash):
+        raise ValueError("canonical block selection changed")
     def check_anchor():
         if block_identity(ask("eth_getBlockByNumber",[hex(height),False]))!=(height,digest):
             raise ValueError("canonical anchor reorganized")
@@ -45,11 +53,16 @@ def inspect_canonical(manifest,url,lease_id,epoch_id=None,*,transport=rpc):
             raise ValueError("canonical runtime mismatch")
     state=_inspect_at_height(manifest,url,lease_id,epoch_id,height,transport=transport)
     check_anchor()
+    latest,_=block_identity(ask("eth_getBlockByNumber",["latest",False]))
+    if latest-height+1<confirmations:
+        raise ValueError("confirmation depth lost")
+    check_anchor()
     # Do not expose the finalized schema or height to existing authorization code.
     state.pop("finalizedExecutionHeight")
     state.update(schema="SSE_R350_CANONICAL_V2_LEASE_READONLY_V1",
                  assurance="CANONICAL_OBSERVATION_NOT_FINALIZED_AUTHORIZATION",
                  observedExecutionHeight=height,observedExecutionHash=digest,
+                 observedConfirmations=latest-height+1,
                  deploymentFinalizedHeight=proof["finalizedExecutionHeight"],
                  reorganizationPossible=True,finalizedAuthorization=False)
     return state
@@ -61,9 +74,10 @@ def main():
     p.add_argument("--rpc",choices=("http://127.0.0.1:18545","http://127.0.0.1:28545"),required=True)
     p.add_argument("--lease-id",type=int,required=True)
     p.add_argument("--epoch-id",type=int)
+    p.add_argument("--confirmations",type=int,default=1)
     a=p.parse_args()
     try:
-        print(json.dumps(inspect_canonical(load(a.manifest),a.rpc,a.lease_id,a.epoch_id),indent=2,sort_keys=True))
+        print(json.dumps(inspect_canonical(load(a.manifest),a.rpc,a.lease_id,a.epoch_id,confirmations=a.confirmations),indent=2,sort_keys=True))
     except (ValueError,TypeError,KeyError,OSError) as exc:
         p.exit(2,"R350_REFUSED: "+str(exc)+"\n")
 
