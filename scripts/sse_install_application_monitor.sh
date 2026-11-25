@@ -26,7 +26,7 @@ echo "Installs signed Ubuntu dependencies and verified ZeroTier package, joins e
 read -r -p "Type INSTALL-SSE-MONITOR to authorize: " APPROVAL
 [[ "$APPROVAL" == INSTALL-SSE-MONITOR ]] || fail "not authorized"
 sudo -n true || fail "local administrative permission required"
-sudo -n env DEBIAN_FRONTEND=noninteractive NEEDRESTART_MODE=l apt-get update -qq
+sudo -n env DEBIAN_FRONTEND=noninteractive NEEDRESTART_MODE=l apt-get update
 sudo -n env DEBIAN_FRONTEND=noninteractive NEEDRESTART_MODE=l apt-get install -y -qq --no-install-recommends python3-venv gnupg ca-certificates
 if ! command -v zerotier-cli >/dev/null; then
  # Root executes only its own immutable checkout, never user-writable source.
@@ -39,7 +39,19 @@ git -c credential.helper= clone --no-checkout https://github.com/AkrAyoub/sse-re
 git -C "$tmp/repo" switch --detach "$1"
 test "$(git -C "$tmp/repo" rev-parse HEAD)" = "$1"
 cd "$tmp/repo"
-PYTHONPATH="$tmp/repo/tools" /usr/bin/python3 -B -c 'from sse_pos_r291_verified_vendor_package_only import install_package_only; install_package_only()'
+PYTHONPATH="$tmp/repo/tools" /usr/bin/python3 -B - <<'PYTHON'
+from sse_pos_r291_verified_vendor_package_only import signed_package_command
+from sse_pos_r152_unattended_host_dependencies import install_verified_zerotier_apt
+import subprocess
+def visible_run(argv, **kwargs):
+    def run(args, **opts):
+        result = subprocess.run(args, **opts)
+        if result.returncode and args[:1] == ["apt-get"]:
+            print(result.stderr, flush=True)
+        return result
+    return signed_package_command(argv, run=run, **kwargs)
+install_verified_zerotier_apt(runner=visible_run)
+PYTHON
 systemctl enable --now zerotier-one
 ROOT_INSTALL
 fi
