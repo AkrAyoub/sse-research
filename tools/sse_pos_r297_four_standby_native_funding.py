@@ -202,10 +202,9 @@ def check_previous_role_finalized(url,role,final_height,*,transport=local_rpc,
         raise Refused("previous role funding receipt no longer canonical")
     if included>final_height:
         raise Pending("previous role funding not yet finalized; DO NOT RESEND")
-    remaining=quantity(ask("eth_getBalance",[doc["recipient"],"latest"]),
-                       "previous recipient latest balance")
-    if remaining<int(doc["valueWei"]):
-        raise Refused("previous funded role wallet spent unexpectedly before next stage")
+    # R311: a finalized exact transfer proves funding independently of
+    # subsequent recipient activity. Spending is legitimate and cannot
+    # invalidate the historical grant or block another recipient.
     return doc
 
 
