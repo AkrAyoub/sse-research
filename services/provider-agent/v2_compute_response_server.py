@@ -136,7 +136,7 @@ def make_docker_executor(profile,endpoint,container_name,*,rootless_docker=False
     return compute
 
 
-def make_server(port,context,signed_payload,profile,executor):
+def make_server(port,context,signed_payload,profile,executor,*,authorize_request=None):
     if type(port) is not int or not (port==0 or 1024<=port<=65535):
         raise Refused("provider port must be unprivileged; 0 is test-only auto-bind")
     if type(executor).__name__ not in ("function","method"):
@@ -185,6 +185,8 @@ def make_server(port,context,signed_payload,profile,executor):
                     raise Refused("not the pinned on-chain challenge")
                 # On EVERY request, real Docker inspect + actual CPU endpoint
                 # must succeed before releasing a pre-signed public payload.
+                if authorize_request is not None:
+                    authorize_request()
                 result=executor(expected["leaseId"],expected["epochId"],
                                 expected["requestHash"])
                 bound=payload_from_result(
@@ -192,6 +194,8 @@ def make_server(port,context,signed_payload,profile,executor):
                     expected["requestHash"],profile_hash,policy_hash_value,result)
                 if any(signed_payload[k]!=bound[k] for k in bound):
                     raise Refused("real worker output not equal to signed payload")
+                if authorize_request is not None:
+                    authorize_request()
             except (Refused,ComputeError,WireRefused,ValueError,TypeError,
                     OSError,OverflowError,KeyError):
                 return self.respond(503,{"error":"provider cannot verify Docker work"})
@@ -237,7 +241,8 @@ def main(argv=None):
         profile=load_public_json(a.profile)
         policy=load_public_json(a.policy)
         signed=load_public_json(a.signed_reply)
-        snapshot=inspect_lease(load_manifest(a.manifest),a.rpc,
+        manifest=load_manifest(a.manifest)
+        snapshot=inspect_lease(manifest,a.rpc,
                                a.lease_id,a.epoch_id)
         report=verify_config(profile,policy,signed,snapshot)
         if not a.serve:
@@ -252,7 +257,28 @@ def main(argv=None):
             **report,"profileHash":snapshot["lease"]["profileHash"],
             "policyHash":snapshot["lease"]["policyHash"],
         }
-        server=make_server(a.port,context,signed,profile,executor)
+        from sse_pos_r350_v2_canonical_lease_snapshot import inspect_canonical
+        from sse_pos_r206_adaptive_v2_deployment_audit import rpc
+        import time
+        def authorize_request():
+            state=inspect_canonical(manifest,a.rpc,a.lease_id,a.epoch_id)
+            ep=state["epoch"]["ledger"]
+            if (state["lease"]["phase"]!=4 or not state["lease"]["providerAccepted"]
+                or not state["committee"]["ready"] or not ep["exists"]
+                or ep["monitoringSealed"] or state["epoch"]["market"]["resolved"]
+                or ep["requestHash"]!=context["requestHash"]
+                or state["lease"]["provider"]!=context["provider"]
+                or state["lease"]["profileHash"]!=context["profileHash"]
+                or state["lease"]["policyHash"]!=context["policyHash"]
+                or state["lease"]["endpointHash"]!=snapshot["lease"]["endpointHash"]
+                or (ep["responseAuthenticated"] and ep["responseHash"]!=context["signedResponseHash"])):
+                raise Refused("provider epoch no longer authorized")
+            block=rpc(a.rpc,"eth_getBlockByNumber",[hex(state["observedExecutionHeight"]),False])
+            if (block["hash"].lower()!=state["observedExecutionHash"]
+                or max(time.time(),int(block["timestamp"],16))>=ep["monitoringClose"]):
+                raise Refused("provider epoch anchor changed or deadline passed")
+        authorize_request()
+        server=make_server(a.port,context,signed,profile,executor,authorize_request=authorize_request)
         print("R234_V2_PROVIDER_LOOPBACK_HTTP_READY=true",flush=True)
         try:
             server.serve_forever()
