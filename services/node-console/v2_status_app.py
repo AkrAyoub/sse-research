@@ -295,12 +295,35 @@ def status_html(payload,public_readonly=False):
             nav_history+=" · <a href='/blocks/"+str(min(first+8,explorer["finalizedHeight"]))+"'>Newer blocks</a>"
         nav_history+=" · <a href='/blocks/0'>Genesis</a> · <a href='/v2/blocks/"+str(first)+"'>Page JSON</a></p>"
         block_panel="<section class='panel' id='blocks'><div class='eyebrow'>Network / Explorer</div><h2>Finalized block explorer</h2><p class='muted'>Finalized execution history from configured RPC. Local disk storage is not verified.</p>"+nav_history+"<div class='blockstrip'>"+"".join(tiles)+"</div>"+"".join(parts)+"</section>"
+    v3=payload.get("marketV3")
+    v3_panel=""
+    if v3 is not None:
+        v3_panel="<section class='panel' id='market-v3'><div class='eyebrow'>Marketplace / Scientific V3</div><h2>Scientific market</h2>"
+        if "error" in v3:
+            v3_panel+="<p class='notice'>Finalized V3 evidence unavailable.</p>"
+        else:
+            v3_panel+= "<div class='grid'>"+metric("Requests",v3["requestsCreated"])+metric("Leases",v3["leasesCreated"])+metric("Active monitors",v3["activeMonitors"])+metric("Finalized height",v3["deployment"]["finalizedHeight"])+"</div>"
+            for req in v3["recentRequests"]:
+                v3_panel+="<details class='blockdetail'><summary>Request "+esc(req["id"])+" / "+esc(req["bidCount"])+" bids</summary><table>"+"".join(field(k,v) for k,v in req.items() if k!="id")+"</table></details>"
+            for lease in v3["recentLeases"]:
+                a=lease["accounting"]
+                v3_panel+="<details class='blockdetail' open><summary>Lease "+esc(lease["id"])+" / exposure "+esc(eth(a["exposureWei"]))+"</summary><table>"
+                v3_panel+="".join(field(k,eth(v) if k.endswith("Wei") else v) for k,v in lease.items() if k not in ("id","accounting","epochs"))
+                v3_panel+="".join(field(k,eth(v) if k.endswith("Wei") else v) for k,v in a.items())+"</table>"
+                for epoch in lease["epochs"]:
+                    outcome="Pending" if not epoch["accounted"] else {0:"Inconclusive",1:"Success",2:"Failure"}.get(epoch["outcome"],"Unknown")
+                    histories=", ".join(label for bit,label in ((1,"N"),(2,"F"),(4,"S")) if epoch["historyMask"] & bit)
+                    v3_panel+="<details class='blockdetail'><summary>Epoch "+esc(epoch["id"])+" / "+esc(outcome)+" / "+esc(histories)+"</summary><table>"+"".join(field(k,eth(v) if k.endswith("Wei") else v) for k,v in epoch.items())+"</table></details>"
+                v3_panel+="</details>"
+            v3_panel+="<p class='muted'>Finalized contract observations; committee evidence is conditional, not proof of physical truth.</p>"
+        v3_panel+="</section>"
     cards="".join(metric(label,value) for label,value in metrics)
     lease_note=("Lease lookups disabled on this public listener." if public_readonly else
                 "Finalized lease lookup: /v2/lease/{id} requires a verified deployment manifest.")
     links=[("Overview","#overview"),("Selected roles","#roles")]
     if account is not None: links.append(("Monitor account","#account"))
     if overview is not None: links.append(("Marketplace","#market"))
+    if v3 is not None: links.append(("Scientific V3","#market-v3"))
     if explorer is not None: links.append(("Blockchain explorer","#blocks"))
     links.append(("Verification","#evidence"))
     links.append(("Raw JSON","/v2/status"))
@@ -315,7 +338,7 @@ def status_html(payload,public_readonly=False):
             "<div class='grid'>"+cards+"</div>"
             "<section class='panel' id='roles'><h2>Selected roles</h2><div class='role-tags'>"+tags+"</div><p class='subtle'>"+esc(roles)+"</p><table>"+checks+"</table>"
             "<p class='notice'>Declared roles do not establish authorization, eligibility or completed work.</p></section>"
-            +account_panel+market_panel+block_panel+"<section class='panel' id='evidence'><div class='eyebrow'>Trust / Evidence</div><h2>Blockchain evidence</h2><table>"+rows+"</table></section>"
+            +account_panel+market_panel+v3_panel+block_panel+"<section class='panel' id='evidence'><div class='eyebrow'>Trust / Evidence</div><h2>Blockchain evidence</h2><table>"+rows+"</table></section>"
             "<footer class='footer'><p>"+esc(lease_note)+" Successful observations may be cached for 15 seconds.</p>"
             "<p>No wallet keys, transaction signing or privileged host controls exposed by this console.</p></footer></main></div></div></body></html>").encode("utf-8")
 
@@ -383,7 +406,7 @@ def block_explorer_allowed(config):
 def make_server(config,port=8766,*,capture=real_node_capture,inspect=finalized_market_lease,public_readonly=False):
     if type(port) is not int or port!=0 and not 1024<=port<=65535:
         raise Refused("only local unprivileged console port (0 for tests)")
-    if type(config) is not dict or set(config)-{"monitorAddress","marketOverview","blockExplorer"}!={"nodeId","declaredRoles","el","bn","manifest"}:
+    if type(config) is not dict or set(config)-{"monitorAddress","marketOverview","blockExplorer","marketV3"}!={"nodeId","declaredRoles","el","bn","manifest"}:
         raise Refused("unexpected node role-local configuration")
 
     address=config.get("monitorAddress")
@@ -418,6 +441,12 @@ def make_server(config,port=8766,*,capture=real_node_capture,inspect=finalized_m
         status=node_status(config,capture=capture)
         if block_explorer_allowed(config):
             status["blockExplorer"]=recent_blocks(config)
+        if config.get("marketV3"):
+            try:
+                from sse_pos_r384_v3_dashboard import overview
+                status["marketV3"]=overview(lambda m,p:rpc(config["el"],m,p))
+            except (AuditRefused,ValueError,TypeError,KeyError,OSError,OverflowError):
+                status["marketV3"]={"error":"finalized V3 evidence unavailable"}
         return status
 
     class Handler(BaseHTTPRequestHandler):
@@ -492,6 +521,7 @@ def main(argv=None):
     p.add_argument("--bn",help="local Beacon endpoint; omit for application-only RPC mode")
     p.add_argument("--v2-manifest",type=Path)
     p.add_argument("--block-explorer",action="store_true",default=os.environ.get("SSE_BLOCK_EXPLORER")=="1",help="bounded finalized execution block inspection")
+    p.add_argument("--market-v3",action="store_true",default=os.environ.get("SSE_MARKET_V3")=="1",help="bounded finalized V3 scientific market panel")
     p.add_argument("--market-overview",action="store_true",default=os.environ.get("SSE_MARKET_OVERVIEW")=="1",help="bounded finalized marketplace observation")
     p.add_argument("--monitor-address",default=os.environ.get("SSE_MONITOR_ADDRESS"),help="explicit public monitor account to display; no ownership claim")
     p.add_argument("--port",type=int,default=8766)
@@ -503,6 +533,8 @@ def main(argv=None):
         conf=approved_options(a.node_id,a.roles.split(","),a.el,a.bn,a.v2_manifest)
         if a.block_explorer:
             conf["blockExplorer"]=True
+        if a.market_v3:
+            conf["marketV3"]=True
         if a.market_overview:
             conf["marketOverview"]=True
         if a.monitor_address:
