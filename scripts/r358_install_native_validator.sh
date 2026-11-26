@@ -40,6 +40,20 @@ read -r -p "Type IMPORT-AND-START-LOCAL-VALIDATOR to authorize: " APPROVAL
 if [[ ! -d "$VC" ]]; then mkdir -m 700 "$VC"; fi
 [[ -z "$(find "$VC" -mindepth 1 -maxdepth 1 -print -quit)" ]] || fail "import directory no longer empty"
 UIDGID="$(id -u):$(id -g)"
+# Copy only public testnet artifacts; never change the existing beacon mount.
+PUBLIC="$ROOT/public-testnet"
+if [[ ! -e "$PUBLIC" && ! -L "$PUBLIC" ]]; then mkdir -m 700 "$PUBLIC"; fi
+[[ -d "$PUBLIC" && ! -L "$PUBLIC" && "$(stat -c '%u:%a' "$PUBLIC")" == "$(id -u):700" ]] || fail "unsafe public testnet copy directory"
+for FILE in config.yaml genesis.ssz deposit_contract_block.txt deposit_contract.txt; do
+  sudo -n test -f "$TESTNET/$FILE" || fail "missing public artifact $FILE"
+  sudo -n test ! -L "$TESTNET/$FILE" || fail "linked public artifact $FILE"
+  if [[ ! -e "$PUBLIC/$FILE" && ! -L "$PUBLIC/$FILE" ]]; then
+    sudo -n install -m 600 -o "$(id -u)" -g "$(id -g)" -- "$TESTNET/$FILE" "$PUBLIC/$FILE"
+  fi
+  [[ -f "$PUBLIC/$FILE" && ! -L "$PUBLIC/$FILE" && "$(stat -c '%u:%a' "$PUBLIC/$FILE")" == "$(id -u):600" ]] || fail "unsafe public artifact copy"
+  sudo -n cmp -s -- "$TESTNET/$FILE" "$PUBLIC/$FILE" || fail "public artifact mismatch"
+done
+TESTNET="$PUBLIC"
 sudo -n docker run --rm -it --pull never --network none \
   --user "$UIDGID" --read-only --tmpfs /tmp:rw,nosuid,noexec,size=128m \
   --cap-drop ALL --security-opt no-new-privileges \
@@ -53,6 +67,7 @@ sudo -n docker run --rm -it --pull never --network none \
 [[ -z "$(find "$VC" -type l -print -quit)" ]] || fail "unexpected symlink"
 find "$VC" -type d -exec chmod 700 {} +
 find "$VC" -type f -exec chmod 600 {} +
+"$PY" -B tools/sse_pos_r358_validator_unlock.py --directory "$ROOT"
 sudo -n docker run -d --pull never --name "$NAME" --restart unless-stopped \
   --network host --init --user "$UIDGID" \
   --read-only --tmpfs /tmp:rw,nosuid,noexec,size=128m \
