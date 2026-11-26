@@ -63,6 +63,9 @@ def plan(action,p):
         ts="(bytes32,uint256,uint256,uint256,uint256,uint256,uint64,uint64,uint64,uint64,uint256,uint256,bool)"
         values=tuple(bytes.fromhex(t[n][2:]) if n=="endpointHash" else t[n] for n in names)
         return MARKET,calldata("chooseBidAndFund(uint256,uint256,"+ts+")",("uint256","uint256",ts),(p["requestId"],p["bidIndex"],values)),p["bidFeeWei"]*t["epochs"]+t["monitorBudget"]
+    if action=="confirm":
+        require(set(p)=={"leaseId"},"wrong confirmation fields")
+        return LEDGER,calldata("confirmSeat(uint256)",("uint256",),(p["leaseId"],)),0
     if action=="accept":
         require(set(p)=={"leaseId","termsHash"},"wrong accept fields")
         return MARKET,calldata("acceptLease(uint256,bytes32)",("uint256","bytes32"),(p["leaseId"],bytes.fromhex(p["termsHash"][2:]))),0
@@ -93,7 +96,7 @@ def plan(action,p):
 def main():
     p=argparse.ArgumentParser()
     p.add_argument("--rpc",default="http://127.0.0.1:28545")
-    p.add_argument("--action",choices=("inspect","register","request","bid","fund","accept","start","draw","close","cancel-expired-draw","cancel-unconfirmed","cancel-unaccepted","expire-idle","finalize","close-evidence","market-withdraw","ledger-withdraw","monitor-exit","authenticate","acknowledge","vote"),default="inspect")
+    p.add_argument("--action",choices=("inspect","register","request","bid","fund","confirm","accept","start","draw","close","cancel-expired-draw","cancel-unconfirmed","cancel-unaccepted","expire-idle","finalize","close-evidence","market-withdraw","ledger-withdraw","monitor-exit","authenticate","acknowledge","vote"),default="inspect")
     p.add_argument("--params",default="{}")
     p.add_argument("--address")
     p.add_argument("--keystore",type=Path)
@@ -171,7 +174,9 @@ def main():
         account=Account.from_key(private)
         require(account.address.lower()==sender,"wrong wallet")
         verify(ask)
-        require(quote()==(gas,price,nonce),"quote changed; review again")
+        new_gas,new_price,new_nonce=quote()
+        require(new_nonce==nonce and new_gas<=gas and new_price<=price,
+                "quote exceeds authorized gas/price or nonce changed; review again")
         signed=account.sign_transaction({"chainId":31340,"nonce":nonce,"to":to_checksum_address(target),"data":data,"value":value,"gas":gas,"gasPrice":price})
         h="0x"+bytes(signed.hash).hex()
         path=dest/(sender+"-"+str(nonce)+".json")
