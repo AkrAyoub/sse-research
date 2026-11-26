@@ -54,6 +54,7 @@ def main():
         require(time.monotonic()<expiry and action in allowed and params["leaseId"]==a.lease and params.get("epochId",a.epoch)==a.epoch,"session scope exceeded")
         allowed.remove(action)
         return execute(ask,action,params,a.address,10**10,send=True,account=account)
+    require(a.output.is_absolute() and not a.output.exists() and not a.output.is_symlink() and a.output.parent.is_dir() and not a.output.parent.is_symlink() and not a.output.parent.stat().st_mode&0o022,"new private evidence path required before opening epoch")
     common=["--lease",str(a.lease),"--epoch",str(a.epoch),"--cert",str(a.cert),"--fingerprint",a.fingerprint,"--output",str(a.output),"--rpc",a.rpc]
     if a.role=="monitor":
         invoke(monitor.main,common+["--profile",str(a.profile),"--monitor",a.address])
@@ -69,7 +70,13 @@ def main():
             print("ADMISSION_ONLY_EXPERIMENT_NO_RESPONSE_AUTHENTICATION",flush=True)
         else:
             invoke(consumer.main,common+["--proposal",str(a.proposal)])
-            send("authenticate",json.loads(a.output.read_text())["authenticateParams"])
+            observation=json.loads(a.output.read_text())
+            params=observation["authenticateParams"]
+            if params is None:
+                require(observation.get("schema")=="SSE_V3_CONSUMER_UNAUTHENTICATED_OBSERVATION_V1" and observation.get("qualifiedFailure") is False and observation.get("challenge",{}).get("leaseId")==a.lease and observation.get("challenge",{}).get("epochId")==a.epoch,"unexpected observation")
+                print("CONTINUING_TO_SETTLEMENT_WITHOUT_RESPONSE_AUTHENTICATION",flush=True)
+            else:
+                send("authenticate",params)
         while True:
             s=snapshot(ask,a.lease,a.epoch)
             if s["accounted"]:break
