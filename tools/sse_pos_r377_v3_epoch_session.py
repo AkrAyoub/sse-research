@@ -27,6 +27,7 @@ def main():
     p.add_argument("--cert",type=Path,required=True)
     p.add_argument("--fingerprint",required=True)
     p.add_argument("--output",type=Path,required=True)
+    p.add_argument("--admission-only",action="store_true",help="Consumer fault experiment: open and settle without claiming response authentication")
     p.add_argument("--rpc",default="http://127.0.0.1:28545")
     a=p.parse_args()
     ask=lambda m,v:rpc(a.rpc,m,v)
@@ -36,10 +37,11 @@ def main():
     s=snapshot(ask,a.lease,a.epoch);check_proposal(d,s)
     require(not s["exists"] and s["nextEpoch"]==a.epoch,"epoch already opened or wrong next epoch")
     require(sys.stdin.isatty() and sys.stderr.isatty(),"owner terminal required")
+    require(not a.admission_only or a.role=="consumer","admission-only requires consumer")
     if a.role=="consumer":
         require(s["consumer"].lower()==a.address.lower() and a.proposal is not None,"wrong consumer")
         require(json.loads(a.proposal.read_text())==d,"proposal mismatch")
-        allowed={"start","authenticate","finalize"}
+        allowed={"start","finalize"} if a.admission_only else {"start","authenticate","finalize"}
     else:
         require(call(ask,LEDGER,"confirmedMonitor(uint256,address)",("uint256","address"),(a.lease,a.address),("bool",))[0],"monitor not confirmed")
         allowed={"vote"}
@@ -63,8 +65,11 @@ def main():
         fresh=snapshot(ask,a.lease,a.epoch)
         require(not fresh["exists"] and fresh["nextEpoch"]==a.epoch,"epoch changed")
         send("start",dict(leaseId=a.lease,requestHash="0x"+secrets.token_hex(32)))
-        invoke(consumer.main,common+["--proposal",str(a.proposal)])
-        send("authenticate",json.loads(a.output.read_text())["authenticateParams"])
+        if a.admission_only:
+            print("ADMISSION_ONLY_EXPERIMENT_NO_RESPONSE_AUTHENTICATION",flush=True)
+        else:
+            invoke(consumer.main,common+["--proposal",str(a.proposal)])
+            send("authenticate",json.loads(a.output.read_text())["authenticateParams"])
         while True:
             s=snapshot(ask,a.lease,a.epoch)
             if s["accounted"]:break
