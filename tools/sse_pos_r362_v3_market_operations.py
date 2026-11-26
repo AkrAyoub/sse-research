@@ -89,6 +89,13 @@ def plan(action,p):
     if action=="acknowledge":
         require(set(p)=={"leaseId","epochId","signature"},"wrong acknowledgment fields")
         return MARKET,calldata("submitAcknowledgment(uint256,uint256,bytes)",("uint256","uint256","bytes"),(p["leaseId"],p["epochId"],bytes.fromhex(p["signature"][2:]))),0
+    if action=="residual":
+        names=("unresolvedAmount","providerShare","consumerShare","nonce","expiry")
+        require(set(p)=={"leaseId","epochId","allocation","consumerSig","providerSig"},"wrong residual fields")
+        a=p["allocation"]
+        require(set(a)==set(names) and a["providerShare"]+a["consumerShare"]==a["unresolvedAmount"],"wrong allocation")
+        ts="(uint256,uint256,uint256,uint256,uint256)"
+        return MARKET,calldata("resolveResidual(uint256,uint256,"+ts+",bytes,bytes)",("uint256","uint256",ts,"bytes","bytes"),(p["leaseId"],p["epochId"],tuple(a[n] for n in names),bytes.fromhex(p["consumerSig"][2:]),bytes.fromhex(p["providerSig"][2:]))),0
     if action=="vote":
         require(set(p)=={"leaseId","epochId","outcome","evidenceHash"} and p["outcome"] in (1,2),"wrong vote fields")
         return LEDGER,calldata("submitVoteDirect(uint256,uint256,uint8,bytes32)",("uint256","uint256","uint8","bytes32"),(p["leaseId"],p["epochId"],p["outcome"],bytes.fromhex(p["evidenceHash"][2:]))),0
@@ -96,7 +103,7 @@ def plan(action,p):
 def main():
     p=argparse.ArgumentParser()
     p.add_argument("--rpc",default="http://127.0.0.1:28545")
-    p.add_argument("--action",choices=("inspect","register","request","bid","fund","confirm","accept","start","draw","close","cancel-expired-draw","cancel-unconfirmed","cancel-unaccepted","expire-idle","finalize","close-evidence","market-withdraw","ledger-withdraw","monitor-exit","authenticate","acknowledge","vote"),default="inspect")
+    p.add_argument("--action",choices=("inspect","register","request","bid","fund","confirm","accept","start","draw","close","cancel-expired-draw","cancel-unconfirmed","cancel-unaccepted","expire-idle","finalize","close-evidence","market-withdraw","ledger-withdraw","monitor-exit","authenticate","acknowledge","residual","vote"),default="inspect")
     p.add_argument("--params",default="{}")
     p.add_argument("--address")
     p.add_argument("--keystore",type=Path)
