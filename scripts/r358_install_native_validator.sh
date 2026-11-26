@@ -30,11 +30,15 @@ EXPECTED="$(python3 -B tools/sse_pos_client_pins.py --image-ids | tail -n1)"
 NAME=sse31340-owner-vc
 [[ -z "$(sudo -n docker ps -a --format '{{.Names}}' | grep -Ei 'validator|[-_]vc([_-]|$)' || true)" ]] || fail "existing possible validator client; inspect before importing"
 VC="$ROOT/lighthouse"
-[[ ! -e "$VC" && ! -L "$VC" ]] || fail "existing import data; preserve and inspect, never recreate"
+if [[ -e "$VC" || -L "$VC" ]]; then
+  [[ -d "$VC" && ! -L "$VC" && "$(stat -c '%u:%a' "$VC")" == "$(id -u):700" ]] || fail "unsafe existing import directory"
+  [[ -z "$(find "$VC" -mindepth 1 -maxdepth 1 -print -quit)" ]] || fail "existing import data; preserve and inspect, never recreate"
+fi
 echo "Use only this host to sign with this BLS key. Lighthouse stores local unlocking material for unattended restart; protect the private directory and backups."
 read -r -p "Type IMPORT-AND-START-LOCAL-VALIDATOR to authorize: " APPROVAL
 [[ "$APPROVAL" == IMPORT-AND-START-LOCAL-VALIDATOR ]] || fail "not authorized"
-mkdir -m 700 "$VC"
+if [[ ! -d "$VC" ]]; then mkdir -m 700 "$VC"; fi
+[[ -z "$(find "$VC" -mindepth 1 -maxdepth 1 -print -quit)" ]] || fail "import directory no longer empty"
 UIDGID="$(id -u):$(id -g)"
 sudo -n docker run --rm -it --pull never --network none \
   --user "$UIDGID" --read-only --tmpfs /tmp:rw,nosuid,noexec,size=128m \
