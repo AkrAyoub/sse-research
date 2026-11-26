@@ -6,7 +6,9 @@ set -euo pipefail
 umask 077
 set +x
 fail(){ echo "R358_VC_REFUSED: $*" >&2; exit 2; }
-[[ $# == 1 && "$1" =~ ^[a-f0-9]{40}$ ]] || fail "exact source SHA required"
+[[ ( $# == 1 || $# == 2 ) && "$1" =~ ^[a-f0-9]{40}$ ]] || fail "usage: SHA [--resume-imported]"
+MODE="${2:-}"
+[[ -z "$MODE" || "$MODE" == --resume-imported ]] || fail "unknown mode"
 cd "$(dirname "${BASH_SOURCE[0]}")/.."
 [[ "$(git rev-parse HEAD)" == "$1" ]] || fail "wrong source"
 git diff --quiet && git diff --cached --quiet || fail "dirty source"
@@ -32,13 +34,19 @@ NAME=sse31340-owner-vc
 VC="$ROOT/lighthouse"
 if [[ -e "$VC" || -L "$VC" ]]; then
   [[ -d "$VC" && ! -L "$VC" && "$(stat -c '%u:%a' "$VC")" == "$(id -u):700" ]] || fail "unsafe existing import directory"
-  [[ -z "$(find "$VC" -mindepth 1 -maxdepth 1 -print -quit)" ]] || fail "existing import data; preserve and inspect, never recreate"
+  if [[ "$MODE" != --resume-imported ]]; then
+    [[ -z "$(find "$VC" -mindepth 1 -maxdepth 1 -print -quit)" ]] || fail "existing import data; preserve and inspect, never recreate"
+  fi
 fi
 echo "Use only this host to sign with this BLS key. Lighthouse stores local unlocking material for unattended restart; protect the private directory and backups."
 read -r -p "Type IMPORT-AND-START-LOCAL-VALIDATOR to authorize: " APPROVAL
 [[ "$APPROVAL" == IMPORT-AND-START-LOCAL-VALIDATOR ]] || fail "not authorized"
 if [[ ! -d "$VC" ]]; then mkdir -m 700 "$VC"; fi
-[[ -z "$(find "$VC" -mindepth 1 -maxdepth 1 -print -quit)" ]] || fail "import directory no longer empty"
+if [[ "$MODE" != --resume-imported ]]; then
+  [[ -z "$(find "$VC" -mindepth 1 -maxdepth 1 -print -quit)" ]] || fail "import directory no longer empty"
+else
+  [[ -s "$VC/validators/slashing_protection.sqlite" && -s "$VC/validators/validator_definitions.yml" ]] || fail "existing completed import required"
+fi
 UIDGID="$(id -u):$(id -g)"
 # Copy only public testnet artifacts; never change the existing beacon mount.
 PUBLIC="$ROOT/public-testnet"
@@ -62,6 +70,7 @@ for FILE in "${FILES[@]}"; do
   sudo -n cmp -s -- "$TESTNET/$FILE" "$PUBLIC/$FILE" || fail "public artifact mismatch"
 done
 TESTNET="$PUBLIC"
+if [[ "$MODE" != --resume-imported ]]; then
 sudo -n docker run --rm -it --pull never --network none \
   --user "$UIDGID" --read-only --tmpfs /tmp:rw,nosuid,noexec,size=128m \
   --cap-drop ALL --security-opt no-new-privileges \
@@ -71,6 +80,7 @@ sudo -n docker run --rm -it --pull never --network none \
   --entrypoint lighthouse "$LIGHTHOUSE" \
   account validator import --testnet-dir /testnet --datadir /data \
   --keystore /import/keystore.json --reuse-password
+fi
 [[ -s "$VC/validators/slashing_protection.sqlite" && -s "$VC/validators/validator_definitions.yml" ]] || fail "import lacks expected slashing DB or definitions; preserve files"
 [[ -z "$(find "$VC" -type l -print -quit)" ]] || fail "unexpected symlink"
 find "$VC" -type d -exec chmod 700 {} +
