@@ -41,9 +41,24 @@ def configure(root):
     text=definitions.read_text()
     if text.count("voting_public_key:")!=1 or pub not in text or text.count("voting_keystore_path:")!=1:
         raise ValueError("unexpected validator definition; preserve")
-    if any("voting_keystore_password" in line for line in text.splitlines()):
-        raise ValueError("existing password configuration; preserve and inspect")
+    # Lighthouse import may store a scalar password inline. Never print it
+    # or parse it as executable data. Replace only the exact single scalar
+    # field in this one-key definition, using the freshly verified password.
     lines=text.splitlines()
+    inline=[i for i,line in enumerate(lines) if line.lstrip().startswith("voting_keystore_password:")]
+    paths=[i for i,line in enumerate(lines) if line.lstrip().startswith("voting_keystore_password_path:")]
+    if paths or len(inline)>1:
+        raise ValueError("existing password path or multiple fields; preserve and inspect")
+    if inline:
+        i=inline[0]
+        scalar=lines[i].split(":",1)[1].strip()
+        if not scalar or scalar.startswith(("|",">","&","*","!","[","{")):
+            raise ValueError("unsupported inline password representation")
+        # A YAML single-line scalar cannot have a more-indented continuation.
+        indent=len(lines[i])-len(lines[i].lstrip())
+        if i+1<len(lines) and lines[i+1].strip() and len(lines[i+1])-len(lines[i+1].lstrip())>indent:
+            raise ValueError("unsupported multiline password representation")
+        del lines[i]
     for i,line in enumerate(lines):
         if line.lstrip().startswith("voting_keystore_path:"):
             if "/data/validators/0x"+pub+"/keystore.json" not in line:
@@ -63,6 +78,9 @@ def configure(root):
         f.write("\n".join(lines)+"\n")
         f.flush()
         os.fsync(f.fileno())
+    fd=os.open(vc,os.O_RDONLY|os.O_DIRECTORY)
+    try: os.fsync(fd)
+    finally: os.close(fd)
     os.replace(temp,definitions)
     fd=os.open(validators,os.O_RDONLY|os.O_DIRECTORY)
     try: os.fsync(fd)
