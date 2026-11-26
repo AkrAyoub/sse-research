@@ -52,3 +52,6 @@ Finality of these receipts not yet rechecked. No independent physical SLA truth 
 3. Live new lease with canonical provider/monitor paths, successful on-chain quorum voting and settlement; verify durable journals, reorg behavior, deadline and resource isolation.
 4. Persistent multi-role services, automatic install/funding/dashboard, fresh external participant, concurrent roles and reboot tests.
 5. Scientific V3 integration and evidence model review; complete tests and clean main, remove obsolete architecture safely. Keep public handover current.
+
+## 2026-11-26 checkpoint (supersedes immediate task above)
+R358c passed on both hosts at finalized height 36465. Historical genesis code unavailable, exact current/finalized deposit runtime verified, both BLS proofs and roots verified. VM4707 balance 8999997883882000 wei, VM4709 zero. Neither funded for stake. Proposed target 32.01 TEST ETH per wallet, difference only. R358d 6181fea661ee61ee86903a741cd313a194194559 implements local create-only prebroadcast deposit intent, no auto retry; untested and not global duplicate protection. Next fund from owner genesis treasury using existing local signer, then verify funding and stake. No deposit broadcast yet. No key regeneration.
