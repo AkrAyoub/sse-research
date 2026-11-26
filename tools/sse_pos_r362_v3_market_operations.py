@@ -99,9 +99,22 @@ def main():
     p.add_argument("--keystore",type=Path)
     p.add_argument("--max-wei",type=int,default=10**10+BOND)
     p.add_argument("--send",action="store_true")
+    p.add_argument("--wait-deployment-seconds",type=int,default=900)
     a=p.parse_args()
+    require(0<=a.wait_deployment_seconds<=3600,"invalid deployment wait")
     ask=lambda m,v:rpc(a.rpc,m,v)
-    proof=verify(ask)
+    # Bootstrap trust is a one-time deployment condition, not a per-action
+    # confirmation delay. Wait internally without requiring operator heights.
+    deadline=time.monotonic()+a.wait_deployment_seconds
+    while True:
+        try:
+            proof=verify(ask)
+            break
+        except ValueError as exc:
+            if str(exc)!="deployment not finalized" or time.monotonic()>=deadline:
+                raise
+            print("V3_STATUS=WAITING_FOR_DEPLOYMENT_FINALITY",flush=True)
+            time.sleep(15)
     print(json.dumps(proof),flush=True)
     if a.action=="inspect":
         print("ACTIVE_MONITORS",call(ask,MARKET,"activeMonitorCount()")[0])
@@ -136,7 +149,23 @@ def main():
                 rec=ask("eth_getTransactionReceipt",[h])
                 require(rec is not None and rec["from"].lower()==sender and rec["transactionHash"].lower()==h.lower(),"unresolved prior intent")
                 require(ask("eth_getBlockByNumber",[rec["blockNumber"],False])["hash"].lower()==rec["blockHash"].lower(),"prior intent reorganized")
-                require(int(rec["blockNumber"],16)<=int(ask("eth_getBlockByNumber",["finalized",False])["number"],16),"prior intent not finalized")
+                prior=ask("eth_getTransactionByHash",[h])
+                previous_data=entry.get("data",entry.get("calldata"))
+                require(prior is not None and prior["hash"].lower()==h.lower()
+                        and prior["from"].lower()==sender
+                        and int(prior["nonce"],16)==entry["nonce"]
+                        and prior["to"].lower()==entry["target"].lower()
+                        and prior["input"].lower()==previous_data.lower()
+                        and int(prior["value"],16)==entry["valueWei"]
+                        and f.name==sender+"-"+str(entry["nonce"])+".json"
+                        and int(rec["status"],16) in (0,1),"prior intent mismatch")
+                final=int(ask("eth_getBlockByNumber",["finalized",False])["number"],16)
+                provisional=int(rec["blockNumber"],16)>final
+                require(not (provisional and entry["target"].lower()==target.lower()
+                            and previous_data.lower()==data.lower() and entry["valueWei"]==value),
+                        "identical provisional operation already recorded")
+                if provisional:
+                    print("V3_PRIOR_INTENT_CANONICAL_NOT_FINAL="+h,flush=True)
         require(input("Type AUTHORIZE-ONE-V3-TRANSACTION: ")=="AUTHORIZE-ONE-V3-TRANSACTION","not authorized")
         private=Account.decrypt(safe_keystore(a.keystore),getpass("Application wallet password: "))
         account=Account.from_key(private)
