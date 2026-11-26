@@ -17,3 +17,6 @@ VM4707 validator index2 and VM4709 index1 active since epoch1212; operator logs 
 8. Preserve original chain and evidence; do not duplicate validator keys or restart live validators casually. New VMs after installer ready; obtain independent operator participation, not just extra VMs controlled by one person.
 
 Acceptance requires actual cross-infrastructure tests, not merely code or documentation. Production-grade economic security and operator independence cannot be guaranteed by a testnet implementation.
+
+## Observed reward audit (2026-11-26)
+VM4707 finalized checkpoint epoch1347; validator indices0/1/2 balances Gwei31999990528/32000797367/32000000000, effective balances32e9 each, active ongoing unslashed. Epoch1346 attestation API returned net5577093 Gwei per validator, inactivity0, API finalized false. Epoch1344/1345 and block reward slots43094/43095/43096/43098/43099/43100 returned HTTP404 on later query; cause not established. Archive native-rewards-20261126T235444Z.json retained privately on VM4707. Do not interpret missing historical reward data as zero rewards or infer cumulative rewards from balances without withdrawals reconciliation. Collect recent reward data and canonical block roots continuously for final dashboard; retain response metadata and errors, no invented historical values.
