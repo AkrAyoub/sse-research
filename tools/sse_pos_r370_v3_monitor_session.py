@@ -47,16 +47,17 @@ def main():
         require(fresh["requestHash"]==s["requestHash"] and not fresh["sealed"] and fresh["headTimestamp"]<fresh["monitoringClose"],"monitoring window ended or epoch changed")
         q=Request(d["profile"]["origin"]+"/v3/challenge",data=canonical(challenge),headers={"Content-Type":"application/json"},method="POST")
         rec={"sample":i,"utcUnixNs":time.time_ns(),"chainBlock":fresh["block"],"chainBlockHash":fresh["blockHash"]}
+        http_started=time.monotonic()
         try:
             with opener.open(q,timeout=6) as res:
                 raw=res.read(8193)
-                elapsed=round((time.monotonic()-started)*1000)
+                elapsed=round((time.monotonic()-http_started)*1000)
                 require(res.status==200 and len(raw)<=8192,"invalid HTTP reply")
             reply=json.loads(raw)
             h=validate_reply(reply,fresh)
             rec.update(elapsedMs=elapsed,reply=reply,responseHash=h,bodySha256=hashlib.sha256(raw).hexdigest(),correct=True)
         except (ValueError,OSError,KeyError,TypeError) as exc:
-            rec.update(correct=False,elapsedMs=round((time.monotonic()-started)*1000),error=type(exc).__name__)
+            rec.update(correct=False,elapsedMs=round((time.monotonic()-http_started)*1000),error=type(exc).__name__)
         records.append(rec)
         print("SAMPLE",i,rec["correct"],rec["elapsedMs"],flush=True)
         if i+1<policy["minProbeCount"]:
