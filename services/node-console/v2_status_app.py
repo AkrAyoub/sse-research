@@ -304,7 +304,10 @@ def status_html(payload,public_readonly=False):
         else:
             v3_panel+= "<div class='grid'>"+metric("Requests",v3["requestsCreated"])+metric("Leases",v3["leasesCreated"])+metric("Active monitors",v3["activeMonitors"])+metric("Finalized height",v3["deployment"]["finalizedHeight"])+"</div>"
             for req in v3["recentRequests"]:
-                v3_panel+="<details class='blockdetail'><summary>Request "+esc(req["id"])+" / "+esc(req["bidCount"])+" bids</summary><table>"+"".join(field(k,v) for k,v in req.items() if k!="id")+"</table></details>"
+                v3_panel+="<details class='blockdetail' open><summary>Request "+esc(req["id"])+" / "+esc(req["bidCount"])+" bids</summary><table>"+"".join(field(k,eth(v) if k.endswith("Wei") else v) for k,v in req.items() if k not in ("id","bids"))+"</table>"
+                for bid in req.get("bids",[]):
+                    v3_panel+="<details class='blockdetail'><summary>Bid "+esc(bid["index"])+" / "+esc(eth(bid["feeWei"]))+"</summary><table>"+field("Provider",bid["provider"])+"</table></details>"
+                v3_panel+="</details>"
             for lease in v3["recentLeases"]:
                 a=lease["accounting"]
                 v3_panel+="<details class='blockdetail' open><summary>Lease "+esc(lease["id"])+" / exposure "+esc(eth(a["exposureWei"]))+"</summary><table>"
