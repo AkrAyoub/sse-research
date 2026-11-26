@@ -63,6 +63,16 @@ def main():
         if i+1<policy["minProbeCount"]:
             time.sleep(max(0,policy["probeIntervalMs"]/1000-(time.monotonic()-started)))
     final=snapshot(ask,a.lease,a.epoch)
+    # Preserve observations while authentication is still eligible.
+    # Do not turn absence of a transaction into negative service evidence.
+    wait_end=time.monotonic()+240
+    while (not final["authenticated"] and not final["sealed"]
+           and final["requestHash"]==s["requestHash"]
+           and final["headTimestamp"]<=final["responseDeadline"]
+           and time.monotonic()<wait_end):
+        print("WAITING_FOR_RESPONSE_AUTHENTICATION",flush=True)
+        time.sleep(3)
+        final=snapshot(ask,a.lease,a.epoch)
     require(ask("eth_getBlockByNumber",[anchor,False])["hash"]==anchor_hash,"observation anchor reorganized")
     qualified=(final["authenticated"] and not final["sealed"] and final["requestHash"]==s["requestHash"] and final["headTimestamp"]<final["monitoringClose"] and all(r["correct"] and r["elapsedMs"]<=policy["maxObservedLatencyMs"] and r.get("responseHash")==final["responseHash"] for r in records))
     evidence={"schema":"SSE_V3_REAL_MONITOR_SESSION_V1","chainId":31340,"market":MARKET,"ledger":LEDGER,"monitor":a.monitor.lower(),"challenge":challenge,"policyHash":s["policyHash"],"records":records,"qualifiedConditionalSuccess":qualified,"physicalSlaTruthProved":False}
