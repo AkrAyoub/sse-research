@@ -55,11 +55,45 @@ def plan(action,p):
     if action=="bid":
         require(set(p)=={"requestId","feeWei"},"wrong bid fields")
         return MARKET,calldata("placeBid(uint256,uint256)",("uint256","uint256"),(p["requestId"],p["feeWei"])),0
+    if action=="fund":
+        require(set(p)=={"requestId","bidIndex","bidFeeWei","terms"},"wrong funding fields")
+        t=p["terms"]
+        names=("endpointHash","epochs","monitorBudget","perMonitorEpochReward","requiredFaultTolerance","gasBoundSeats","confirmationSeconds","responseSeconds","monitoringSeconds","evidenceSeconds","reservationFee","exposureBudget","conditionalQuorumPolicy")
+        require(set(t)==set(names),"wrong V3 terms")
+        ts="(bytes32,uint256,uint256,uint256,uint256,uint256,uint64,uint64,uint64,uint64,uint256,uint256,bool)"
+        values=tuple(bytes.fromhex(t[n][2:]) if n=="endpointHash" else t[n] for n in names)
+        return MARKET,calldata("chooseBidAndFund(uint256,uint256,"+ts+")",("uint256","uint256",ts),(p["requestId"],p["bidIndex"],values)),p["bidFeeWei"]*t["epochs"]+t["monitorBudget"]
+    if action=="accept":
+        require(set(p)=={"leaseId","termsHash"},"wrong accept fields")
+        return MARKET,calldata("acceptLease(uint256,bytes32)",("uint256","bytes32"),(p["leaseId"],bytes.fromhex(p["termsHash"][2:]))),0
+    if action=="start":
+        require(set(p)=={"leaseId","requestHash"},"wrong start fields")
+        return MARKET,calldata("startEpoch(uint256,bytes32)",("uint256","bytes32"),(p["leaseId"],bytes.fromhex(p["requestHash"][2:]))),0
+    if action in ("draw","close","cancel-expired-draw","cancel-unconfirmed","cancel-unaccepted","expire-idle"):
+        require(set(p)=={"leaseId"},"wrong lease fields")
+        fn={"draw":"drawCommittee","close":"closeLease","cancel-expired-draw":"cancelExpiredDraw","cancel-unconfirmed":"cancelUnconfirmed","cancel-unaccepted":"cancelUnaccepted","expire-idle":"forceCloseIdle"}[action]
+        return MARKET,calldata(fn+"(uint256)",("uint256",),(p["leaseId"],)),0
+    if action in ("finalize","close-evidence"):
+        require(set(p)=={"leaseId","epochId"},"wrong epoch fields")
+        fn={"finalize":"finalizeEpoch","close-evidence":"closeEpochEvidence"}[action]
+        return MARKET,calldata(fn+"(uint256,uint256)",("uint256","uint256"),(p["leaseId"],p["epochId"])),0
+    if action in ("market-withdraw","ledger-withdraw","monitor-exit"):
+        require(not p,"unexpected fields")
+        return (LEDGER if action=="ledger-withdraw" else MARKET),calldata("exitMonitor()" if action=="monitor-exit" else "withdraw()"),0
+    if action=="authenticate":
+        require(set(p)=={"leaseId","epochId","responseHash","signature"},"wrong response fields")
+        return MARKET,calldata("authenticateProviderResponse(uint256,uint256,bytes32,bytes)",("uint256","uint256","bytes32","bytes"),(p["leaseId"],p["epochId"],bytes.fromhex(p["responseHash"][2:]),bytes.fromhex(p["signature"][2:]))),0
+    if action=="acknowledge":
+        require(set(p)=={"leaseId","epochId","signature"},"wrong acknowledgment fields")
+        return MARKET,calldata("submitAcknowledgment(uint256,uint256,bytes)",("uint256","uint256","bytes"),(p["leaseId"],p["epochId"],bytes.fromhex(p["signature"][2:]))),0
+    if action=="vote":
+        require(set(p)=={"leaseId","epochId","outcome","evidenceHash"} and p["outcome"] in (1,2),"wrong vote fields")
+        return LEDGER,calldata("submitVoteDirect(uint256,uint256,uint8,bytes32)",("uint256","uint256","uint8","bytes32"),(p["leaseId"],p["epochId"],p["outcome"],bytes.fromhex(p["evidenceHash"][2:]))),0
     raise ValueError("unknown action")
 def main():
     p=argparse.ArgumentParser()
     p.add_argument("--rpc",default="http://127.0.0.1:28545")
-    p.add_argument("--action",choices=("inspect","register","request","bid"),default="inspect")
+    p.add_argument("--action",choices=("inspect","register","request","bid","fund","accept","start","draw","close","cancel-expired-draw","cancel-unconfirmed","cancel-unaccepted","expire-idle","finalize","close-evidence","market-withdraw","ledger-withdraw","monitor-exit","authenticate","acknowledge","vote"),default="inspect")
     p.add_argument("--params",default="{}")
     p.add_argument("--address")
     p.add_argument("--keystore",type=Path)
