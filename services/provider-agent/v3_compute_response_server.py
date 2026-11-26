@@ -40,7 +40,12 @@ def main():
     class Handler(BaseHTTPRequestHandler):
         def reply(self,status,body):
             raw=json.dumps(body,separators=(",",":")).encode()
-            self.send_response(status);self.send_header("Content-Type","application/json");self.send_header("Content-Length",str(len(raw)));self.end_headers();self.wfile.write(raw)
+            try:
+                self.send_response(status);self.send_header("Content-Type","application/json");self.send_header("Content-Length",str(len(raw)));self.end_headers();self.wfile.write(raw)
+            except (BrokenPipeError, ConnectionResetError, ConnectionAbortedError, TimeoutError):
+                # Client disconnected or timed out; do not attempt a second reply.
+                self.close_connection=True
+                print("V3_HTTP_CLIENT_DISCONNECTED",flush=True)
         def do_GET(self):
             if self.path=="/healthz":self.reply(200,{"service":"SSE_V3_PROVIDER","lease":a.lease})
             else:self.reply(404,{})
@@ -54,6 +59,10 @@ def main():
                 with lock:
                     s=snapshot(ask,a.lease,q["epochId"]);check_proposal(d,s)
                     require(s["exists"] and not s["sealed"] and s["requestHash"]==q["requestHash"] and s["headTimestamp"]<=s["monitoringClose"],"inactive challenge")
+                    key=(q["epochId"],q["requestHash"])
+                    # Reject expired first responses before spending worker resources.
+                    if key not in cache:
+                        require(s["headTimestamp"]<=s["responseDeadline"],"first response deadline expired")
                     result=execute(a.lease,q["epochId"],q["requestHash"])
                     payload=payload_from_result(a.lease,q["epochId"],q["requestHash"],s["profileHash"],s["policyHash"],result)
                     h=response_hash(payload)
