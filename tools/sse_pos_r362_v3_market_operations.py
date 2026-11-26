@@ -129,22 +129,25 @@ def main():
     if a.action=="inspect":
         print("ACTIVE_MONITORS",call(ask,MARKET,"activeMonitorCount()")[0])
         return
-    sender=to_checksum_address(a.address).lower()
+    return execute(ask,a.action,json.loads(a.params),a.address,a.max_wei,send=a.send,keystore=a.keystore)
+
+def execute(ask,action,params,address,max_wei,*,send=False,keystore=None,account=None):
+    sender=to_checksum_address(address).lower()
     require(sender!=ORIGINAL_GENESIS_EOA.lower(),"genesis wallet prohibited")
-    target,data,value=plan(a.action,json.loads(a.params))
+    target,data,value=plan(action,params)
     query={"from":sender,"to":target,"data":data,"value":hex(value)}
     def quote():
         gas=(int(ask("eth_estimateGas",[query]),16)*125+99)//100
         price=int(ask("eth_gasPrice",[]),16)
-        require(0<gas and 0<price and gas*price+value<=a.max_wei,"spend cap exceeded")
+        require(0<gas and 0<price and gas*price+value<=max_wei,"spend cap exceeded")
         require(int(ask("eth_getBalance",[sender,"latest"]),16)>=gas*price+value,"insufficient funds")
         nonce=int(ask("eth_getTransactionCount",[sender,"latest"]),16)
         require(int(ask("eth_getTransactionCount",[sender,"pending"]),16)==nonce,"pending nonce")
         return gas,price,nonce
     gas,price,nonce=quote()
-    print(json.dumps({"action":a.action,"from":sender,"to":target,"data":data,"valueWei":value,"gas":gas,"gasPrice":price,"nonce":nonce,"maxWei":a.max_wei}),flush=True)
-    if not a.send:return
-    require(a.keystore is not None and sys.stdin.isatty() and sys.stderr.isatty(),"local owner terminal required")
+    print(json.dumps({"action":action,"from":sender,"to":target,"data":data,"valueWei":value,"gas":gas,"gasPrice":price,"nonce":nonce,"maxWei":max_wei}),flush=True)
+    if not send:return
+    require(account is not None or (keystore is not None and sys.stdin.isatty() and sys.stderr.isatty()),"local owner terminal required")
     root=Path.home()/".local/share/sse-transaction-journal"
     with journal_lock(root,sender):
         # V2 and V3 share wallet lock, but separate journal schemas.
@@ -176,9 +179,9 @@ def main():
                         "identical provisional operation already recorded")
                 if provisional:
                     print("V3_PRIOR_INTENT_CANONICAL_NOT_FINAL="+h,flush=True)
-        require(input("Type AUTHORIZE-ONE-V3-TRANSACTION: ")=="AUTHORIZE-ONE-V3-TRANSACTION","not authorized")
-        private=Account.decrypt(safe_keystore(a.keystore),getpass("Application wallet password: "))
-        account=Account.from_key(private)
+        if account is None:
+            require(input("Type AUTHORIZE-ONE-V3-TRANSACTION: ")=="AUTHORIZE-ONE-V3-TRANSACTION","not authorized")
+            account=Account.from_key(Account.decrypt(safe_keystore(keystore),getpass("Application wallet password: ")))
         require(account.address.lower()==sender,"wrong wallet")
         verify(ask)
         new_gas,new_price,new_nonce=quote()
@@ -196,16 +199,16 @@ def main():
         finally:os.close(fd)
         print("DURABLE_TX_HASH="+h,flush=True)
         require(ask("eth_sendRawTransaction",["0x"+bytes(signed.raw_transaction).hex()]).lower()==h,"wrong acknowledgment; do not retry")
-        del private,account,signed
+        del signed
         for _ in range(24):
             rec=ask("eth_getTransactionReceipt",[h])
             if rec:
                 require(ask("eth_getBlockByNumber",[rec["blockNumber"],False])["hash"].lower()==rec["blockHash"].lower(),"receipt reorganized")
                 print(json.dumps(rec,indent=2))
                 require(rec["status"]=="0x1","transaction reverted")
-                return
+                return rec
             time.sleep(1)
-        print("RECEIPT_PENDING_DO_NOT_RETRY="+h)
+        raise ValueError("RECEIPT_PENDING_DO_NOT_RETRY="+h)
 if __name__=="__main__":
     try:main()
     except (ValueError,TypeError,KeyError,OSError) as exc:
