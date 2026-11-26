@@ -412,7 +412,7 @@ def block_explorer_allowed(config):
             and bool(set(config['declaredRoles']) & {'observer','full_node','validator'}))
 
 
-def make_server(config,port=8766,*,capture=real_node_capture,inspect=finalized_market_lease,public_readonly=False):
+def make_server(config,port=8766,*,capture=real_node_capture,inspect=finalized_market_lease,public_readonly=False,provider_control=None):
     if type(port) is not int or port!=0 and not 1024<=port<=65535:
         raise Refused("only local unprivileged console port (0 for tests)")
     if type(config) is not dict or set(config)-{"monitorAddress","marketOverview","blockExplorer","marketV3"}!={"nodeId","declaredRoles","el","bn","manifest"}:
@@ -423,6 +423,8 @@ def make_server(config,port=8766,*,capture=real_node_capture,inspect=finalized_m
         raise Refused("monitor account requires a nonzero public address and application monitor role")
     if config.get("marketOverview") and config["bn"] is not None:
         raise Refused("market overview currently requires application RPC mode")
+    if provider_control is not None and ("provider" not in config["declaredRoles"] or not config.get("marketV3")):
+        raise Refused("owner control requires explicitly configured V3 provider role")
     cache=StatusCache()
     history_lock=threading.Lock()
     history_cache={}
@@ -459,7 +461,7 @@ def make_server(config,port=8766,*,capture=real_node_capture,inspect=finalized_m
         return status
 
     class Handler(BaseHTTPRequestHandler):
-        def reply(self,status,body,content_type):
+        def reply(self,status,body,content_type,*,control_page=False):
             if type(body) is not bytes or len(body)>MAX_RESPONSE_BYTES:
                 raise Refused("public response exceeds bound")
             self.send_response(status)
@@ -468,7 +470,7 @@ def make_server(config,port=8766,*,capture=real_node_capture,inspect=finalized_m
             self.send_header("Cache-Control","no-store")
             self.send_header("X-Content-Type-Options","nosniff")
             self.send_header("Content-Security-Policy",
-                             "default-src 'none'; base-uri 'none'; frame-ancestors 'none'; form-action 'self'; style-src 'sha256-"+DASHBOARD_STYLE_HASH+"'")
+                             "default-src 'none'; base-uri 'none'; frame-ancestors 'none'; form-action 'self'; style-src 'sha256-"+DASHBOARD_STYLE_HASH+"'"+("; script-src 'self'; connect-src 'self'" if control_page else ""))
             self.send_header("Referrer-Policy","no-referrer")
             self.end_headers()
             self.wfile.write(body)
@@ -487,11 +489,18 @@ def make_server(config,port=8766,*,capture=real_node_capture,inspect=finalized_m
                         "schema":"SSE_R238_LOOPBACK_PROCESS_HEALTH_V1",
                         "alive":True,"chainVerifiedByHealthz":False,
                         "transactionsSubmitted":False})
+                if provider_control is not None and path in ("/v3/control","/v3/control.js"):
+                    from sse_pos_r403_owner_control_web import page,SCRIPT
+                    if path.endswith(".js"):
+                        return self.reply(200,SCRIPT.encode("utf-8"),"application/javascript; charset=utf-8")
+                    return self.reply(200,page(config["nodeId"]),"text/html; charset=utf-8",control_page=True)
                 if path in ("/","/v2/status"):
                     status=cache.read(load_status)
                     if path=="/":
-                        return self.reply(200,status_html(status,public_readonly=public_readonly),
-                                          "text/html; charset=utf-8")
+                        body=status_html(status,public_readonly=public_readonly)
+                        if provider_control is not None:
+                            body=body.replace(b"</main>",b"<section class='panel'><h2>Owner controls</h2><p><a href='/v3/control'>Provider interruption control (wallet authorization required)</a></p></section></main>")
+                        return self.reply(200,body,"text/html; charset=utf-8")
                     return self.json_reply(200,status)
                 history=re.fullmatch(r"/(?:v2/)?blocks/([0-9]{1,12})",path)
                 if history and block_explorer_allowed(config):
@@ -515,6 +524,21 @@ def make_server(config,port=8766,*,capture=real_node_capture,inspect=finalized_m
                     "error":"real original-chain or finalized market evidence unavailable",
                     "fabricatedServiceStatus":False})
         def do_POST(self):
+            if provider_control is not None and self.path in ("/v3/control/challenge","/v3/control/approve"):
+                try:
+                    if self.headers.get("Transfer-Encoding") or self.headers.get_content_type()!="application/json":
+                        return self.json_reply(415,{"error":"JSON required"})
+                    lengths=self.headers.get_all("Content-Length") or []
+                    if len(lengths)!=1 or not lengths[0].isdigit() or not 0<int(lengths[0])<=4096:
+                        return self.json_reply(400,{"error":"invalid request size"})
+                    raw=self.rfile.read(int(lengths[0]))
+                    if len(raw)!=int(lengths[0]):raise ValueError("incomplete request")
+                    from sse_pos_r403_owner_control_web import dispatch
+                    return self.json_reply(200,dispatch(provider_control,self.path,json.loads(raw)))
+                except (ValueError,TypeError,KeyError,OSError,OverflowError):
+                    return self.json_reply(400,{"error":"owner control refused"})
+                except Exception:
+                    return self.json_reply(503,{"error":"control unavailable; inspect local recovery state"})
             if self.path!="/v3/intent" or not config.get("marketV3"):
                 return self.json_reply(405,{"error":"console never signs or changes roles"})
             try:
@@ -554,6 +578,8 @@ def main(argv=None):
     p.add_argument("--market-v3",action="store_true",default=os.environ.get("SSE_MARKET_V3")=="1",help="bounded finalized V3 scientific market panel")
     p.add_argument("--market-overview",action="store_true",default=os.environ.get("SSE_MARKET_OVERVIEW")=="1",help="bounded finalized marketplace observation")
     p.add_argument("--monitor-address",default=os.environ.get("SSE_MONITOR_ADDRESS"),help="explicit public monitor account to display; no ownership claim")
+    p.add_argument("--control-owner",help="explicitly enrolled public browser wallet address")
+    p.add_argument("--control-provider-pid",type=int,help="locally selected V3 provider PID; never accepted from HTTP")
     p.add_argument("--port",type=int,default=8766)
     p.add_argument("--public-readonly",action="store_true",help="restrict tunnel-facing console to bounded cached status and health; no lease lookups")
     p.add_argument("--serve",action="store_true",
@@ -582,7 +608,13 @@ def main(argv=None):
             return 0
         if not 1024<=a.port<=65535:
             raise Refused("--serve requires explicit owner-local unprivileged port")
-        server=make_server(conf,a.port,public_readonly=a.public_readonly)
+        broker=None
+        if a.control_owner is not None or a.control_provider_pid is not None:
+            if not a.control_owner or not a.control_provider_pid or not re.fullmatch(r"0x[0-9a-fA-F]{40}",a.control_owner) or int(a.control_owner,16)==0:
+                raise Refused("explicit owner address and local provider PID required")
+            from sse_pos_r401_provider_control import ProviderControl
+            broker=ProviderControl(node=conf["nodeId"],owner=a.control_owner,pid=a.control_provider_pid,store=Path.home()/".local/share/sse-owner-control/nonces")
+        server=make_server(conf,a.port,public_readonly=a.public_readonly,provider_control=broker)
         print("R238_ROLE_LOCAL_PUBLIC_STATUS_HTTP_LOOPBACK_READY=true",flush=True)
         try:
             server.serve_forever()
