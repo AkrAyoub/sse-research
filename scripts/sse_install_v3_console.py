@@ -27,16 +27,41 @@ def main():
     for arg in args:
         if not re.fullmatch(r"[A-Za-z0-9_./,:@+=-]+",arg):raise ValueError("unsafe unit argument")
     run(*[x for x in args if x!="--serve"])
+    # Persistence requires a user manager that survives logout.
+    uid=str(os.getuid())
+    def linger():
+        return subprocess.check_output(["loginctl","show-user",uid,"-p","Linger","--value"],text=True).strip()=="yes"
+    if not linger():
+        attempt=subprocess.run(["loginctl","enable-linger",uid],check=False)
+        if attempt.returncode!=0 or not linger():
+            raise ValueError("cannot enable user linger; host administrator must authorize this prerequisite")
+    if not linger():raise ValueError("user linger not enabled")
+
     unit=Path.home()/".config/systemd/user/sse-v3-console.service"
     unit.parent.mkdir(parents=True,exist_ok=True)
-    if unit.exists():raise ValueError("unit already exists; inspect before replacement")
     body="[Unit]\nDescription=SSE V3 public marketplace console\nAfter=network-online.target\n\n[Service]\nType=simple\nExecStart="+" ".join(args)+"\nRestart=on-failure\nRestartSec=5\nUMask=0077\nNoNewPrivileges=true\n\n[Install]\nWantedBy=default.target\n"
-    fd=os.open(unit,os.O_WRONLY|os.O_CREAT|os.O_EXCL|os.O_NOFOLLOW,0o600)
-    with os.fdopen(fd,"w") as f:f.write(body)
+    if unit.exists() or unit.is_symlink():
+        if unit.is_symlink() or not unit.is_file() or unit.stat().st_uid!=os.getuid() or unit.read_text()!=body:
+            raise ValueError("existing unit differs; preserve it and review upgrade")
+    else:
+        fd=os.open(unit,os.O_WRONLY|os.O_CREAT|os.O_EXCL|os.O_NOFOLLOW,0o600)
+        with os.fdopen(fd,"w") as f:f.write(body)
     run("systemctl","--user","daemon-reload")
     run("systemctl","--user","enable","--now",unit.name)
     run("systemctl","--user","is-active",unit.name)
     print("SSE_V3_CONSOLE_SERVICE_ENABLED=true")
+    import time
+    from urllib.request import urlopen
+    for i in range(30):
+        try:
+            with urlopen("http://127.0.0.1:"+str(a.port)+"/healthz",timeout=2) as response:
+                import json
+                health=json.loads(response.read(8192))
+                if response.status==200 and health.get("alive") is True:break
+        except (OSError,ValueError):pass
+        time.sleep(1)
+    else:raise ValueError("dashboard readiness check failed; inspect service journal")
+    print("SSE_V3_CONSOLE_HTTP_READY=true")
     print("LOCAL_DASHBOARD=http://127.0.0.1:"+str(a.port))
     print("LINGER_STATUS:")
     run("loginctl","show-user",str(os.getuid()),"-p","Linger")
