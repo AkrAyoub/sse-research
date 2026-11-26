@@ -320,13 +320,19 @@ def status_html(payload,public_readonly=False):
                 v3_panel+="</details>"
             v3_panel+="<p class='muted'>Finalized contract observations; committee evidence is conditional, not proof of physical truth.</p>"
         v3_panel+="</section>"
+    intent_panel=""
+    if v3 is not None:
+        from sse_pos_r389_v3_intent_forms import render
+        intent_panel=render(payload["declaredRoles"])
     cards="".join(metric(label,value) for label,value in metrics)
     lease_note=("Lease lookups disabled on this public listener." if public_readonly else
                 "Finalized lease lookup: /v2/lease/{id} requires a verified deployment manifest.")
     links=[("Overview","#overview"),("Selected roles","#roles")]
     if account is not None: links.append(("Monitor account","#account"))
     if overview is not None: links.append(("Marketplace","#market"))
-    if v3 is not None: links.append(("Scientific V3","#market-v3"))
+    if v3 is not None:
+        links.append(("Scientific V3","#market-v3"))
+        links.append(("Prepare operations","#market-actions"))
     if explorer is not None: links.append(("Blockchain explorer","#blocks"))
     links.append(("Verification","#evidence"))
     links.append(("Raw JSON","/v2/status"))
@@ -341,7 +347,7 @@ def status_html(payload,public_readonly=False):
             "<div class='grid'>"+cards+"</div>"
             "<section class='panel' id='roles'><h2>Selected roles</h2><div class='role-tags'>"+tags+"</div><p class='subtle'>"+esc(roles)+"</p><table>"+checks+"</table>"
             "<p class='notice'>Declared roles do not establish authorization, eligibility or completed work.</p></section>"
-            +account_panel+market_panel+v3_panel+block_panel+"<section class='panel' id='evidence'><div class='eyebrow'>Trust / Evidence</div><h2>Blockchain evidence</h2><table>"+rows+"</table></section>"
+            +account_panel+market_panel+v3_panel+intent_panel+block_panel+"<section class='panel' id='evidence'><div class='eyebrow'>Trust / Evidence</div><h2>Blockchain evidence</h2><table>"+rows+"</table></section>"
             "<footer class='footer'><p>"+esc(lease_note)+" Successful observations may be cached for 15 seconds.</p>"
             "<p>No wallet keys, transaction signing or privileged host controls exposed by this console.</p></footer></main></div></div></body></html>").encode("utf-8")
 
@@ -462,7 +468,7 @@ def make_server(config,port=8766,*,capture=real_node_capture,inspect=finalized_m
             self.send_header("Cache-Control","no-store")
             self.send_header("X-Content-Type-Options","nosniff")
             self.send_header("Content-Security-Policy",
-                             "default-src 'none'; base-uri 'none'; frame-ancestors 'none'; style-src 'sha256-"+DASHBOARD_STYLE_HASH+"'")
+                             "default-src 'none'; base-uri 'none'; frame-ancestors 'none'; form-action 'self'; style-src 'sha256-"+DASHBOARD_STYLE_HASH+"'")
             self.send_header("Referrer-Policy","no-referrer")
             self.end_headers()
             self.wfile.write(body)
@@ -509,7 +515,28 @@ def make_server(config,port=8766,*,capture=real_node_capture,inspect=finalized_m
                     "error":"real original-chain or finalized market evidence unavailable",
                     "fabricatedServiceStatus":False})
         def do_POST(self):
-            return self.json_reply(405,{"error":"read-only console never signs or changes roles"})
+            if self.path!="/v3/intent" or not config.get("marketV3"):
+                return self.json_reply(405,{"error":"console never signs or changes roles"})
+            try:
+                if self.headers.get("Transfer-Encoding") or self.headers.get_content_type()!="application/x-www-form-urlencoded":
+                    return self.json_reply(415,{"error":"form encoding required"})
+                lengths=self.headers.get_all("Content-Length") or []
+                if len(lengths)!=1 or not lengths[0].isdigit() or not 0<int(lengths[0])<=4096:
+                    return self.json_reply(400,{"error":"invalid form size"})
+                from sse_pos_r389_v3_intent_forms import parse
+                body=self.rfile.read(int(lengths[0]))
+                if len(body)!=int(lengths[0]): raise ValueError("incomplete form")
+                data=parse(body,config["declaredRoles"])
+                self.send_response(200)
+                self.send_header("Content-Type","application/json")
+                self.send_header("Content-Disposition",'attachment; filename="sse-v3-intent.json"')
+                self.send_header("Content-Length",str(len(data)))
+                self.send_header("Cache-Control","no-store")
+                self.send_header("X-Content-Type-Options","nosniff")
+                self.end_headers()
+                self.wfile.write(data)
+            except (ValueError,KeyError,TypeError,OSError,OverflowError):
+                return self.json_reply(400,{"error":"invalid unsigned intent"})
         def log_message(self,*args):
             return
 
