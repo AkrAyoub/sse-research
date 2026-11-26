@@ -42,7 +42,11 @@ def collect():
     cp=query(BN,"/eth/v1/beacon/states/head/finality_checkpoints")
     final=cp["data"]["finalized"]
     epoch=int(final["epoch"])
-    validators=query(BN,"/eth/v1/beacon/states/"+final["root"]+"/validators")
+    header=query(BN,"/eth/v1/beacon/headers/"+final["root"])["data"]
+    if header["root"].lower()!=final["root"].lower() or not header["canonical"]:
+        raise ValueError("finalized checkpoint header mismatch")
+    state_root=header["header"]["message"]["state_root"]
+    validators=query(BN,"/eth/v1/beacon/states/"+state_root+"/validators")
     ids=[v["index"] for v in validators["data"] if v["status"].startswith("active_")]
     if not ids:
         raise ValueError("no active validators")
@@ -57,7 +61,7 @@ def collect():
         blocks[str(s)]=optional(lambda s=s:query(BN,"/eth/v1/beacon/rewards/blocks/"+str(s)))
     return {"schema":"SSE_NATIVE_REWARD_OBSERVATION_V1","chainId":31340,
             "observedUnixNs":time.time_ns(),"checkpoints":cp,
-            "finalizedValidators":validators,"attestationRewards":rewards,
+            "finalizedHeader":header,"finalizedValidators":validators,"attestationRewards":rewards,
             "recentBlockRewards":blocks,"headSlot":slot,
             "executionFinalized":rpc("eth_getBlockByNumber",["finalized",False])}
 
