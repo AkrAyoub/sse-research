@@ -44,7 +44,15 @@ UIDGID="$(id -u):$(id -g)"
 PUBLIC="$ROOT/public-testnet"
 if [[ ! -e "$PUBLIC" && ! -L "$PUBLIC" ]]; then mkdir -m 700 "$PUBLIC"; fi
 [[ -d "$PUBLIC" && ! -L "$PUBLIC" && "$(stat -c '%u:%a' "$PUBLIC")" == "$(id -u):700" ]] || fail "unsafe public testnet copy directory"
-for FILE in config.yaml genesis.ssz deposit_contract_block.txt deposit_contract.txt; do
+# Lighthouse requires config, genesis state and deposit block. The legacy
+# deposit_contract.txt is optional; the live spec was already checked at staking.
+FILES=(config.yaml genesis.ssz deposit_contract_block.txt)
+if sudo -n test -e "$TESTNET/deposit_contract.txt" || sudo -n test -L "$TESTNET/deposit_contract.txt"; then
+  FILES+=(deposit_contract.txt)
+elif [[ -e "$PUBLIC/deposit_contract.txt" || -L "$PUBLIC/deposit_contract.txt" ]]; then
+  fail "unexpected stale optional deposit contract artifact"
+fi
+for FILE in "${FILES[@]}"; do
   sudo -n test -f "$TESTNET/$FILE" || fail "missing public artifact $FILE"
   sudo -n test ! -L "$TESTNET/$FILE" || fail "linked public artifact $FILE"
   if [[ ! -e "$PUBLIC/$FILE" && ! -L "$PUBLIC/$FILE" ]]; then
