@@ -10,7 +10,7 @@ from eth_utils import keccak,to_checksum_address
 DOMAIN={"name":"SSE Node Control","version":"1","chainId":31340}
 FIELDS=[{"name":k,"type":t} for k,t in (
 ("nodeId","string"),("owner","address"),("operation","string"),
-("parametersHash","bytes32"),("nonce","bytes32"),("expiry","uint64"))]
+("parametersHash","bytes32"),("durationSeconds","uint64"),("nonce","bytes32"),("expiry","uint64"))]
 def require(ok,msg):
     if not ok:raise ValueError(msg)
 def canonical(params):
@@ -23,7 +23,7 @@ def challenge(node,owner,operation,params,*,now=None):
     now=int(time.time()) if now is None else now
     return dict(nodeId=node,owner=to_checksum_address(owner),operation=operation,
                 parametersHash="0x"+keccak(canonical(params)).hex(),
-                nonce="0x"+secrets.token_hex(32),expiry=now+120)
+                durationSeconds=params["seconds"],nonce="0x"+secrets.token_hex(32),expiry=now+120)
 def typed(d):
     return encode_typed_data(domain_data=DOMAIN,message_types={"NodeControl":FIELDS},message_data=d)
 def wallet_payload(d):
@@ -35,6 +35,7 @@ def verify_and_consume(d,signature,params,*,node,owner,issued,store,now=None):
     require(d["nodeId"]==node and d["owner"].lower()==owner.lower(),"wrong owner or node")
     require(type(d["expiry"]) is int and now<=d["expiry"]<=now+120,"expired challenge")
     require(d["operation"]=="provider-interrupt" and set(params)=={"seconds"} and type(params["seconds"]) is int and 10<=params["seconds"]<=240,"invalid operation")
+    require(type(d["durationSeconds"]) is int and d["durationSeconds"]==params["seconds"],"signed duration changed")
     require(d["parametersHash"]=="0x"+keccak(canonical(params)).hex(),"parameters changed")
     require(isinstance(signature,str) and re.fullmatch(r"0x[0-9a-fA-F]{130}",signature),"invalid signature")
     require(Account.recover_message(typed(d),signature=signature).lower()==owner.lower(),"wrong signature")
