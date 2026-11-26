@@ -3,7 +3,10 @@ import html,json
 from urllib.parse import parse_qs
 from sse_pos_r388_v3_owner_intent import ACTIONS,validate
 # Only expose straightforward actions. Evidence-bound operations remain agent-driven.
+TERMS=(("endpointHash","Endpoint commitment"),("epochs","Number of epochs"),("monitorBudget","Monitor budget (wei)"),("perMonitorEpochReward","Reward per report (wei)"),("requiredFaultTolerance","Required fault tolerance"),("gasBoundSeats","Maximum committee seats"),("confirmationSeconds","Confirmation window (seconds)"),("responseSeconds","Response window (seconds)"),("monitoringSeconds","Monitoring window (seconds)"),("evidenceSeconds","Evidence window (seconds)"),("reservationFee","Reservation fee (wei)"),("exposureBudget","Exposure budget (wei)"),("conditionalQuorumPolicy","Conditional quorum policy (true or false)"))
 FIELDS={
+"request":(("profileHash","Resource profile commitment"),("policyHash","SLA policy commitment"),("maxFeeWei","Maximum epoch fee (wei)"),("biddingClose","Bidding deadline (Unix seconds)")),
+"fund":(("requestId","Request ID"),("bidIndex","Selected bid index"),("bidFeeWei","Exact bid fee (wei)"))+TERMS,
 "bid":(("requestId","Request ID"),("feeWei","Epoch fee (wei)")),
 "register":(),
 "confirm":(("leaseId","Lease ID"),),
@@ -30,7 +33,7 @@ def render(roles):
     return "".join(parts)
 def parse(body,roles):
     if len(body)>4096:raise ValueError("form too large")
-    f=parse_qs(body.decode("ascii"),strict_parsing=True,keep_blank_values=True,max_num_fields=10)
+    f=parse_qs(body.decode("ascii"),strict_parsing=True,keep_blank_values=True,max_num_fields=24)
     if any(len(v)!=1 for v in f.values()):raise ValueError("duplicate field")
     f={k:v[0] for k,v in f.items()}
     role=f.pop("role"); action=f.pop("action"); cap=f.pop("maxWei")
@@ -43,10 +46,15 @@ def parse(body,roles):
         return n
     params={}
     for k,v in f.items():
-        if k=="termsHash":
+        if k=="conditionalQuorumPolicy":
+            if v not in ("true","false"):raise ValueError("explicit quorum policy required")
+            params[k]=v=="true"
+        elif k in ("termsHash","profileHash","policyHash","endpointHash"):
             if len(v)!=66 or not v.startswith("0x") or len(bytes.fromhex(v[2:]))!=32:raise ValueError("invalid hash")
             params[k]=v
         else:params[k]=uint(v)
+    if action=="fund":
+        params["terms"]={name:params.pop(name) for name,label in TERMS}
     d=dict(schema="SSE_V3_OWNER_INTENT_V1",chainId=31340,role=role,action=action,params=params,maxWei=uint(cap))
     validate(d)
     return json.dumps(d,indent=2).encode("utf-8")
