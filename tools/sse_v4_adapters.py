@@ -94,6 +94,8 @@ def make_job_runner(policy, state_dir):
         if out != expected:
             # Never relay a response we know is wrong; record for the owner.
             return {"state": "WORKER_MISMATCH", "finishedAt": int(time.time())}
+        if time.time() > job["responseDeadline"]:
+            return {"state": "MISSED_DEADLINE", "finishedAt": int(time.time())}
         h = response_hash(out)
         st.atomic_write_json(outdir / (h + ".json"), out)
         return {"state": "DONE", "responseHash": h, "finishedAt": int(time.time())}
@@ -136,7 +138,11 @@ def make_prober(policy, reader_factory, state_dir):
                         results.append({"leaseId": lid, "epochId": e["id"], "verdict": record["verdict"],
                                         "reason": record.get("reason"),
                                         "evidenceHash": "0x" + keccak256(canonical(record)).hex()})
-                    continue
+                    if record["verdict"] != "inconclusive":
+                        continue
+                    # Preserve inconclusive attempts separately, then retry.
+                    archive = evdir / (done.stem + "-attempt-" + keccak256(canonical(record)).hex() + ".json")
+                    st.atomic_write_json(archive, record)
                 if not v["responseAuthenticated"] and now <= v["responseDeadline"]:
                     continue  # wait for the response window
                 ep = endpoints.get(l["endpointHash"])
@@ -156,7 +162,8 @@ def make_prober(policy, reader_factory, state_dir):
                     try:
                         out = _post(ep["url"].rstrip("/") + "/v1/compute",
                                     {"leaseId": lid, "epochId": e["id"], "requestHash": v["requestHash"]},
-                                    ca_file=ep.get("caFile"))
+                                    ca_file=ep.get("caFile"),
+                                    timeout=min(approved.get("probeTimeoutSeconds", 8), max(1, v["monitoringClose"] - now)))
                         record["latencyMs"] = round((time.perf_counter() - t0) * 1000, 3)
                         fetched = response_hash(out)
                         expected = compute_result(lid, e["id"], v["requestHash"])
