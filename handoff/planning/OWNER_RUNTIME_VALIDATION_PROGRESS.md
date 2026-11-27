@@ -13,11 +13,11 @@ Only owner-observed results count as runtime evidence.
 | F03 Isolated checkout | Passed | Owner verified exact SHA and clean worktree |
 | F04 Dependency/toolchain | Passed | R429 and S1 identical pins; forge-std f3dae6e6ee381f25eb6a246f7da9b85c91a68219; OpenZeppelin cab19933c33c2ad1d4c7a84864a3601dddfd16f3; Forge 1.9.0, Python 3.12.3, Solc 0.8.24 |
 | F05 Solidity compile | Passed at cabaa2b | Owner build --sizes exit 0, unchanged compiler settings; revalidate new checkpoint |
-| F06 Compile/size repairs | Partial | Build passed; explicit bytecode-size test blocked by ledger constructor |
-| F07 Full Foundry regression | Failed at cabaa2b | 275 passed, 2 failed; market suite setup prevented execution |
-| F08 Focused V4 tests/fuzz | Partial | 22 passed, 2 failed; registry reservation fuzz and ordered sample fuzz 1024 runs each |
-| F09 Python regression | V4 subset passed; full historical suite pending | Owner VM4707 at 68c6f4d: 46 V4 + 4 setup tests passed, zero failures |
-| F10 ABI/EIP-712 parity | Partial | Compiled ABI checker reported ledger Withdrawal name mismatch only; correction unverified; digest parity pending |
+| F06 Compile/size repairs | Passed at 374cce8 | All five modules within limits; market runtime 22986 bytes; size test passed |
+| F07 Full Foundry regression | Passed at 374cce8 | 305 passed, zero failed/skipped, 32 suites |
+| F08 Focused V4 tests/fuzz | Passed at 374cce8 | 52 passed, zero failed/skipped; three fuzz tests 1024 runs each |
+| F09 Python regression | V4 subset passed; full historical suite pending | 47 V4 tests at 374cce8; 4 setup tests at 68c6f4d |
+| F10 ABI/EIP-712 parity | Partial | Compiled ABI checker passed at 374cce8; cross-language Solidity digest parity pending |
 | F11 Security/science review | Active; mandatory pre-use gate | Static remediation pass 1 committed; open findings in audit report; no certification |
 | F12 Isolated deployment/lifecycle | Pending | Disposable keys, isolated RPC |
 | F13 Consumer marketplace/UI | Source, unvalidated | Owner-run |
@@ -65,3 +65,6 @@ Owner decisions unchanged: P-1 standby retainer rejected; P-2 keeper bounty and 
 - DEV-005: corrected undeployed ledger domain to SSEAdaptiveCommitteeVotesV4 in Solidity (4f19aeb) and Python (025a4db); added regression fixture (90d54f8). Old candidate domain signatures invalid under new domain. No V3 change.
 - DEV-006: same Solidity commit normalizes Withdrawal indexed parameter name to account. Event topic/types/values unchanged. ABI checker not weakened.
 - Next: rerun build, ABI, Python V4 tests, focused Foundry with 1024 fuzz runs and full Foundry. Inspect full size report and retain lint warnings for triage. No deployment authorization.
+
+## Owner validation at 374cce84d71496e5d8acde892d8ccb30034fffec
+All six checks exit 0: build, V4 Python (47), compiled ABI (zero mismatches), focused Foundry (52), full Foundry (305 across 32 suites), explicit size test (1; overlaps other suites). No failed/skipped tests in these runs. Focused fuzz runs 1024 each for conservation, reservation accounting and ordered sampling. Full suite uses default 256 fuzz runs. DEV-002/003/004/005/006 closed for observed failures at this checkpoint. Clean checkout. Runtime/initcode bytes: market 22986/24530, ledger 11023/11762, registry 6409/6664, board 6226/6408, standby 4636/4821. Market runtime margin 1590 bytes. Formation gas draw/activate: n7 s2 1064197/1015140; n7 s4 1229028/1044562; n10 s2 1373128/1255686; n10 s4 1541745/1287010. Foundry measurements only; E9 distributed experiment remains pending. Logs ~/sse-v4-validation-logs/374cce84d71496e5d8acde892d8ccb30034fffec. Full Python regression, browser validation, actual cross-language digest parity, resource enforcement, public endpoint security, installer readiness, qualified negative evidence, independent participation and isolated rehearsal remain open. No deployment approval.
