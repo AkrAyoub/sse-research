@@ -94,7 +94,12 @@ def make_handler(outputs):
             self.wfile.write(body)
 
         def do_POST(self):
-            n = int(self.headers.get("Content-Length", "0") or 0)
+            try:
+                n = int(self.headers.get("Content-Length", "0") or 0)
+                if n < 0 or self.headers.get("Transfer-Encoding") is not None:
+                    raise ValueError("invalid body framing")
+            except ValueError:
+                return self._send(400, {"error": "invalid body framing"})
             if n > MAX_BODY:
                 return self._send(413, {"error": "too large"})
             try:
