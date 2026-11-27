@@ -6,6 +6,8 @@ import argparse
 import json
 import os
 import time
+import tempfile
+import fcntl
 from pathlib import Path
 from urllib.request import Request, urlopen
 from urllib.error import HTTPError, URLError
@@ -33,7 +35,7 @@ def optional(fn):
     except (OSError,ValueError) as e:
         return {"available":False,"errorType":type(e).__name__}
 
-def collect():
+def collect(previous_slot=None):
     if int(rpc("eth_chainId",[]),16)!=31340:
         raise ValueError("wrong chain")
     genesis=rpc("eth_getBlockByNumber",["0x0",False])
@@ -56,13 +58,24 @@ def collect():
     head=query(BN,"/eth/v1/beacon/headers/head")["data"]["header"]["message"]
     slot=int(head["slot"])
     blocks={}
-    # Recent slots only: avoid repeated huge historical queries.
-    for s in range(max(0,slot-3),slot+1):
-        blocks[str(s)]=optional(lambda s=s:query(BN,"/eth/v1/beacon/rewards/blocks/"+str(s)))
+    start=max(0,slot-3) if previous_slot is None else max(0,slot-31,min(previous_slot-3,slot-3))
+    for s in range(start,slot+1):
+        def block_reward(s=s):
+            h=query(BN,"/eth/v1/beacon/headers/"+str(s))
+            if not h["data"]["canonical"]:
+                raise ValueError("noncanonical block header")
+            root=h["data"]["root"]
+            return {"header":h,"reward":query(BN,"/eth/v1/beacon/rewards/blocks/"+root)}
+        entry=optional(block_reward)
+        if entry["available"]:
+            pair=entry["response"]
+            entry={"available":True,"response":pair["reward"],"header":pair["header"]}
+        blocks[str(s)]=entry
     return {"schema":"SSE_NATIVE_REWARD_OBSERVATION_V1","chainId":31340,
             "observedUnixNs":time.time_ns(),"checkpoints":cp,
             "finalizedHeader":header,"finalizedValidators":validators,"attestationRewards":rewards,
-            "recentBlockRewards":blocks,"headSlot":slot,
+            "recentBlockRewards":blocks,"headSlot":slot,"collectionStartSlot":start,
+            "gapBeforeStart":previous_slot is not None and start>previous_slot+1,
             "executionFinalized":rpc("eth_getBlockByNumber",["finalized",False])}
 
 def summarize(d):
@@ -94,10 +107,60 @@ def archive(root,d):
         os.fsync(f.fileno())
     return path
 
+def atomic_json(path,value):
+    fd,tmp=tempfile.mkstemp(prefix=".native-",dir=path.parent)
+    try:
+        with os.fdopen(fd,"w") as f:
+            json.dump(value,f,separators=(",",":"))
+            f.flush()
+            os.fsync(f.fileno())
+        os.replace(tmp,path)
+    finally:
+        if os.path.exists(tmp):
+            os.unlink(tmp)
+
+def compact(d):
+    for entry in d["attestationRewards"].values():
+        if entry["available"]:
+            entry["response"]["data"].pop("ideal_rewards",None)
+    return d
+
+def tick(root,limit=2048):
+    if not 16<=limit<=100000:
+        raise ValueError("retention must be 16..100000 snapshots")
+    root.mkdir(mode=0o700,parents=True,exist_ok=True)
+    if root.is_symlink() or root.stat().st_uid!=os.getuid() or root.stat().st_mode & 0o077:
+        raise ValueError("private owner archive required")
+    fd=os.open(root/".collector.lock",os.O_CREAT|os.O_RDWR|os.O_NOFOLLOW,0o600)
+    with os.fdopen(fd,"w") as lock:
+        fcntl.flock(lock,fcntl.LOCK_EX|fcntl.LOCK_NB)
+        cursor=root/"cursor.json"
+        prev=json.loads(cursor.read_text())["headSlot"] if cursor.exists() else None
+        d=compact(collect(prev))
+        result=summarize(d)
+        result["gapBeforeStart"]=d["gapBeforeStart"]
+        result["observedUnixNs"]=d["observedUnixNs"]
+        dest=root/("sample-"+str(d["observedUnixNs"])+".json")
+        atomic_json(dest,d)
+        atomic_json(root/"latest.json",result)
+        atomic_json(cursor,{"headSlot":d["headSlot"]})
+        samples=sorted((p for p in root.glob("sample-*.json")
+                        if p.stem[7:].isdigit() and p.is_file() and not p.is_symlink()),
+                       key=lambda p:int(p.stem[7:]))
+        for p in samples[:-limit]:
+            p.unlink()
+        return {"headSlot":d["headSlot"],"finalizedEpoch":result["finalizedEpoch"],
+                "gapBeforeStart":d["gapBeforeStart"],"archive":str(dest)}
+
 def main():
     p=argparse.ArgumentParser(description=__doc__)
     p.add_argument("--output",type=Path,default=Path.home()/".local/share/sse-native-rewards")
+    p.add_argument("--tick",action="store_true")
+    p.add_argument("--retain",type=int,default=2048)
     a=p.parse_args()
+    if a.tick:
+        print(json.dumps(tick(a.output,a.retain)))
+        return
     d=collect()
     result=summarize(d)
     result["archive"]=str(archive(a.output,d))
