@@ -77,7 +77,8 @@ def policy_for(roles, wallet, keystore, caps, extra):
          "spending": caps, "selfKeep": True,  # advance only own leases (D-09); owner may set false
          "consumer": {"epochRequests": {}},
          "provider": {"approvedOfferHashes": [], "approvedTermsHashes": [], "leaseTerms": {},
-                      "profiles": {}, "offers": {}, "workers": {}},
+                      "profiles": {}, "offers": {}, "workers": {},
+                      "capacity": {"cpuCores": 0, "memoryMiB": 0, "maxConcurrentLeases": 0}},
          "monitor": {"autoConfirm": False, "allowFailureVotes": False, "providerEndpoints": {}, "services": {},
                      "approvedPolicies": {}}}
     for k, v in extra.items():
