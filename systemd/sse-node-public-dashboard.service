@@ -1,0 +1,16 @@
+[Unit]
+Description=SSE node public read-only dashboard backend
+StartLimitIntervalSec=0
+
+[Service]
+Type=simple
+EnvironmentFile=%h/.config/sse/dashboard.env
+WorkingDirectory=%h/sse-dashboard-runtime
+ExecStart=%h/.venvs/sse-v2-operator/bin/python -B %h/sse-dashboard-runtime/services/node-console/v2_status_app.py --node-id ${SSE_NODE_ID} --roles ${SSE_ROLES} --el ${SSE_EL} --v2-manifest %h/sse-dashboard-runtime/evidence/r261_vm4707_latest_state_v2_deployment_candidate.json --port 8767 --public-readonly --serve
+Restart=always
+RestartSec=5
+NoNewPrivileges=true
+UMask=0077
+
+[Install]
+WantedBy=default.target

@@ -1,0 +1,70 @@
+{
+  "schema": "SSE_R291_EXISTING_ORIGINAL_CHAIN31340_PUBLIC_OVERLAY_REUSE_AND_NEW_APP_ROLE_VM_SOURCE_ONLY_V1",
+  "date": "2026-11-24",
+  "bindingSourceDocs": [
+    "docs/ARCHITECTURE.md",
+    "docs/R61_COMMON_PERMISSIONLESS_P2P_BOOTSTRAP.md",
+    "docs/R55_ZEROTIER_CROSS_HOST_IPV6_TRANSPORT.md",
+    "docs/R225_VM4707_VM4709_FINALIZED_EPOCH602_MATCH_SKEW_RESTRICTION.md"
+  ],
+  "originalChain": {
+    "chainId": 31340,
+    "actualOriginalNativeELAndCLVmNodes": [
+      "VM4706",
+      "VM4707",
+      "VM4709"
+    ],
+    "transport": "controllerless_public_zerotier_adhoc_ipv6",
+    "networkId": "ff2328775f000000",
+    "ipv66planePrefix": "fca0::/16",
+    "allowedDestinationPorts": "9000..30559",
+    "originalActualPeerEvidence": {
+      "vm4707ExecutionPeers": 2,
+      "vm4707BeaconPeers": 2,
+      "vm4709ExecutionPeers": 2,
+      "vm4709BeaconPeers": 2,
+      "bothObservedFinalizedEpoch": 602,
+      "matchingFinalizedRoot": "0x9d140067a9049103fc482221713f2f0c46cf7d0a89593bef4d6e19fb0dddecd7",
+      "formal180SecondCaptureSkewPassed": false
+    },
+    "outsideCloudWslOverlayRealTcpAndUdpRoundTripVerifiedEarlier": true,
+    "outsideCloudWslNativeELCLPeerSyncVerified": false,
+    "planetaryRootRelayDependencyRemains": true
+  },
+  "latestActualVM4711to4714State": {
+    "r288SafetyTestsPassedEach": 21,
+    "newSeparateLabSshKeypairCreatedOnEachMonitor4711to4713": true,
+    "vm4714AuthorizedKeysObservedBytes": 0,
+    "privateIpSshAuthenticationConfigured": false,
+    "realVm4714DockerCpuWorkerPreviouslyVerifiedRunning": true,
+    "newVMsActualZeroTierInstalledStatusUnknown": true,
+    "newVMsPublicOverlayMembershipObserved": false,
+    "newVMsActualOpenOverlayTcpUdpRoundTripObserved": false,
+    "newEvmNativeTransactionsSignedOrSubmitted": false
+  },
+  "githubSourceOnlyR291": {
+    "newSource": [
+      "tools/sse_pos_r291_common_public_overlay_onboarding.py",
+      "tools/sse_pos_r291_verified_vendor_package_only.py",
+      "scripts/r291_vm4711_4714_signed_overlay_install.sh"
+    ],
+    "newTests": [
+      "tests/test_sse_pos_r291_common_public_overlay_onboarding.py",
+      "tests/test_sse_pos_r291_verified_vendor_package_only.py"
+    ],
+    "authoredFocusedTests": 30,
+    "ownerVmNewFocusedTestsPassed": false,
+    "actualR291ZerotierJoinSubmitted": false,
+    "actualR291VendorSignedPackageInstallationExecuted": false,
+    "existingVMSignerDockerSshChanged": false,
+    "prohibitsPrivateInfrastructureDataPlane": true,
+    "doesNotRequirePreapprovedMonitorSshKeys": true,
+    "doesNotSetVmRoleMembershipCaps": true,
+    "packageAutomaticUnrelatedServiceRestartsDisabled": true
+  },
+  "funding": {
+    "originalThreeNativeRoleGrantsFinalized": true,
+    "newFourStandbyEoasStillUnfunded": true,
+    "newFourAdditionalNativeGrantFundingAuthorized": false
+  }
+}

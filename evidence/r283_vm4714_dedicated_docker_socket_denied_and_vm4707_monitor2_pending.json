@@ -1,0 +1,49 @@
+{
+  "schema": "SSE_R283_VM4714_EXACT_DOCKER_PERMISSION_BARRIER_AND_NATIVE_MONITOR2_PREDECESSOR_PENDING_V1",
+  "observedUtcDate": "2026-11-24",
+  "vm4714": {
+    "owner": "ayoubakrvm4714",
+    "sourceSha": "847f3196cedad92963e0854e628aa20a2ce4acca",
+    "r281FocusedMockedTestsPassed": 8,
+    "readOnlyWorkerPreviewPassed": true,
+    "plannedWorkerName": "sse-compute-vm4714",
+    "plannedLoopbackEndpoint": "http://127.0.0.1:8877",
+    "plannedCpuMilli": 500,
+    "plannedMemoryBytes": 268435456,
+    "rootfulDockerSocket": "/var/run/docker.sock",
+    "socketOwner": "root",
+    "socketGroup": "docker",
+    "socketMode": "0660",
+    "unprivilegedDockerInspectionFailedPermissionDenied": true,
+    "rootlessDockerScriptsFoundOnHost": false,
+    "realDockerWorkerStarted": false,
+    "realPhysicalCpuMeasured": false,
+    "walletAlreadyEncryptedEOA": "0x016B91ED50Ec350e600327C4287F2ED882E0Cf66",
+    "walletTestEthFunded": false
+  },
+  "vm4707": {
+    "owner": "ayoubakrvm4707",
+    "sourceSha": "847f3196cedad92963e0854e628aa20a2ce4acca",
+    "r282ReadOnlyMockedTestsPassed": 6,
+    "actualR282ReadOnlyResult": "MONITOR2_NOT_FINALIZED_NO_STANDBY_FUNDING_QUOTE",
+    "monitor2PendingActualTxHash": "0x0c6b2e79f930b8e23e5ee9b32bd151733bb09d88a7ecbc8c145cec091cdb389a",
+    "monitor2PreviousCanonicalSuccessfulObserved": true,
+    "monitor2FinalizedAtNewR282Read": false,
+    "realRpcBalanceAndRecipientNewGrantQuotePerformed": false,
+    "fourNewStandbyGrantsAuthorized": false,
+    "transactionsSignedOrSentByR282": false
+  },
+  "gitHubR283SourceOnly": {
+    "vm4714ExplicitSudoLocalDockerModeAdded": true,
+    "requiresOwnerTerminalTypedConsent": true,
+    "onlyExactNonrootVm4714UserAllowed": true,
+    "onlyExactWorkerNameAndLoopbackAllowed": true,
+    "strictRealDockerCapsInspected": true,
+    "noDockerPrivilegeFallback": true,
+    "noExistingContainerOnHostAllowed": true,
+    "nativePoSHostDockerUntouched": true,
+    "newSudoModeExecutedByOwner": false,
+    "newMockedTestsAuthored": 8,
+    "newMockedTestsOwnerVm4714Executed": false
+  }
+}

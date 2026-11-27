@@ -67,6 +67,10 @@ contract SSEAdaptiveMarketV2 is EIP712 {
         uint256 entropyBlock;
         Phase phase;
         bool providerAccepted;
+        // Per-lease progress anchor; never extends via an arbitrary caller.
+        // confirmationSeconds also bounds post-accept idle time, providing
+        // a negotiated escape from malicious consumer lock-up of monitor bonds.
+        uint64 lastProgressAt;
     }
     struct Epoch {
         bytes32 requestHash;
@@ -121,6 +125,7 @@ contract SSEAdaptiveMarketV2 is EIP712 {
     event EpochConcluded(uint256 indexed leaseId, uint256 indexed epochId, SSEAdaptiveVoteLedger.Outcome outcome);
     event InconclusiveAllocated(uint256 indexed leaseId, uint256 indexed epochId, uint256 consumerShare, uint256 providerShare);
     event LeaseClosed(uint256 indexed leaseId, uint256 returnedServiceWei);
+    event LeaseIdleExpired(uint256 indexed leaseId, uint256 unresolvedFeeWei, uint256 refundedUnusedWei);
     event LeaseCancelled(uint256 indexed leaseId);
     event Withdrawal(address indexed account, uint256 amount);
 
@@ -388,6 +393,7 @@ contract SSEAdaptiveMarketV2 is EIP712 {
         if (block.timestamp > c.confirmationDeadline || c.confirmationExpired)
             revert InvalidPhase();
         l.providerAccepted = true;
+        l.lastProgressAt = uint64(block.timestamp);
         emit ProviderAccepted(leaseId);
     }
 
@@ -396,6 +402,8 @@ contract SSEAdaptiveMarketV2 is EIP712 {
         if (msg.sender != l.consumer) revert Unauthorized();
         if (!l.providerAccepted || (l.phase != Phase.Assigned && l.phase != Phase.Active)
             || l.nextEpoch >= l.maxEpochs || l.nextEpoch != l.closedEpochs ||
+            l.lastProgressAt == 0 ||
+            block.timestamp > uint256(l.lastProgressAt) + l.confirmationSeconds ||
             requestHash == bytes32(0)) revert InvalidPhase();
         SSEAdaptiveVoteLedger.Committee memory c = votes.committee(leaseId);
         if (!c.ready) revert InvalidPhase();
@@ -408,6 +416,7 @@ contract SSEAdaptiveMarketV2 is EIP712 {
         e.fee = l.epochFee;
         e.exists = true;
         l.phase = Phase.Active;
+        l.lastProgressAt = uint64(block.timestamp);
         votes.openEpoch(leaseId, epochId, requestHash,
                         uint64(responseDeadline), uint64(monitoringClose));
         emit EpochStarted(leaseId, epochId, requestHash);
@@ -446,6 +455,7 @@ contract SSEAdaptiveMarketV2 is EIP712 {
         }
         e.resolved = true;
         ++l.closedEpochs;
+        l.lastProgressAt = uint64(block.timestamp);
         l.serviceRemaining -= e.fee;
         totalServiceEscrow -= e.fee;
         _credit(outcome == SSEAdaptiveVoteLedger.Outcome.Success ? l.provider : l.consumer, e.fee);
@@ -472,11 +482,55 @@ contract SSEAdaptiveMarketV2 is EIP712 {
         ++e.nonce;
         e.resolved = true;
         ++l.closedEpochs;
+        l.lastProgressAt = uint64(block.timestamp);
         l.serviceRemaining -= e.fee;
         totalServiceEscrow -= e.fee;
         _credit(l.consumer, consumerShare);
         _credit(l.provider, providerShare);
         emit InconclusiveAllocated(leaseId, epochId, consumerShare, providerShare);
+    }
+
+    /// @notice Permissionless escape when a funded lease owner stops
+    /// progressing after provider acceptance. The per-lease negotiated
+    /// confirmationSeconds is also the maximum permitted idle interval.
+    /// This does NOT invent a service verdict or confiscate monitor bonds.
+    /// When an epoch remains inconclusive, only unused FUTURE service
+    /// epochs are refunded; the unresolved epoch fee stays in escrow for
+    /// the original consumer+provider bilateral EIP-712 allocation.
+    /// Any caller may first seal a finished monitoring period using
+    /// finalizeEpoch; a payable Success/Failure quorum must be finalized
+    /// normally before this call can close the lease.
+    function forceCloseIdle(uint256 leaseId) external {
+        Lease storage l = leases[leaseId];
+        if (!l.providerAccepted ||
+            (l.phase != Phase.Assigned && l.phase != Phase.Active) ||
+            l.lastProgressAt == 0 ||
+            block.timestamp <= uint256(l.lastProgressAt) + l.confirmationSeconds)
+            revert InvalidPhase();
+
+        uint256 unresolvedFee;
+        if (l.nextEpoch != l.closedEpochs) {
+            // Only one outstanding epoch is permitted by startEpoch.
+            if (l.nextEpoch != l.closedEpochs + 1) revert InvalidPhase();
+            Epoch storage e = epochs[leaseId][l.closedEpochs];
+            SSEAdaptiveVoteLedger.Epoch memory v = votes.epoch(leaseId, l.closedEpochs);
+            if (!e.exists || e.resolved || !v.monitoringSealed ||
+                v.outcome != SSEAdaptiveVoteLedger.Outcome.None)
+                revert InvalidPhase();
+            unresolvedFee = e.fee;
+        }
+
+        // The ledger will refuse any unsealed epoch; every selected
+        // monitor's bond is released exactly once below after closeReporting.
+        votes.closeReporting(leaseId);
+        _unlockSeats(leaseId);
+        l.phase = Phase.Closed;
+        uint256 refundable = l.serviceRemaining - unresolvedFee;
+        l.serviceRemaining = unresolvedFee;
+        totalServiceEscrow -= refundable;
+        _credit(l.consumer, refundable);
+        emit LeaseIdleExpired(leaseId, unresolvedFee, refundable);
+        emit LeaseClosed(leaseId, refundable);
     }
 
     function closeLease(uint256 leaseId) external {

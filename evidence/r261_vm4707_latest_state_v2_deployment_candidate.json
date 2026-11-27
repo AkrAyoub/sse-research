@@ -1,0 +1,16 @@
+{
+  "schema": "SSE_R206_ADAPTIVE_MARKET_V2_DEPLOYMENT_V1",
+  "chainId": 31340,
+  "executionGenesisHash": "0x5f7cbcd4f1ddfbbedbdd2b180b83d9eff49d4b7263643858d7be2e9c243936bf",
+  "deployer": "0xED0ED5E0526898c6E0e3C83140efcA12672E7ff0",
+  "deploymentTxHash": "0xe9187bd24d72d2dec11fc6a2758802ddf6fa46a2941edd306329173fe132d6b6",
+  "minimumBondWei": "1000000000000000",
+  "market": {
+    "address": "0x6C01dBd7aA336a96d8Ab09Ea631E209612224080",
+    "runtimeSha256": "aed48968f9b5ef4e8f238efaed8c539af5c8799de181f290b38a21803386c261"
+  },
+  "ledger": {
+    "address": "0x6635849b77f037fab611736612d7d3493dc650ff",
+    "runtimeSha256": "3a14ac0cd120271c50ac31661b6080546477aa8218e9944e51dd89998b78622d"
+  }
+}

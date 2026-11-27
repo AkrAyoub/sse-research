@@ -1,0 +1,55 @@
+{
+  "schema": "SSE_R288_REAL_3_MONITOR_HOST_PIN_VERIFIED_BUT_DIRECT_SSH_PUBLIC_KEY_LOGIN_NOT_CONFIGURED_V1",
+  "observedDateUtc": "2026-11-24",
+  "sourceShaForOwnerTest": "add16707b3b7bc6abe5ffc7370d8269efc8f5c5a",
+  "provider": {
+    "vm": "VM4714",
+    "owner": "ayoubakrvm4714",
+    "addressPrivate": "10.50.56.22",
+    "sshHostPublicEd25519KeyFingerprintFromTrustedProviderTerminal": "SHA256:jWl81QyIY7+m7Y51lzA2g0wM6F0lIuvdE3bv2SeAFoY",
+    "publicHostKeyOnlyRead": true,
+    "sshPrivateKeyRead": false
+  },
+  "monitors": [
+    {
+      "vm": "VM4711",
+      "owner": "ayoubakrvm4711",
+      "r287UnitTestsPassed": 14,
+      "actualProviderConsoleFingerprintVerified": true,
+      "sshNoninteractivePublicKeyLoginVerified": false,
+      "actualSshTunnelingAttempted": false
+    },
+    {
+      "vm": "VM4712",
+      "owner": "ayoubakrvm4712",
+      "r287UnitTestsPassed": 14,
+      "actualProviderConsoleFingerprintVerified": true,
+      "sshNoninteractivePublicKeyLoginVerified": false,
+      "actualSshTunnelingAttempted": false
+    },
+    {
+      "vm": "VM4713",
+      "owner": "ayoubakrvm4713",
+      "r287UnitTestsPassed": 14,
+      "actualProviderConsoleFingerprintVerified": true,
+      "sshNoninteractivePublicKeyLoginVerified": false,
+      "actualSshTunnelingAttempted": false
+    }
+  ],
+  "providerFocusedTestsPassed": 14,
+  "newAggregateFocusedTestsPassed": 56,
+  "reportedInvalidFingerprintUsedOnFirstAttempt": "29111805200603600369",
+  "invalidFingerprintFirstAttemptRejectedSafely": true,
+  "directSshLoginUnavailabilityCouldResultFromMissingClientKeyOrProviderAuthorizedKeysOrSshdPolicy": true,
+  "authorizedKeyFilesEditedByR287": false,
+  "sshClientPrivateKeysCopiedOrPrinted": false,
+  "actualRemoteCpuOverSshVerified": false,
+  "originalWorkerDockerChanged": false,
+  "originalNativeChainTransactionsSignedOrBroadcast": false,
+  "newFourVmNativeFundingApproved": false,
+  "newR288OwnerRestrictedSshBootstrapSourceAuthored": true,
+  "newR288SafetyTestsAuthored": 18,
+  "newR288SafetyTestsOwnerVmExecuted": false,
+  "newR288SshKeysActuallyCreatedByAssistant": false,
+  "newR288ProviderAuthorizedKeysChangedByAssistant": false
+}

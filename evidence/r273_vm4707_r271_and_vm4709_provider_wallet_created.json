@@ -1,0 +1,62 @@
+{
+  "schema": "SSE_R273_REAL_VM4707_CONSUMER_CANONICAL_PENDING_AND_VM4709_PROVIDER_WALLET_CREATED_V1",
+  "observedDateUtc": "2026-11-24",
+  "vm4707": {
+    "sourceSha": "4eafadae5e27a6bc5ff6467c3a76996858dbdcb5",
+    "r271TestsPassed": 5,
+    "actualNativeReadOnlyR271Passed": true,
+    "executionChainId": 31340,
+    "consumerAddress": "0xD74A2aBC5a906BaFe39471CEe222c48BDD62DE3f",
+    "consumerFundingTxHash": "0x9f3a13cb295b5ba2f642804a30c391b9cce266784a83dd293d0dd7fb7d1f9fdd",
+    "includedBlock": 25564,
+    "executionHead": 25697,
+    "finalizedExecutionHeight": 25556,
+    "gapBlocksToFinality": 8,
+    "beaconHeadSlot": 27309,
+    "beaconHeadEpoch": 853,
+    "beaconFinalizedEpoch": 849,
+    "consumerBalanceLatestWei": "10000000000000000",
+    "consumerBalanceFinalizedWei": "0",
+    "txSuccessfulAndCanonical": true,
+    "consumerTxFinalized": false,
+    "monitor1TransactionSent": false,
+    "monitor2TransactionSent": false
+  },
+  "vm4709": {
+    "sourceSha": "a52050f89a7bce7e811eced98ab3e57aa7303db6",
+    "r272TestsPassed": 7,
+    "actualR272ReadOnlyPassed": true,
+    "linuxUser": "ayoubakrvm4709",
+    "logicalCpus": 4,
+    "memAvailableBytes": 11272003584,
+    "diskFreeBytes": 97732464640,
+    "dockerCliExists": true,
+    "dockerSocketUserPermissionDenied": true,
+    "dockerRootReadOnlyListWorked": true,
+    "actualDockerContainersAtObservation": [
+      {
+        "name": "sse31340-r137-node-8be265272c35f3d8c3a0-bn",
+        "status": "Up 30 hours"
+      },
+      {
+        "name": "sse31340-r137-node-8be265272c35f3d8c3a0-el",
+        "status": "Up About an hour (healthy)"
+      }
+    ],
+    "venvInstalled": true,
+    "appDependenciesInstalledFromRequirements": true,
+    "providerWalletCreated": true,
+    "providerRole": "adaptive-v2-provider",
+    "providerAddress": "0xBbd4F07be80E1f4c40A1b470A180C0F38352bEaf",
+    "localPrivateKeystorePathNotContents": "/home/ayoubakrvm4709/.local/share/sse-v2-app-only/adaptive-v2-provider.keystore.json",
+    "encrypted": true,
+    "passwordOrPrivateKeyPrinted": false,
+    "providerTestEthFunded": false,
+    "realDockerComputeWorkerRunningProven": false,
+    "dockerOrValidatorMutated": false
+  },
+  "independentPhysicalOperatorsVerified": false,
+  "publicInternetNativeP2pVerified": false,
+  "realPaidPhysicalSlaVerified": false,
+  "additionalNativeTestEthTransactionsAuthorized": false
+}

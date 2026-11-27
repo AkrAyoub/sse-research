@@ -11,6 +11,33 @@ on:
       - "tools/sse_pos_r206_adaptive_v2_deployment_audit.py"
       - "tests/test_sse_pos_r201_v2_readonly_live_chain_gate.py"
       - "tests/test_sse_pos_r206_adaptive_v2_deployment_audit.py"
+      - "tools/sse_pos_r226_adaptive_v2_transaction_planner.py"
+      - "tools/sse_pos_r227_v2_finalized_event_audit.py"
+      - "tools/sse_pos_r228_v2_typed_data.py"
+      - "tools/sse_pos_r229_v2_finalized_lease_snapshot.py"
+      - "tests/test_sse_pos_r226_adaptive_v2_transaction_planner.py"
+      - "tests/test_sse_pos_r227_v2_finalized_event_audit.py"
+      - "tests/test_sse_pos_r228_v2_typed_data.py"
+      - "tests/test_sse_pos_r229_v2_finalized_lease_snapshot.py"
+      - "tools/sse_pos_r231_v2_compute_wire.py"
+      - "tools/sse_pos_r232_v2_monitor_probe.py"
+      - "tools/sse_pos_r233_public_v2_compute_terms.py"
+      - "services/provider-agent/v2_compute_response_server.py"
+      - "tests/test_sse_pos_r231_v2_compute_wire.py"
+      - "tests/test_sse_pos_r232_v2_monitor_probe.py"
+      - "tests/test_sse_pos_r233_public_v2_compute_terms.py"
+      - "tests/test_sse_pos_r234_v2_compute_response_server.py"
+      - "tools/sse_pos_r237_v2_approved_local_eip712_sign.py"
+      - "tools/sse_pos_r239_v2_real_gas_quote.py"
+      - "services/node-console/v2_status_app.py"
+      - "tests/test_sse_pos_r237_v2_approved_local_eip712_sign.py"
+      - "tests/test_sse_pos_r238_v2_status_app.py"
+      - "tests/test_sse_pos_r239_v2_real_gas_quote.py"
+      - "scripts/r235_vm4707_v2_source_only_gate.sh"
+      - "tools/sse_pos_r242_v2_owner_local_send.py"
+      - "tests/test_sse_pos_r242_v2_owner_local_send.py"
+      - "tools/sse_pos_r247_v2_compiled_abi_parity.py"
+      - "tests/test_sse_pos_r247_v2_compiled_abi_parity.py"
       - ".github/workflows/sse-adaptive-v2-source.yml"
   workflow_dispatch:
 
@@ -29,13 +56,33 @@ jobs:
       - uses: foundry-rs/foundry-toolchain@v1
         with:
           version: v1.9.0
+      - name: Install pinned Python application test dependencies
+        run: python3 -m pip install --disable-pip-version-check -r requirements.txt
+      - name: Compile R226-R229 unsigned operator modules
+        run: python3 -m compileall -q tools/sse_pos_r22*.py tests/test_sse_pos_r22*.py
+      - name: Test V2 role planner, finalized event log and typed evidence APIs
+        run: python3 -B -m unittest discover -s tests -p 'test_sse_pos_r22*.py' -v
+      - name: Compile R231-R234 provider and monitor modules
+        run: python3 -m compileall -q tools/sse_pos_r23*.py services/provider-agent/v2_compute_response_server.py services/node-console/v2_status_app.py tests/test_sse_pos_r23*.py
+      - name: Test actual-provider-wire transport policies and local Docker/HTTP adapters
+        run: python3 -B -m unittest discover -s tests -p 'test_sse_pos_r23*.py' -v
+      - name: Source-only R242 one-transaction safety policy syntax
+        run: python3 -m py_compile tools/sse_pos_r242_v2_owner_local_send.py tests/test_sse_pos_r242_v2_owner_local_send.py
+      - name: Source-only one-transaction owner-consent and no-broadcast policy tests
+        run: python3 -B -m unittest discover -s tests -p 'test_sse_pos_r242_v2_owner_local_send.py' -v
       - name: Compile and report contract size
         run: forge build --sizes
+      - name: R247 compiled ABI parity unit tests
+        run: python3 -B -m unittest discover -s tests -p 'test_sse_pos_r247_v2_compiled_abi_parity.py' -v
+      - name: Verify compiled V2 Solidity ABI versus off-chain Python actions events and tuples
+        run: python3 -B tools/sse_pos_r247_v2_compiled_abi_parity.py
       - name: Adversarial adaptive-marketplace EVM tests
         run: forge test --match-contract SSEAdaptiveMarketV2Test -vv
       - name: Read-only chain-gate policy tests (mock transport only)
         run: python3 -B -m unittest discover -s tests -p 'test_sse_pos_r201_v2_readonly_live_chain_gate.py' -v
       - name: Read-only deployment-audit policy tests (mock transport only)
         run: python3 -B -m unittest discover -s tests -p 'test_sse_pos_r206_adaptive_v2_deployment_audit.py' -v
+      - name: Whole Python source regression without live VM or chain writes
+        run: python3 -B -m unittest discover -s tests
       - name: Full Foundry regression
         run: forge test -q

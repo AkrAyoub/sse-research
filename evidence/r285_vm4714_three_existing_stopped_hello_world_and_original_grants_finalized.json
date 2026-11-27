@@ -1,0 +1,48 @@
+{
+  "schema": "SSE_R285_ACTUAL_OWNER_VM4714_PREEXISTING_HARMLESS_STOPPED_CONTAINERS_NO_DELETE_AND_FINALIZED_FUNDS_V1",
+  "observedDateUtc": "2026-11-24",
+  "vm4714": {
+    "r283SafetyUnitTestsPassed": 8,
+    "r281WorkerUnitTestsPassed": 8,
+    "existingDockerInspectorUnitTestsPassed": 16,
+    "observedAllContainers": 3,
+    "observedRunningContainers": 0,
+    "actualReadOnlySudoDockerAvailable": true,
+    "containers": [
+      {
+        "id": "0736e142f5d925c8a63771d6ce08d02cc2723509e06f9d3b638f35d306f88084",
+        "name": "serene_sammet",
+        "image": "hello-world",
+        "psStatus": "Exited (0) 5 months ago"
+      },
+      {
+        "id": "dc71dc02b5e4375535c2fc69e90c0dc62322e72a4550b46e0c7f6d90f6e9434c",
+        "name": "friendly_saha",
+        "image": "hello-world",
+        "psStatus": "Exited (0) 5 months ago"
+      },
+      {
+        "id": "ff494d7657a18a7f0a6ecce74ceb9edf97250c8ae64cacaa23aa166d8524aade",
+        "name": "zealous_wilson",
+        "image": "hello-world",
+        "psStatus": "Exited (0) 5 months ago"
+      }
+    ],
+    "allExistingContainersPreserved": true,
+    "newComputeContainerBuiltOrRun": false,
+    "newDockerComputeMeasurementProven": false,
+    "newR285SafetyGateAuthoredOnGithub": true,
+    "newR285GateTestsAuthoredOnGithub": 9,
+    "newR285OwnerVmTestsActuallyRun": false,
+    "newR285LiveExistingContainerInspectActuallyRun": false,
+    "newR285RealCpuWorkerActuallyRun": false
+  },
+  "vm4707": {
+    "threePreviouslyOwnerApprovedOriginalNativeFundingTransfersFinalized": true,
+    "fourAdditionalNewStandbyVmFundsQuotedAsClean": true,
+    "fourAdditionalFundingNotYetAuthorized": true,
+    "maximumFourGrantCombinedDebitWei": "20000000084000000",
+    "newStandbyFundingTransactionSubmitted": false
+  },
+  "noPrivateKeyAccessOrValidatorChange": true
+}

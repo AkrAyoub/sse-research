@@ -1,0 +1,67 @@
+{
+  "schema": "SSE_R295_ACTUAL_OLD_VM4707_NEW_VM4711_AND_NEW_VM4712_VM4714_TCP_UDP_ON_ORIGINAL_OPEN_NETWORK_V1",
+  "ownerReportDate": "2026-11-25",
+  "pinnedSourceCommit": "30bbfa33186f05a0fdfccedf8e93974b63c3a6ea",
+  "originalOpenOverlayNetworkId": "ff2328775f000000",
+  "tool": "tools/sse_pos_r55_zerotier_ipv6_transport.py",
+  "realIndependentClientAndServerOldNew": {
+    "clientHost": "VM4711",
+    "clientOwner": "ayoubakrvm4711",
+    "actualSourceOverlayIpv6": "fca0:2328:77a9:8951:acf0::1",
+    "serverHost": "VM4707",
+    "serverOwner": "ayoubakrvm4707",
+    "serverActuallyObservedIpv6": "fca0:2328:77b8:6578:a55::1",
+    "serverExistingOriginalNativeBesuAndLighthousePeer": true,
+    "clientHasNativeBesuAndLighthouseAttested": false,
+    "realRemoteTcpPayloadRoundTrip": true,
+    "realRemoteUdpPayloadRoundTrip": true,
+    "realBothTransportPayloadRoundTrips": true,
+    "tcpRttMs": 356.75,
+    "udpRttMs": 0.85,
+    "serverRealRemoteTcpRequestReceived": true,
+    "serverRealRemoteUdpRequestReceived": true,
+    "serverBothTransportRequestsReceived": true,
+    "sourceUdpPortWithinNetworkPolicy": 29002,
+    "originalChainClientsChangedByThisProbe": false,
+    "nativePeerOrFinalityProvedByThisPacketProbe": false
+  },
+  "realNewToProvider": {
+    "clientHost": "VM4712",
+    "clientOwner": "ayoubakrvm4712",
+    "actualSourceOverlayIpv6": "fca0:2328:77b9:dc2a:748a::1",
+    "serverHost": "VM4714",
+    "serverOwner": "ayoubakrvm4714",
+    "actualServerOverlayIpv6": "fca0:2328:77f8:9326:689f::1",
+    "realRemoteTcpPayloadRoundTrip": true,
+    "realRemoteUdpPayloadRoundTrip": true,
+    "realBothTransportPayloadRoundTrips": true,
+    "tcpRttMs": 349.99,
+    "udpRttMs": 0.6,
+    "serverRealRemoteTcpRequestReceived": true,
+    "serverRealRemoteUdpRequestReceived": true,
+    "serverBothTransportRequestsReceived": true
+  },
+  "alreadyObservedEarlier": {
+    "clientHost": "VM4711",
+    "serverHost": "VM4714",
+    "realBothTransportPayloadRoundTrips": true,
+    "tcpRttMs": 346.55,
+    "udpRttMs": 0.91,
+    "originalEvidence": "evidence/r294_vm4711_vm4714_actual_public_overlay_tcp_udp_confirmed.json"
+  },
+  "remaining": {
+    "vm4713ToVm4714ActualR55ClientReport": false,
+    "vm4713ToVm4714ServerPairedReport": false,
+    "separatePhysicalIspProof": false,
+    "newApplicationHostNativeELCLSyncProof": false,
+    "newOpenOverlaySignedComputeGatewayProof": false,
+    "finalizedPaidV2LeaseAndBondedCommitteeProof": false
+  },
+  "unchanged": {
+    "newFourVmAppWalletsUnfunded": true,
+    "additionalFourVmNativeTestEthGrantsNotYetApproved": true,
+    "oldThreePreviouslyApprovedGrantsFinalized": true,
+    "rawVm4714DockerWorkerNotExposedToOverlay": true,
+    "originalNativePoSClientKeysNotTouchedByThisProbe": true
+  }
+}

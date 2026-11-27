@@ -1,0 +1,74 @@
+{
+  "schema": "SSE_R287_OWNER_ACTUAL_FOUR_VM_NETWORK_AND_CURRENT_CPU_WORKER_READONLY_V1",
+  "observedUtcDate": "2026-11-24",
+  "sourceSha": "03abca776f8cefd33cfd381e885cb8f25c7303c2",
+  "privateProvider": {
+    "user": "ayoubakrvm4714",
+    "privateIPv4": "10.50.56.22",
+    "workerContainerId": "59b9086543110acd2ef44da7fddeb100ab0341204de3dac595093803985f535b",
+    "workerImageId": "sha256:848cde736008713d2f72e8de20cc669326abc678e41f644d3d63480ce77bd20d",
+    "workerDockerRuntimeIdAndImageReverifiedActual": true,
+    "strictDockerConfigReauditedActual": true,
+    "actualSecondIndependentLocalCpuChallengeVerified": true,
+    "cpuSha256Rounds": 8192,
+    "observedSecondCpuLocalResponseSeconds": 0.015428,
+    "observedSecondRequestHash": "0xb3d6a1d7244cfa5ff2410b59cda6ed0e900d73e4713eca78efe15f37b256ffda",
+    "observedSecondDigest": "sha256:676dbe62ec36cd3f42a14ee6b65e3753be3a5ae71df244161b1a886732728abe",
+    "workerRawHttpLocalOnly": true,
+    "peerPrivateIPRawPort8877Connection": "TCP_REFUSED",
+    "directRemoteHttpsProviderEstablished": false,
+    "realOnChainLeaseOrSlaVerified": false,
+    "productionHardwareAttestation": false
+  },
+  "vmNetworkObservations": [
+    {
+      "vm": "VM4711",
+      "user": "ayoubakrvm4711",
+      "focusedTestsPassed": 9,
+      "sshPrivateTcp22": "TCP_HANDSHAKE_SUCCEEDED",
+      "sshTcpElapsedMs": 2,
+      "rawWorkerPrivateTcp8877": "TCP_REFUSED",
+      "sshUserPublicKeyAuthenticationVerified": false,
+      "remoteCpuOverSshVerified": false
+    },
+    {
+      "vm": "VM4712",
+      "user": "ayoubakrvm4712",
+      "focusedTestsPassed": 9,
+      "sshPrivateTcp22": "TCP_HANDSHAKE_SUCCEEDED",
+      "sshTcpElapsedMs": 1,
+      "rawWorkerPrivateTcp8877": "TCP_REFUSED",
+      "sshUserPublicKeyAuthenticationVerified": false,
+      "remoteCpuOverSshVerified": false
+    },
+    {
+      "vm": "VM4713",
+      "user": "ayoubakrvm4713",
+      "focusedTestsPassed": 9,
+      "sshPrivateTcp22": "TCP_HANDSHAKE_SUCCEEDED",
+      "sshTcpElapsedMs": 1,
+      "rawWorkerPrivateTcp8877": "TCP_REFUSED",
+      "sshUserPublicKeyAuthenticationVerified": false,
+      "remoteCpuOverSshVerified": false
+    },
+    {
+      "vm": "VM4714",
+      "user": "ayoubakrvm4714",
+      "focusedTestsPassed": 9,
+      "sshPrivateTcp22": "TCP_HANDSHAKE_SUCCEEDED",
+      "sshTcpElapsedMs": 0,
+      "rawWorkerPrivateTcp8877": "TCP_REFUSED",
+      "workerActualLocalCpuRechecked": true
+    }
+  ],
+  "aggregateNewR286SafetyTestsPassed": 36,
+  "sshHostAuthenticityFingerprintIndependentlyVerified": false,
+  "sshUserAuthenticationFromMonitorVmsVerified": false,
+  "outsideCloudProviderPublicInternetAccessVerified": false,
+  "monitorSeparateVirtualMachinesVerified": true,
+  "monitorIndependentOperatorsOrHypervisorsVerified": false,
+  "newNativeFundingAuthorized": false,
+  "newNativeTransactionsSent": false,
+  "existingPoSNodeOrValidatorChanged": false,
+  "newDockerWorkerRestartedOrModified": false
+}

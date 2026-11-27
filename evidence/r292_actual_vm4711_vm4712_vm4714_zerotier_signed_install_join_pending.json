@@ -1,0 +1,68 @@
+{
+  "schema": "SSE_R292_ACTUAL_THREE_NEW_VM_SIGNED_ZEROTIER_INSTALL_AND_PENDING_PUBLIC_JOIN_OBSERVATIONS_V1",
+  "recordedAsOf": "2026-11-24",
+  "ownerExecutedSourceSha": "b8aabf923407d45a6c518b0684cb2f68a1bc66bb",
+  "sharedPublicOverlayNetworkId": "ff2328775f000000",
+  "memberHostObservations": [
+    {
+      "vm": "VM4711",
+      "owner": "ayoubakrvm4711",
+      "r291OpenOverlaySafetyTestsPassed": 18,
+      "r291SignedPackageSafetyTestsPassed": 12,
+      "ownerExplicitSignedAptInstallConsentGiven": true,
+      "vendorVerifiedPackageInstalled": true,
+      "zerotierDaemonEnabledStarted": true,
+      "ownerExplicitPublicNetworkJoinConsentGiven": true,
+      "actualZeroTierJoinCommandSent": true,
+      "zerotierDaemonOnlineAfterJoin": true,
+      "networkMembershipListedAfterJoin": true,
+      "networkReportsOkPublicImmediatelyAfterJoin": false,
+      "usable6planeOverlayIpv6Observed": false
+    },
+    {
+      "vm": "VM4712",
+      "owner": "ayoubakrvm4712",
+      "r291OpenOverlaySafetyTestsPassed": 18,
+      "r291SignedPackageSafetyTestsPassed": 12,
+      "ownerExplicitSignedAptInstallConsentGiven": true,
+      "vendorVerifiedPackageInstalled": true,
+      "zerotierDaemonEnabledStarted": true,
+      "ownerExplicitPublicNetworkJoinConsentGiven": true,
+      "actualZeroTierJoinCommandSent": true,
+      "zerotierDaemonOnlineAfterJoin": true,
+      "networkMembershipListedAfterJoin": true,
+      "networkReportsOkPublicImmediatelyAfterJoin": false,
+      "usable6planeOverlayIpv6Observed": false
+    },
+    {
+      "vm": "VM4714",
+      "owner": "ayoubakrvm4714",
+      "r291OpenOverlaySafetyTestsPassed": 18,
+      "r291SignedPackageSafetyTestsPassed": 12,
+      "ownerExplicitSignedAptInstallConsentGiven": true,
+      "vendorVerifiedPackageInstalled": true,
+      "zerotierDaemonEnabledStarted": true,
+      "ownerExplicitPublicNetworkJoinConsentGiven": true,
+      "actualZeroTierJoinCommandSent": true,
+      "zerotierDaemonOnlineAfterJoin": true,
+      "networkMembershipListedAfterJoin": true,
+      "networkReportsOkPublicImmediatelyAfterJoin": false,
+      "usable6planeOverlayIpv6Observed": false
+    }
+  ],
+  "totalActuallyRunR291FocusedTests": 90,
+  "vm4713R291EvidenceProvided": false,
+  "networkSettlingMayBeAsynchronous": true,
+  "networkSuccessNotClaimed": true,
+  "activePublicOverlayNativeELCLPeersOnNewHostsVerified": false,
+  "actualPublicOverlayTcpUdpCrossHostMeasuredOnNewHosts": false,
+  "vm4714WorkerDockerModifiedByTheseCommands": false,
+  "newSshNetworkAdmissionRequired": false,
+  "newEvmNativeTransactionsSignedOrSubmitted": false,
+  "ownerFutureAction": "READONLY_R291_STATUS_AND_ZEROTIER_JSON_NETWORK_INFO; DO_NOT_REPEAT_JOIN_ON_VM4711_VM4712_VM4714",
+  "funding": {
+    "threeEarlierOriginalRoleGrantsFinalized": true,
+    "fourNewEoasFunded": false,
+    "fourNewNativeRoleGrantsAuthorized": false
+  }
+}

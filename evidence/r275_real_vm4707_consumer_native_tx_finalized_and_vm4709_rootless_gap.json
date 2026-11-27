@@ -1,0 +1,52 @@
+{
+  "schema": "SSE_R275_REAL_CONSUMER_31340_NATIVE_FINALIZED_AND_VM4709_ROOTLESS_NOT_READY_V1",
+  "observedUtcDate": "2026-11-24",
+  "vm4707": {
+    "realR271ReadOnlyExecuted": true,
+    "chainId": 31340,
+    "consumerNativeFundingTx": "0x9f3a13cb295b5ba2f642804a30c391b9cce266784a83dd293d0dd7fb7d1f9fdd",
+    "consumerEOA": "0xD74A2aBC5a906BaFe39471CEe222c48BDD62DE3f",
+    "includedBlock": 25564,
+    "finalizedExecutionBlock": 25588,
+    "executionHead": 25728,
+    "transactionSuccessfulAndCanonicalAndFinalized": true,
+    "consumerLatestBalanceWei": "10000000000000000",
+    "consumerFinalizedBalanceWei": "10000000000000000",
+    "beaconHeadEpoch": 854,
+    "beaconFinalizedEpoch": 850,
+    "beaconFinalityLagEpochs": 4,
+    "monitor1FundingTxObserved": false,
+    "monitor2FundingTxObserved": false
+  },
+  "vm4709": {
+    "realR274OwnerReadOnlyExecuted": true,
+    "r274TestsPassed": 7,
+    "ownerUid": 1001,
+    "ownerRuntimeDirectory": "/run/user/1001",
+    "ownerRuntimeDirectoryPrivate0700": true,
+    "subuidStart": 165536,
+    "subuidCount": 65536,
+    "subgidStart": 165536,
+    "subgidCount": 65536,
+    "rootlessDockerdInstalled": false,
+    "rootlessKitInstalled": false,
+    "slirp4netnsInstalled": false,
+    "newuidmapInstalled": false,
+    "newgidmapInstalled": false,
+    "rootlessDockerSocketCreated": false,
+    "nativePoSDaemonModified": false,
+    "realRootlessComputeWorkerVerified": false,
+    "encryptedProviderApplicationEOACreatedPreviously": "0xBbd4F07be80E1f4c40A1b470A180C0F38352bEaf",
+    "providerApplicationEOAFunded": false
+  },
+  "sourceOnlyNewR275": {
+    "strictPrivateSocketEnforcementGitHubAuthored": true,
+    "Vm4709Executed": false,
+    "newFocusedTestsAuthored": 9,
+    "newFocusedTestsVmExecuted": false,
+    "dockerPackagesInstalled": false,
+    "rootlessServiceStarted": false,
+    "transactionSignedOrBroadcast": false,
+    "physicalSlaProven": false
+  }
+}

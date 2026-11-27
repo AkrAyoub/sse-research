@@ -395,6 +395,126 @@ contract SSEAdaptiveMarketV2Test is Test {
         assertEq(address(votes).balance, 4 * REWARD);
     }
 
+    function testExpiredIdleCannotBeRevivedByLateConsumerEpoch() public {
+        uint256 leaseId = _fund(4);
+        _draw(leaseId);
+        _confirm(leaseId);
+        vm.prank(provider);
+        market.acceptLease(leaseId);
+        SSEAdaptiveMarketV2.Lease memory l = market.lease(leaseId);
+        vm.warp(uint256(l.lastProgressAt) + l.confirmationSeconds + 1);
+        vm.prank(consumer);
+        vm.expectRevert(SSEAdaptiveMarketV2.InvalidPhase.selector);
+        market.startEpoch(leaseId, keccak256("malicious-late-request"));
+        market.forceCloseIdle(leaseId);
+        assertEq(market.withdrawable(consumer), FEE);
+        assertEq(market.totalServiceEscrow(), 0);
+    }
+
+    function testIdleAcceptedLeaseOutsiderUnlocksMonitorsAndRefundsConsumer() public {
+        uint256 leaseId = _fund(4);
+        _draw(leaseId);
+        _confirm(leaseId);
+        vm.prank(provider);
+        market.acceptLease(leaseId);
+        SSEAdaptiveMarketV2.Lease memory l = market.lease(leaseId);
+        address[] memory selected = votes.selected(leaseId);
+        vm.expectRevert(SSEAdaptiveMarketV2.InvalidPhase.selector);
+        market.forceCloseIdle(leaseId);
+        vm.warp(uint256(l.lastProgressAt) + l.confirmationSeconds + 1);
+        market.forceCloseIdle(leaseId); // unprivileged outsider
+        assertEq(market.withdrawable(consumer), FEE);
+        assertEq(votes.withdrawable(consumer), 4 * REWARD);
+        assertEq(market.totalServiceEscrow(), 0);
+        (, uint256 locked,) = market.monitors(selected[0]);
+        assertEq(locked, 0);
+        vm.prank(selected[0]);
+        market.exitMonitor();
+        vm.expectRevert(SSEAdaptiveMarketV2.InvalidPhase.selector);
+        market.forceCloseIdle(leaseId); // cannot double-unlock bonds
+    }
+
+    function testIdleExpiryDoesNotInventOutcomeOrDistributeInconclusiveFee() public {
+        uint256 leaseId = _open(4);
+        SSEAdaptiveMarketV2.Lease memory l = market.lease(leaseId);
+        address[] memory selected = votes.selected(leaseId);
+        vm.warp(uint256(l.lastProgressAt) + l.confirmationSeconds + 1);
+        vm.expectRevert(SSEAdaptiveMarketV2.InvalidPhase.selector);
+        market.forceCloseIdle(leaseId); // cannot skip monitor sealing
+        SSEAdaptiveVoteLedger.Epoch memory ep = votes.epoch(leaseId, 0);
+        assertGt(block.timestamp, ep.monitoringClose);
+        assertEq(uint8(market.finalizeEpoch(leaseId, 0)),
+                 uint8(SSEAdaptiveVoteLedger.Outcome.None));
+        market.forceCloseIdle(leaseId);
+        assertEq(market.totalServiceEscrow(), FEE); // frozen unresolved fee
+        assertEq(market.withdrawable(consumer), 0);
+        assertEq(market.withdrawable(provider), 0);
+        assertEq(votes.withdrawable(consumer), 4 * REWARD);
+        assertEq(uint8(market.lease(leaseId).phase), uint8(SSEAdaptiveMarketV2.Phase.Closed));
+        (, uint256 locked,) = market.monitors(selected[0]);
+        assertEq(locked, 0);
+        vm.prank(consumer);
+        vm.expectRevert(SSEAdaptiveMarketV2.InvalidPhase.selector);
+        market.startEpoch(leaseId, keccak256("malicious-late-work"));
+    }
+
+    function testIdleExpiryAfterActualFailureRetainsConservativeRefund() public {
+        uint256 leaseId = _open(4);
+        address[] memory selected = votes.selected(leaseId);
+        SSEAdaptiveVoteLedger.Epoch memory ep = votes.epoch(leaseId, 0);
+        vm.warp(uint256(ep.responseDeadline) + 1);
+        for (uint256 i; i < 3; ++i) {
+            vm.prank(selected[i]);
+            votes.submitVoteDirect(leaseId, 0, SSEAdaptiveVoteLedger.Outcome.Failure,
+                                   keccak256(abi.encode("actual-monitor-report", i)));
+        }
+        vm.warp(uint256(ep.monitoringClose) + 1);
+        assertEq(uint8(market.finalizeEpoch(leaseId, 0)),
+                 uint8(SSEAdaptiveVoteLedger.Outcome.Failure));
+        SSEAdaptiveMarketV2.Lease memory l = market.lease(leaseId);
+        vm.warp(uint256(l.lastProgressAt) + l.confirmationSeconds + 1);
+        market.forceCloseIdle(leaseId);
+        assertEq(market.withdrawable(consumer), FEE);
+        assertEq(market.totalServiceEscrow(), 0);
+        assertEq(votes.withdrawable(consumer), REWARD);
+        (, uint256 locked,) = market.monitors(selected[0]);
+        assertEq(locked, 0);
+    }
+
+    function testIdleExpiryCanPreserveUnresolvedFeeAndRefundFutureEpochs() public {
+        // 2 real funded epochs, so the second unstarted service fee is
+        // safe to refund while the first no-quorum fee remains in escrow.
+        vm.prank(consumer);
+        uint256 requestId = market.requestResource(
+            PROFILE, POLICY, FEE, uint64(block.timestamp + 20)
+        );
+        vm.prank(provider);
+        market.placeBid(requestId, FEE);
+        vm.warp(block.timestamp + 21);
+        SSEAdaptiveMarketV2.Terms memory t = _terms(4);
+        t.epochs = 2;
+        t.monitorBudget = 8 * REWARD;
+        vm.prank(consumer);
+        uint256 leaseId = market.chooseBidAndFund{value: 2 * FEE + 8 * REWARD}(
+            requestId, 0, t
+        );
+        _draw(leaseId);
+        _confirm(leaseId);
+        vm.prank(provider);
+        market.acceptLease(leaseId);
+        vm.prank(consumer);
+        market.startEpoch(leaseId, keccak256("first-actual-request"));
+        SSEAdaptiveMarketV2.Lease memory l = market.lease(leaseId);
+        vm.warp(uint256(l.lastProgressAt) + l.confirmationSeconds + 1);
+        assertEq(uint8(market.finalizeEpoch(leaseId, 0)),
+                 uint8(SSEAdaptiveVoteLedger.Outcome.None));
+        market.forceCloseIdle(leaseId);
+        assertEq(market.withdrawable(consumer), FEE);
+        assertEq(market.totalServiceEscrow(), FEE);
+        assertEq(market.lease(leaseId).serviceRemaining, FEE);
+        assertEq(votes.withdrawable(consumer), 8 * REWARD);
+    }
+
     function testRegistrationNotLimitedTo64LifetimeOrActiveEOAs() public {
         for (uint256 i; i < 70; ++i) {
             address addr = address(uint160(0xD000 + i));

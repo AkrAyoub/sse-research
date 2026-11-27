@@ -1,0 +1,81 @@
+{
+  "schema": "SSE_R284_ACTUAL_FINALIZED_THREE_NATIVE_ROLE_GRANTS_NEW_FOUR_EOA_QUOTE_AND_REAL_VM4714_DOCKER_PRESERVATION_V1",
+  "observedUtcDate": "2026-11-24",
+  "vm4707": {
+    "lastApprovedRole": "monitor-2",
+    "lastApprovedRoleTransactionHash": "0x0c6b2e79f930b8e23e5ee9b32bd151733bb09d88a7ecbc8c145cec091cdb389a",
+    "actualTransactionStatus": "MATCHING_TX_SUCCESSFUL_CANONICAL_FINALIZED",
+    "monitor2ReceiptIncludedBlock": 26008,
+    "actualFinalizedExecutionBlock": 26100,
+    "actualExecutionHead": 26250,
+    "monitor2Recipient": "0xf8D4c882A7439507e2fc237DCBDf4A1c228F0FF8",
+    "monitor2LatestBalanceWei": "5000000000000000",
+    "monitor2FinalizedBalanceWei": "5000000000000000",
+    "allThreeOriginalOwnerApprovedGrantsFinalized": true,
+    "sourceAppEOA": "0xED0ED5E0526898c6E0e3C83140efcA12672E7ff0",
+    "sourceLatestAndPendingNonce": 4,
+    "fourAdditionalVmOwnerWalletsReadOnlyPreflightReal": true,
+    "allFourUnfundedNoncontractRecipientChecksPassed": true,
+    "allFourRealGasEstimates": 21000,
+    "actualNativeGasPriceWei": 1000,
+    "sourceLatestBalanceWei": "979999993320597000",
+    "newRoleFundingProposedByR282": [
+      {
+        "vm": "VM4711",
+        "role": "monitor",
+        "recipient": "0x1a89D81288522912643e15D8e06a2a7D9dc4bc08",
+        "nonce": 4,
+        "valueWei": "5000000000000000"
+      },
+      {
+        "vm": "VM4712",
+        "role": "monitor",
+        "recipient": "0x30dc70daA83B2D4199B98Cf1b93f31f1BA80f0Aa",
+        "nonce": 5,
+        "valueWei": "5000000000000000"
+      },
+      {
+        "vm": "VM4713",
+        "role": "monitor",
+        "recipient": "0x001f529E8d17A243078631100CA7Ad93c001Ea2d",
+        "nonce": 6,
+        "valueWei": "5000000000000000"
+      },
+      {
+        "vm": "VM4714",
+        "role": "provider",
+        "recipient": "0x016B91ED50Ec350e600327C4287F2ED882E0Cf66",
+        "nonce": 7,
+        "valueWei": "5000000000000000"
+      }
+    ],
+    "proposedMaxDebitFourWithFeesWei": "20000000084000000",
+    "newGrantsAuthorized": false,
+    "newGrantsSignedOrBroadcast": false,
+    "walletPasswordOrKeysRead": false
+  },
+  "vm4714": {
+    "actualSourceSha": "7d28b78e66ca862ca52ccc27e17cdb9fee6daafa",
+    "r283TestsExecuted": 8,
+    "r283Passed": 7,
+    "r283Failed": 1,
+    "r283FailureCategory": "FAKE_TEMPORARY_ID_TEST_EXECUTABLE_INVALID_SHEBANG_ESCAPED_NEWLINE",
+    "r281AndDockerInspectorTestsInThatShellNotReachedDueToSetE": true,
+    "operatorThenInvokedExplicitRunSudo": true,
+    "exactOwnerTypedConsent": true,
+    "actualSudoDockerLocalHostAccessible": true,
+    "preExistingDockerContainersPresent": true,
+    "preExistingDockerContainersNamesImagesAndPurposesKnown": false,
+    "actualOwnerScriptRefusal": "R281_REFUSED: dedicated compute host has existing Docker containers; do not disturb them",
+    "noDockerBuildOrContainerRunReached": true,
+    "newCpuWorkerStarted": false,
+    "preExistingContainersModified": false,
+    "realCpuWorkloadMeasured": false,
+    "needCurrentReadOnlyContainerInventory": true
+  },
+  "githubR284": {
+    "temporaryFakeShellTestFixtureNewlineCorrected": true,
+    "mockedUnitTestFixVm4714Retested": false,
+    "noNewDockerOrNativeChainTransactionByGitHub": false
+  }
+}
