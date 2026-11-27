@@ -434,9 +434,9 @@ class Console:
         got = "0x" + terms.terms_hash(st.CHAIN_ID, self.mods["market"], lid, lease["bidIndex"], q, bid, clean).hex()
         match = got.lower() == lease["termsHash"].lower()
         return dict(self._meta(tag), onchainTermsHash=lease["termsHash"], recomputedTermsHash=got, match=match,
-                    policySnippet={"provider": {"leaseTerms": {str(lid): clean}}} if match else None,
-                    note="Add the snippet to the provider policy only if it matches; acceptance additionally "
-                         "requires the offer hash to be in approvedOfferHashes.")
+                    policySnippet={"provider": {"leaseTerms": {str(lid): clean}, "approvedTermsHashes": [got]}} if match else None,
+                    note="Review every lease term before explicitly approving the exact terms hash in policy. "
+                         "A hash match is integrity, not consent. Acceptance also requires approvedOfferHashes.")
 
     # ------------------------------------------------------- structured manifests
     def manifest(self, kind, body):
