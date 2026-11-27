@@ -130,6 +130,32 @@ $("rForm").onsubmit = async (ev) => {
   try { await sendWithWallet(await api("intent/createRequest", body), "rOut"); } catch (e) { fail("rOut", e); }
 };
 
+$("awardForm").onsubmit = async (ev) => {
+  ev.preventDefault();
+  const f = formObj(ev.target);
+  const terms = {};
+  for (const k of ["acceptSeconds", "confirmationRoundSeconds", "responseSeconds", "monitoringSeconds", "evidenceSeconds", "idleSeconds"]) {
+    terms[k] = Number(f[k]);
+  }
+  terms.reservationFee = f.reservationFee;
+  terms.exposureBudget = f.exposureBudget;
+  terms.conditionalQuorumPolicy = ev.target.elements.conditionalQuorumPolicy.checked;
+  terms.responseAdmitsReceipt = ev.target.elements.responseAdmitsReceipt.checked;
+  try {
+    await sendWithWallet(await api("intent/awardAndFund", { requestId: Number(f.requestId), bidIndex: Number(f.bidIndex), terms }), "awardOut");
+  } catch (e) { fail("awardOut", e); }
+};
+$("epochForm").onsubmit = async (ev) => {
+  ev.preventDefault();
+  try {
+    await sendWithWallet(await api("intent/startEpoch", { leaseId: Number($("lId").value), requestHash: formObj(ev.target).requestHash }), "epochOut");
+  } catch (e) { fail("epochOut", e); }
+};
+$("withdrawGo").onclick = async () => {
+  try { await sendWithWallet(await api("intent/withdraw", { module: $("withdrawModule").value }), "withdrawOut"); }
+  catch (e) { fail("withdrawOut", e); }
+};
+
 // --------------------------------------------------------------- lease
 const PHASE_HELP = {
   PendingDraw: "Funded; waiting for the committed entropy block, then anyone may draw the committee.",
