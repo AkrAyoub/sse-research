@@ -19,7 +19,12 @@ standby + preconfirmed ledger → source task in planning/MASTER_TASK_CHECKLIST.
   (owner-supplied, left untracked intentionally — owner decides whether to commit PDFs).
 - Done: added handoff/GOVERNING_INSTRUCTION.md; rewrote CLAUDE.md, AGENTS.md; annotated handoff/README.md, ROADMAP_AND_ACCEPTANCE.md,
   STATE_AND_EVIDENCE.md (historical records preserved verbatim).
-- Next: audits (handoff/audits/), planning docs, then V4 market ↔ standby ↔ ledger integration in source.
+- Done: integrated V4 contracts + tests (5d5867b); V4 planner + encoders + tests (6d8bcfe); audits, planning, logs, HAND_BACK.
+- Static checks: see logs/STATIC_REVIEW_LOG.md. Tests written, NOT executed: 33 Solidity, 11 Python.
+- Blockers: execution prohibited (all DRV items owner-run); Milestone 4 rubric missing.
+- NEXT exact steps (source-only): (1) DRV-V4-PARITY forge test that logs termsHash for the Python fixture; (2) gas-parametrized
+  V4 tests n∈{7,10}, s∈{2,4}; (3) V4 event decoder + keeper agent on r351 journal; (4) consumer UI planner view; (5) keeper bounty
+  design A-09. Constraints: source-only, V3 untouched, no push, use git -c core.autocrlf=true.
 
 ## Owner-only follow-up (preserved)
 Original Milestone4 rubric and earlier reports not retrieved; copy originals locally into handoff/references/ and reconcile. Live VM logs/evidence remain on hosts; collect sanitized copies later with owner. Do not import wallets, secrets or signer state. Owner to review new source and execute staged real VM tests.
