@@ -1,3 +1,5 @@
+> **2026-11-27:** Everything in this file is a record of past owner-run executions and live observations. It is preserved verbatim. The current source-only session (handoff/GOVERNING_INSTRUCTION.md) produces no runtime evidence.
+
 # Latest state and experimental evidence — 2026-11-27
 Authoritative handoff snapshot from prior development conversations; public metadata only. Not a fresh live poll. Prior docs may contradict this because their observations were earlier. Recheck finalized chain before owner-authorized writes. Never repeat a transaction based on this file. Exact original raw logs are on VMs or in earlier conversations; only captured summaries here. All values TEST ETH/wei/Gwei as stated.
 

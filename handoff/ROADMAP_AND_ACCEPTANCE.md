@@ -1,3 +1,5 @@
+> **2026-11-27 source-only conversion.** Per handoff/GOVERNING_INSTRUCTION.md no item may be compiled, executed, installed or deployed by the coding agent. Every "run/test/compile/install/deploy/measure" step below is now a **deferred owner-run validation task** tracked in handoff/planning/DEFERRED_RUNTIME_VALIDATION.md; the agent delivers source + test source + static review only. Status of each item is tracked only in handoff/planning/MASTER_TASK_CHECKLIST.md (this file is the historical work-package definition). Checked [x] items below record historical owner-run evidence, not results from this session.
+
 # Execution roadmap and acceptance gates
 Status at handoff: V3 scientific baseline live; V4 candidate incomplete; R430 latest source untested. These are dependency-ordered work packages, not time estimates. Keep owner requirements authoritative. Work on multiple nonconflicting packages when blocked. Mark done only on actual tests. No live chain writes overnight.
 
