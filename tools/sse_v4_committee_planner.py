@@ -58,7 +58,10 @@ def validate(seats, fault_tolerance, standbys):
 def draw_success_probability(population, eligible, count):
     """Exact P(sampler finds `count` distinct eligible entries) under a uniform
     hash model: each attempt hits a not-yet-picked eligible entry with
-    probability (eligible - found) / population."""
+    probability (eligible - found) * floor(2^256 / population) / 2^256.
+    This includes the contract's modulo-bias rejection attempts."""
+    if any(type(x) is not int or x < 0 for x in (population, eligible, count)) or eligible > population or population >= 2 ** 256 or count > MAX_SEATS:
+        raise ValueError("invalid draw population or count")
     if count == 0:
         return Fraction(1)
     if population < count or eligible < count:
@@ -73,7 +76,7 @@ def draw_success_probability(population, eligible, count):
             p = state[found]
             if not p:
                 continue
-            hit = Fraction(eligible - found, population)
+            hit = Fraction((eligible - found) * (2 ** 256 // population), 2 ** 256)
             nxt[found + 1] += p * hit
             nxt[found] += p * (1 - hit)
         state = nxt
@@ -105,6 +108,10 @@ def plan(seats, fault_tolerance, standbys, population, eligible, epochs, epoch_f
     errors = validate(seats, fault_tolerance, standbys)
     if errors:
         return {"valid": False, "errors": errors}
+    if type(epochs) is not int or not 1 <= epochs <= 64 or any(type(x) is not int or not 0 < x < 2 ** 256 for x in (epoch_fee, per_report_reward)):
+        raise ValueError("invalid epoch count or price")
+    if prices(seats, epochs, epoch_fee, per_report_reward)["totalFundingWei"] >= 2 ** 256:
+        raise ValueError("funding exceeds uint256")
     count = seats + standbys
     success = draw_success_probability(population, eligible, count)
     out = {"valid": True, "seats": seats, "standbys": standbys, "faultTolerance": fault_tolerance,
@@ -138,7 +145,9 @@ def plan(seats, fault_tolerance, standbys, population, eligible, epochs, epoch_f
 
 def _render(v):
     if isinstance(v, Fraction):
-        return {"numerator": v.numerator, "denominator": v.denominator, "probability": float(v)}
+        # Exact rational can exceed Python's decimal digit limit at 512 attempts.
+        # Hex representation is lossless and bounded; the display uses float.
+        return {"numeratorHex": hex(v.numerator), "denominatorHex": hex(v.denominator), "probability": float(v)}
     if isinstance(v, dict):
         return {k: _render(x) for k, x in v.items()}
     if isinstance(v, list):
