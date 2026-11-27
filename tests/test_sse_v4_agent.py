@@ -173,7 +173,9 @@ class PlannerTest(unittest.TestCase):
         import sse_v4_adapters as adapters
         from compute_workload import compute_result
         policy, l = self.resource_fixture()
-        job = dict(l, leaseId=1, epochId=0, requestHash=H, responseDeadline=10**12)
+        w = policy["provider"]["workers"]["1"]
+        job = dict(l, leaseId=1, epochId=0, requestHash=H, responseDeadline=10**12,
+                   workerKey=agent.worker_key(w), workerBindingHash=adapters.response_hash(w))
         inspection = {"containerId":"test-container", "trustedHardwareAttestation":False}
         with tempfile.TemporaryDirectory() as d:
             run = adapters.make_job_runner(policy, d)
@@ -196,6 +198,52 @@ class PlannerTest(unittest.TestCase):
                  patch.object(adapters, "_post", return_value=compute_result(1,0,H)):
                 with self.assertRaisesRegex(ValueError, "worker changed"):
                     run(job)
+
+    def test_parallel_dispatch_persists_before_work_and_quarantines_failure(self):
+        from threading import Barrier
+        from copy import deepcopy
+        policy, l = self.resource_fixture()
+        cfg = policy["provider"]
+        from sse_v4_adapters import response_hash
+        offer = dict(cfg["offers"][l["offerHash"]], resources=dict(cpuCores=2, memoryMiB=1024, storageMiB=0),
+                     maxConcurrentLeases=2)
+        oh = response_hash(offer)
+        cfg["offers"][oh] = offer
+        cfg["approvedOfferHashes"] = [oh]
+        cfg["capacity"] = dict(cpuCores=2, memoryMiB=1024, maxConcurrentLeases=2)
+        cfg["workers"]["2"] = dict(cfg["workers"]["1"], container="sse-compute-second", url="http://127.0.0.1:8878")
+        l.update(offerHash=oh, providerAccepted=True)
+        snap = {"market":MODS["market"], "leases":{
+            i:bundle("Active", dict(l), [epoch(0)], termsHashRecomputed=H) for i in (1,2)}}
+        _, planned = agent.plan_provider(snap, policy, 10, {})
+        self.assertEqual(len(planned), 2)
+        eligible = {j["jobId"]:j for j in planned}
+        jobs = {jid:dict(j,state="QUEUED") for jid,j in eligible.items()}
+        writes = []
+        barrier = Barrier(2)
+        def run(j):
+            self.assertEqual(writes[-1][j["jobId"]]["state"], "RUNNING")
+            barrier.wait(timeout=3)
+            if j["leaseId"] == 1:
+                raise TimeoutError("uncertain execution")
+            return dict(state="DONE", responseHash=H, finishedAt=11, resourceObservation={"test":True})
+        agent.dispatch_provider_jobs(jobs, eligible, run, lambda d:writes.append(deepcopy(d)), lambda:10, 2)
+        self.assertEqual({j["leaseId"]:j["state"] for j in jobs.values()}, {1:"EXECUTION_UNKNOWN",2:"DONE"})
+        self.assertTrue(agent.worker_quarantined(agent.worker_key(cfg["workers"]["1"]), jobs))
+        self.assertFalse(agent.worker_quarantined(agent.worker_key(cfg["workers"]["2"]), jobs))
+        self.assertTrue(agent.worker_quarantined(agent.worker_key(cfg["workers"]["2"]), {"legacy":{"state":"RUNNING"}}))
+        agent.dispatch_provider_jobs(jobs, eligible, lambda j:self.fail("must never repeat"), lambda d:None, lambda:10, 2)
+
+    def test_dispatch_refuses_changed_worker_binding(self):
+        policy, l = self.resource_fixture()
+        l["providerAccepted"] = True
+        snap = {"market":MODS["market"], "leases":{1:bundle("Active",l,[epoch(0)],termsHashRecomputed=H)}}
+        _, planned = agent.plan_provider(snap, policy, 10, {})
+        j = planned[0]
+        jobs = {j["jobId"]:dict(j,state="QUEUED",workerBindingHash=H)}
+        agent.dispatch_provider_jobs(jobs,{j["jobId"]:j},lambda j:self.fail("must not run"),
+                                     lambda d:None,lambda:10,1)
+        self.assertEqual(jobs[j["jobId"]]["state"],"REFUSED_RESOURCE_ADMISSION")
 
     def test_provider_multi_worker_capacity(self):
         from sse_v4_adapters import response_hash
