@@ -209,7 +209,7 @@ def verify_terms(bundle, market, chain_id, local_terms):
     return "0x" + h.hex()
 
 
-def provider_response_actions(jobs, manifest, sender):
+def provider_response_actions(jobs, manifest, sender, snapshot, now):
     """Sign and relay the provider response for finished jobs (once per job).
     The response hash commits to the delivered output manifest; it authenticates
     origin and context, NOT SLA correctness."""
@@ -217,7 +217,13 @@ def provider_response_actions(jobs, manifest, sender):
     domain = terms.domain_separator(terms.MARKET_NAME, st.CHAIN_ID, market)
     out = []
     for j in jobs.values():
-        if j.get("state") == "DONE" and j.get("responseHash") and not j.get("responseRelayed"):
+        b = snapshot["leases"].get(j["leaseId"])
+        if not b or b["phase"] != "Active":
+            continue
+        e = next((e for e in b["epochs"] if e["id"] == j["epochId"]), None)
+        if not e or e["market"]["requestHash"] != j["requestHash"] or e["votes"]["responseAuthenticated"] or now > e["votes"]["responseDeadline"]:
+            continue
+        if j.get("state") == "DONE" and j.get("responseHash"):
             d = terms.response_digest(domain, j["leaseId"], j["epochId"], j["requestHash"], j["responseHash"])
             out.append(_act("market", abi.authenticate_response(j["leaseId"], j["epochId"], j["responseHash"],
                                                                  sender.sign_digest(d)),
@@ -243,6 +249,7 @@ class Sender:
 
     def send(self, action, now):
         sp = self.p["spending"]
+        st.require(action.get("value") == 0, "automatic action must have zero value")
         st.require(not self.j.blocking(self.p["wallet"]), "unresolved journal entry: reconcile before sending")
         target = self.m[action["module"]]
         task = st.Journal.task_id(target, action["calldata"], 0, action.get("key", ""))
@@ -392,12 +399,22 @@ class Agent:
             if self.job_runner and persist:
                 for jid, j in jobs.items():
                     if j["state"] == "QUEUED":
+                        b = snap["leases"].get(j["leaseId"])
+                        e = next((e for e in b["epochs"] if e["id"] == j["epochId"]), None) if b else None
+                        if not b or b["phase"] != "Active" or not b["lease"]["providerAccepted"] or not e or e["market"]["accounted"] or e["market"]["requestHash"] != j["requestHash"] or self.clock() > j["responseDeadline"]:
+                            jobs[jid] = dict(j, state="STALE_AUTHORIZATION")
+                            st.atomic_write_json(self.jobs_path, jobs)
+                            continue
                         jobs[jid] = dict(j, state="RUNNING")
                         st.atomic_write_json(self.jobs_path, jobs)
-                        jobs[jid] = dict(jobs[jid], **self.job_runner(j))  # returns state + responseHash
+                        try:
+                            jobs[jid] = dict(jobs[jid], **self.job_runner(j))
+                        except Exception as exc:
+                            # Execution may have occurred: never automatically repeat it.
+                            jobs[jid] = dict(jobs[jid], state="EXECUTION_UNKNOWN", error=type(exc).__name__)
                         st.atomic_write_json(self.jobs_path, jobs)
             if self.sender:
-                actions += provider_response_actions(jobs, self.manifest, self.sender)
+                actions += provider_response_actions(jobs, self.manifest, self.sender, snap, int(self.clock()))
         if "monitor" in roles and self.prober:
             acts, abstentions = vote_actions(self.prober(snap, now), self.policy)
             actions += acts
