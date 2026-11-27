@@ -112,7 +112,7 @@
   <div id="bOut"></div>
   <fieldset>
     <legend>Verify consumer terms (contract-wallet consumers)</legend>
-    <p class="note">If the consumer funded through a contract wallet, your agent cannot read the terms from the funding transaction. Paste the terms JSON the consumer gave you; the console recomputes the terms hash from finalized chain state and, only on a match, shows the policy snippet for your agent.</p>
+    <p class="note">Review every term before approval. Paste the consumer's terms JSON; the console recomputes the finalized terms hash and provides an approval snippet only on a match. A matching hash does not by itself mean the terms are acceptable.</p>
     <label>Lease id <input id="tcLease" type="number" min="1"></label>
     <label>Terms JSON <textarea id="tcTerms" rows="5" placeholder='{"acceptSeconds":86400,...}'></textarea></label>
     <button id="tcGo">Check terms</button>
