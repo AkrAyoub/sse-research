@@ -109,8 +109,9 @@ def resource_binding(cfg, lease):
                "immutable worker image required")
     st.require(isinstance(w.get("container"), str) and re.fullmatch(r"sse-compute-[a-z0-9][a-z0-9-]{0,45}", w["container"]),
                "invalid worker container")
-    local_endpoint(w["url"])
-    st.require(isinstance(w.get("dockerSocket"), str) and w["dockerSocket"].startswith("/run/user/"),
+    port = local_endpoint(w["url"])
+    st.require(w["url"] == f"http://127.0.0.1:{port}", "worker URL must be canonical")
+    st.require(isinstance(w.get("dockerSocket"), str) and re.fullmatch(r"/run/user/[1-9][0-9]*/docker\.sock", w["dockerSocket"]),
                "private local worker socket required")
     st.require(isinstance(w.get("dockerSocket"), str), "explicit private rootless Docker socket required")
     return p, o, w
