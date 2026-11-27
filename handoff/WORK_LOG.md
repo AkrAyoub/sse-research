@@ -16,7 +16,7 @@ standby + preconfirmed ledger → source task in planning/MASTER_TASK_CHECKLIST.
 ## Session entries
 ### 2026-11-27 S1 (Claude, source-only)
 - Start HEAD 394705a on handoff/claude-code-2026-11-27, tree clean apart from untracked handoff/references/Report2.pdf, Report3.pdf
-  (owner-supplied, left untracked intentionally — owner decides whether to commit PDFs).
+  (owner-supplied; owner decision 2026-11-27: never commit them).
 - Done: added handoff/GOVERNING_INSTRUCTION.md; rewrote CLAUDE.md, AGENTS.md; annotated handoff/README.md, ROADMAP_AND_ACCEPTANCE.md,
   STATE_AND_EVIDENCE.md (historical records preserved verbatim).
 - Done: integrated V4 contracts + tests (5d5867b); V4 planner + encoders + tests (6d8bcfe); audits, planning, logs, HAND_BACK.

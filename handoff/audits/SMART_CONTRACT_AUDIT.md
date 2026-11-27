@@ -61,7 +61,7 @@ reserveSample ≤512 attempts (~2 storage reads each) + ≤64 reservations; rele
 initialize O(k²) ≤ 4096 comparisons; ledger freeze O(n). Estimated worst case well below 30M gas; **to be measured (DRV-V4-GAS)**.
 
 ### Known open issues / not implemented
-SC-09 No standby retainer: unpromoted standbys are bonded but unpaid (incentive gap; documented).
+SC-09 No standby retainer: unpromoted standbys are bonded but unpaid. Owner decision D-12: accepted by design, no retainer.
 SC-10 No keeper bounty for permissionless transitions (draw, activate, advance, finalize).
 SC-11 No misconduct penalties/slashing of monitor bonds (only provable misconduct would be acceptable; none implemented).
 SC-12 Bonds of committee members are released at lease closure, not at evidence-window end (no slashing exists, so no loss).

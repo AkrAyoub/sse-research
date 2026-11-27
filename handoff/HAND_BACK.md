@@ -42,7 +42,8 @@ used sed/heredocs only. See logs/BUGS_AND_FIXES_LOG.md.
     lease, provider, monitor, account, explorer, node/validator, rewards, consumer outputs), installer + unit templates;
     43 Python tests (incl. tests/test_sse_setup.py).
 - **Awaiting deployment:** all V4 contracts (new version; V3 stays at its addresses).
-- **Not implemented / owner decision:** standby retainer (P-1), on-chain keeper bounty (P-2), misconduct penalties (P-3),
+- **Owner decided (D-12):** no standby retainer; Report2/Report3 PDFs stay untracked.
+- **Not implemented / owner decision pending:** on-chain keeper bounty (P-2), misconduct penalties (P-3),
   stronger randomness for V4, arbitrary uploaded code (needs microVM isolation), single-format installer output (the new
   scripts/sse_setup.py orders the existing installers but does not merge them),
   E7/E9/E10.
@@ -59,7 +60,7 @@ the finalized on-chain responseHash. Details: audits/SMART_CONTRACT_AUDIT.md, au
 ## Owner next steps
 1. Run planning/DEFERRED_RUNTIME_VALIDATION.md Stages 0–3 (read-only, compile, tests) and record outputs in
    logs/BUGS_AND_FIXES_LOG.md; then a new source session fixes failures.
-2. Decide P-1/P-2/P-3 (planning/DESIGN_DECISIONS.md), whether to commit Report2/Report3 PDFs, and provide the Milestone 4
+2. Decide P-2/P-3 (planning/DESIGN_DECISIONS.md; P-1 rejected, PDFs stay untracked), and provide the Milestone 4
    rubric if it exists.
 3. Only after Stage 4 (isolated chain) passes: approve a chain31340 V4 deployment plan (Stage 5).
 

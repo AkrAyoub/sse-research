@@ -17,7 +17,7 @@ BL Blocked · NO Not implemented. Commits are on branch handoff/claude-code-2026
 | A-07 | V4 deployment script (owner-run, nonce-predicted wiring) | script/DeploySSEV4Candidate31340.s.sol | NI, SR, AD | DRV-V4-05 | 5d5867b |
 | A-08 | Explicit response-as-receipt term (V3 unchanged) | market `responseAdmitsReceipt` | NI, SR, TW | DRV-V4-01 | 5d5867b |
 | A-09 | Keeper bounties for permissionless transitions | — | NO | — | — |
-| A-10 | Standby retainer payment | — | NO — owner economics decision P-1 (DESIGN_DECISIONS) | — | — |
+| A-10 | Standby retainer payment | — | WONT DO — owner rejected P-1 (D-12) | — | — |
 | A-14 | Keeper incentive: self-keeping of own leases by consumer/provider agents (D-09); on-chain bounty = owner decision P-2 | tools/sse_v4_agent.py step, installer selfKeep | NI, SR (self-keeping) | DRV-AGENT-V4 | pass 3 |
 | A-11 | Provable-misconduct penalties for monitor bonds | — | NO — owner decision P-3 (equivocation-only proposal) | — | — |
 | A-12 | Qualified negative evidence beyond conditional quorum (E7 adapter) | — | NO (design D-07) | E7 | — |

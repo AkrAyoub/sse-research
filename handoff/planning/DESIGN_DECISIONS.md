@@ -23,7 +23,7 @@
   against the finalized responseHash. Public console verifies pasted outputs only (no server-side fetch → no SSRF surface).
 
 ## Economics proposals awaiting the owner (NOT implemented; recorded so the decision is explicit)
-P-1 Standby retainer (A-10/SC-09). Option A (recommended): consumer pre-funds `standbys × perReportReward` once at
+P-1 Standby retainer (A-10/SC-09). **OWNER DECISION 2026-11-27: REJECTED — no standby retainer; unpromoted standbys stay unpaid (D-05 final).** Former option A: consumer pre-funds `standbys × perReportReward` once at
 award; each unpromoted standby that stayed reserved until activation may withdraw one report reward at lease close.
 Cost to consumer is bounded and visible in the planner; contract change ≈ one mapping + one loop over ≤60 standbys in
 `activateCommittee` (size risk: market is the largest module; would likely need moving retainer accounting into
@@ -35,3 +35,4 @@ P-3 Misconduct penalties (SC-11). Only provably attributable faults are eligible
 outcomes for one epoch (equivocation, verifiable from two EIP-712 signatures), (ii) a provider signing two different
 responseHash values for one epoch. Penalty = forfeit bond to the harmed party. Not implemented: needs a slashing path in
 the registry and new audit; would change monitor risk and should be an explicit owner decision.
+- D-12 (2026-11-27, owner) No standby retainer (P-1 rejected). handoff/references/Report2.pdf and Report3.pdf stay untracked; never commit them.
