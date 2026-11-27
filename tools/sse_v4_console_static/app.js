@@ -355,3 +355,52 @@ async function loadHistory(to) {
   } catch (e) { fail("aHistOut", e); }
 }
 $("aHist").onclick = () => loadHistory(null);
+
+
+// Bilateral consent: each party independently reviews the same typed message.
+function residualAgreement() {
+  const body = JSON.parse($("resAgreement").value);
+  if (!Number.isSafeInteger(body.leaseId) || body.leaseId < 1 ||
+      !Number.isSafeInteger(body.epochId) || body.epochId < 0) throw new Error("Invalid lease or epoch id");
+  for (const k of ["unresolvedAmount", "providerShare", "consumerShare", "nonce", "expiry"]) {
+    if (typeof body.allocation[k] !== "string" || !/^[0-9]{1,78}$/.test(body.allocation[k])) {
+      throw new Error("Allocation integers must be exact decimal strings: " + k);
+    }
+  }
+  return body;
+}
+$("resPreview").onclick = async () => {
+  try {
+    const p = await api("residual-preview", residualAgreement());
+    show("resOut", "<pre>" + esc(JSON.stringify(p, null, 2)) + "</pre>");
+  } catch (e) { fail("resOut", e); }
+};
+$("resSign").onclick = async () => {
+  const btn = $("resSign");
+  btn.disabled = true;
+  try {
+    if (!window.ethereum) throw new Error("EOA browser wallet required");
+    const p = await api("residual-preview", residualAgreement());
+    const chain = await window.ethereum.request({method:"eth_chainId"});
+    if (parseInt(chain, 16) !== p.typedData.domain.chainId) throw new Error("Wrong wallet chain");
+    const genesis = await window.ethereum.request({method:"eth_getBlockByNumber",params:["0x0",false]});
+    if (!genesis || genesis.hash.toLowerCase() !== "0x5f7cbcd4f1ddfbbedbdd2b180b83d9eff49d4b7263643858d7be2e9c243936bf") throw new Error("Wrong wallet genesis");
+    const [from] = await window.ethereum.request({method:"eth_requestAccounts"});
+    const role = from.toLowerCase() === p.consumer.toLowerCase() ? "consumer" :
+      from.toLowerCase() === p.provider.toLowerCase() ? "provider" : null;
+    if (!role) throw new Error("Wallet is neither recorded counterparty");
+    show("resOut", "<p>Review the exact agreement in your wallet before signing.</p><pre>" + esc(JSON.stringify(p, null, 2)) + "</pre>");
+    const sig = await window.ethereum.request({method:"eth_signTypedData_v4",params:[from, JSON.stringify(p.typedData)]});
+    $(role === "consumer" ? "resConsumer" : "resProvider").value = sig;
+    show("resOut", "<p>Signature obtained. Share only the agreement and signature with the counterparty. No transaction has been submitted.</p><pre>" + esc(JSON.stringify(p, null, 2)) + "</pre>");
+  } catch (e) { fail("resOut", e); }
+  finally { btn.disabled = false; }
+};
+$("resRelay").onclick = async () => {
+  try {
+    const body = residualAgreement();
+    body.consumerSignature = $("resConsumer").value.trim();
+    body.providerSignature = $("resProvider").value.trim();
+    await sendWithWallet(await api("intent/resolveResidual", body), "resOut");
+  } catch (e) { fail("resOut", e); }
+};
