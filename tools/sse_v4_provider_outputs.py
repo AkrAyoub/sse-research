@@ -132,6 +132,10 @@ def main():
     ask = LocalRPC(a.rpc).request
     manifest = st.load_manifest(a.manifest)
     st.verify_deployment(ask, manifest)
+    identity = st.read_json(a.state / "deployment-identity.json")
+    st.require(isinstance(identity, dict) and identity.get("chainId") == st.CHAIN_ID
+               and identity.get("genesisHash") == st.GENESIS and identity.get("modules") == manifest["modules"],
+               "provider state deployment identity missing or mismatched")
     ThreadingHTTPServer(("127.0.0.1", a.port), make_handler(Outputs(ask, manifest, a.state))).serve_forever()
 
 
