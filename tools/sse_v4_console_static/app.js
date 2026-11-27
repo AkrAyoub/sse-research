@@ -307,7 +307,7 @@ $("ofBuild").onclick = async () => {
     const o = await api("manifest/offer", { endpointUrl: $("ofUrl").value.trim(), services: ["SHA256_CHAIN_8192"], cpuCores: n("ofCpu"), memoryMiB: n("ofMem"), storageMiB: n("ofSto"), maxConcurrentLeases: n("ofConc") });
     document.querySelector('#bForm [name="offerHash"]').value = o.hash;
     document.querySelector('#bForm [name="endpointHash"]').value = o.endpointHash;
-    show("ofOut", manifestHtml(o) + "<p>Endpoint hash <code>" + esc(o.endpointHash) + "</code></p><p class='note'>Add the offer hash to your agent policy approvedOfferHashes so it may accept leases awarded on this bid.</p>");
+    show("ofOut", manifestHtml(o) + "<p>Endpoint hash <code>" + esc(o.endpointHash) + "</code></p><p class='note'>Add the offer hash to approvedOfferHashes, then review and approve each exact lease terms hash in approvedTermsHashes.</p>");
   } catch (e) { fail("ofOut", e); }
 };
 
