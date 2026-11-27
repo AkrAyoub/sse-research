@@ -83,7 +83,7 @@ def resource_binding(cfg, lease):
     """
     p = cfg.get("profiles", {}).get(lease["profileHash"])
     o = cfg.get("offers", {}).get(lease["offerHash"])
-    w = cfg.get("workers", {}).get(lease["profileHash"])
+    w = cfg.get("workers", {}).get(str(lease["leaseId"]))
     st.require(isinstance(p, dict) and response_hash(p) == lease["profileHash"], "profile preimage missing or mismatched")
     st.require(isinstance(o, dict) and response_hash(o) == lease["offerHash"], "offer preimage missing or mismatched")
     st.require(isinstance(w, dict), "worker binding missing")
@@ -98,8 +98,8 @@ def resource_binding(cfg, lease):
                    "invalid or insufficient offered resources")
     st.require(1 <= r["cpuCores"] <= 256 and 64 <= r["memoryMiB"] <= 1 << 20
                and r["storageMiB"] == a["storageMiB"] == 0, "unsupported resource allocation")
-    st.require(type(o.get("maxConcurrentLeases")) is int and o["maxConcurrentLeases"] == 1,
-               "only one reserved lease per worker is currently supported")
+    st.require(type(o.get("maxConcurrentLeases")) is int and 1 <= o["maxConcurrentLeases"] <= 1024,
+               "invalid offer lease capacity")
     sla = p["sla"]
     for k in ("responseSeconds", "maxRuntimeSeconds"):
         st.require(type(sla.get(k)) is int and 1 <= sla[k] <= 86400, "invalid runtime SLA")
@@ -110,8 +110,50 @@ def resource_binding(cfg, lease):
     st.require(isinstance(w.get("container"), str) and re.fullmatch(r"sse-compute-[a-z0-9][a-z0-9-]{0,45}", w["container"]),
                "invalid worker container")
     local_endpoint(w["url"])
+    st.require(isinstance(w.get("dockerSocket"), str) and w["dockerSocket"].startswith("/run/user/"),
+               "private local worker socket required")
     st.require(isinstance(w.get("dockerSocket"), str), "explicit private rootless Docker socket required")
     return p, o, w
+
+
+def inspect_bound_worker(p, w):
+    require_local_owner_rootless_socket(w["dockerSocket"])
+    limits = {"endpoint": w["url"], "imageId": w["imageId"],
+              "cpuMilli": p["resources"]["cpuCores"] * 1000,
+              "memoryBytes": p["resources"]["memoryMiB"] * 2**20}
+    return inspect_container(limits, w["url"], w["container"], strict_hardening=True,
+                             docker_socket=w["dockerSocket"])
+
+
+def allocation_fits(cfg, bindings):
+    """Every reserved lease needs a distinct pre-provisioned worker.
+    Count CPU/memory against both owner budget and each committed offer.
+    These budgets are administrative limits, not hardware guarantees.
+    """
+    cap = cfg.get("capacity", {})
+    st.require(all(type(cap.get(k)) is int and cap[k] > 0 for k in
+                   ("cpuCores", "memoryMiB", "maxConcurrentLeases")), "missing provider capacity")
+    st.require(cap["maxConcurrentLeases"] <= 64, "local allocator supports at most 64 leases")
+    seen_names, seen_urls, by_offer = set(), set(), {}
+    cpu = mem = 0
+    for ph, oh, p, o, w in bindings:
+        name = (w["dockerSocket"], w["container"])
+        url = w["url"]
+        if name in seen_names or url in seen_urls:
+            return False
+        seen_names.add(name)
+        seen_urls.add(url)
+        r = p["resources"]
+        cpu += r["cpuCores"]
+        mem += r["memoryMiB"]
+        totals = by_offer.setdefault(oh, [0, 0, 0])
+        totals[0] += r["cpuCores"]
+        totals[1] += r["memoryMiB"]
+        totals[2] += 1
+        if (totals[0] > o["resources"]["cpuCores"] or totals[1] > o["resources"]["memoryMiB"]
+                or totals[2] > o["maxConcurrentLeases"]):
+            return False
+    return cpu <= cap["cpuCores"] and mem <= cap["memoryMiB"] and len(bindings) <= cap["maxConcurrentLeases"]
 
 
 def make_job_runner(policy, state_dir):
@@ -121,13 +163,8 @@ def make_job_runner(policy, state_dir):
     def run(job):
         try:
             p, _, w = resource_binding(cfg, job)
-            require_local_owner_rootless_socket(w["dockerSocket"])
             worker = w["url"]
-            limits = {"endpoint": worker, "imageId": w["imageId"],
-                      "cpuMilli": p["resources"]["cpuCores"] * 1000,
-                      "memoryBytes": p["resources"]["memoryMiB"] * 2**20}
-            before = inspect_container(limits, worker, w["container"], strict_hardening=True,
-                                       docker_socket=w["dockerSocket"])
+            before = inspect_bound_worker(p, w)
         except (ValueError, KeyError, TypeError, OSError):
             return {"state": "REFUSED_RESOURCE_BINDING", "finishedAt": int(time.time())}
         remaining = job["responseDeadline"] - time.time()
@@ -138,8 +175,7 @@ def make_job_runner(policy, state_dir):
         out = _post(worker + "/v1/compute",
                     {"leaseId": job["leaseId"], "epochId": job["epochId"], "requestHash": job["requestHash"]},
                     timeout=timeout, allow_http_local=True)
-        after = inspect_container(limits, worker, w["container"], strict_hardening=True,
-                                  docker_socket=w["dockerSocket"])
+        after = inspect_bound_worker(p, w)
         st.require(before["containerId"] == after["containerId"], "worker changed during execution")
         expected = compute_result(job["leaseId"], job["epochId"], job["requestHash"])
         if out != expected:
