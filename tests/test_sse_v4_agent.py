@@ -123,32 +123,60 @@ class PlannerTest(unittest.TestCase):
         acts = [x for x in agent.plan_keeper(snap, now=60, head=0) if x["module"] == "standby"]
         self.assertEqual(acts[0]["key"], "50")
 
+    def resource_fixture(self):
+        from sse_v4_adapters import response_hash, endpoint_hash
+        r = dict(cpuCores=1, memoryMiB=512, storageMiB=0)
+        p = dict(schema="SSE_V4_PROFILE_V1", service="SHA256_CHAIN_8192",
+                 resources=r, sla=dict(responseSeconds=100, maxRuntimeSeconds=30))
+        o = dict(schema="SSE_V4_OFFER_V1", services=["SHA256_CHAIN_8192"],
+                 resources=dict(r), maxConcurrentLeases=1, endpointUrl="https://provider.example")
+        ph, oh = response_hash(p), response_hash(o)
+        cfg = dict(profiles={ph:p}, offers={oh:o}, workers={ph:dict(
+            imageId="sha256:"+"ab"*32, container="sse-compute-test",
+            url="http://127.0.0.1:8877", dockerSocket="/run/user/1001/docker.sock")},
+            approvedOfferHashes=[oh], approvedTermsHashes=[H])
+        l = lease(profileHash=ph, offerHash=oh, endpointHash=endpoint_hash(o["endpointUrl"]), responseSeconds=100)
+        return {"wallet":ME,"provider":cfg}, l
+
     def test_provider_never_accepts_unapproved_or_unverified_terms(self):
-        policy = {"wallet": ME, "provider": {"approvedOfferHashes": []}}
-        snap = {"market": MODS["market"], "leases": {1: bundle("Forming", lease(), termsHashRecomputed=H)}}
-        acts, _ = agent.plan_provider(snap, policy, now=10, jobs={})
-        self.assertEqual(acts, [])
-        policy["provider"]["approvedOfferHashes"] = [H]
+        policy, l = self.resource_fixture()
+        cfg = policy["provider"]
+        snap = {"market": MODS["market"], "leases": {1: bundle("Forming", l, termsHashRecomputed=H)}}
+        cfg["approvedOfferHashes"] = []
         self.assertEqual(agent.plan_provider(snap, policy, now=10, jobs={})[0], [])
-        policy["provider"]["approvedTermsHashes"] = [H]
+        cfg["approvedOfferHashes"] = [l["offerHash"]]
+        cfg["approvedTermsHashes"] = []
+        self.assertEqual(agent.plan_provider(snap, policy, now=10, jobs={})[0], [])
+        cfg["approvedTermsHashes"] = [H]
         snap["leases"][1]["termsHashRecomputed"] = "0x" + "22" * 32
-        acts, _ = agent.plan_provider(snap, policy, now=10, jobs={})
-        self.assertEqual(acts, [])
+        self.assertEqual(agent.plan_provider(snap, policy, now=10, jobs={})[0], [])
         snap["leases"][1]["termsHashRecomputed"] = H
-        acts, _ = agent.plan_provider(snap, policy, now=10, jobs={})
-        self.assertEqual(len(acts), 1)
+        self.assertEqual(len(agent.plan_provider(snap, policy, now=10, jobs={})[0]), 1)
+        cfg["workers"] = {}
+        self.assertEqual(agent.plan_provider(snap, policy, now=10, jobs={})[0], [])
 
     def test_provider_jobs_only_for_active_accepted(self):
-        policy = {"wallet": ME, "provider": {}}
-        l = lease(providerAccepted=False)
-        snap = {"market": MODS["market"], "leases": {1: bundle("Active", l, [epoch(0)])}}
-        _, jobs = agent.plan_provider(snap, policy, now=10, jobs={})
-        self.assertEqual(jobs, [])
-        snap["leases"][1]["lease"]["providerAccepted"] = True
+        policy, l = self.resource_fixture()
+        snap = {"market": MODS["market"], "leases": {1: bundle("Active", l, [epoch(0)], termsHashRecomputed=H)}}
+        self.assertEqual(agent.plan_provider(snap, policy, now=10, jobs={})[1], [])
+        l["providerAccepted"] = True
         _, jobs = agent.plan_provider(snap, policy, now=10, jobs={})
         self.assertEqual(len(jobs), 1)
-        _, again = agent.plan_provider(snap, policy, now=10, jobs={jobs[0]["jobId"]: jobs[0]})
-        self.assertEqual(again, [])  # idempotent
+        self.assertEqual(jobs[0]["offerHash"], l["offerHash"])
+        self.assertEqual(agent.plan_provider(snap, policy, now=10, jobs={jobs[0]["jobId"]: jobs[0]})[1], [])
+        snap["leases"][2] = bundle("Active", dict(l), [epoch(0)], termsHashRecomputed=H)
+        self.assertEqual(agent.plan_provider(snap, policy, now=10, jobs={})[1], [])
+
+    def test_provider_single_lease_admission_and_release(self):
+        policy, l = self.resource_fixture()
+        snap = {"market": MODS["market"], "leases": {
+            1: bundle("Forming", l, termsHashRecomputed=H),
+            2: bundle("Forming", dict(l), termsHashRecomputed=H)}}
+        self.assertEqual(len(agent.plan_provider(snap, policy, now=10, jobs={})[0]), 1)
+        l["providerAccepted"] = True
+        self.assertEqual(agent.plan_provider(snap, policy, now=10, jobs={})[0], [])
+        snap["leases"][1]["phase"] = "Closed"
+        self.assertEqual(len(agent.plan_provider(snap, policy, now=10, jobs={})[0]), 1)
 
     def test_monitor_abstains_on_inconclusive_and_needs_policy_for_failure(self):
         res = [{"leaseId": 1, "epochId": 0, "verdict": "inconclusive", "evidenceHash": H, "reason": "timeout"},
