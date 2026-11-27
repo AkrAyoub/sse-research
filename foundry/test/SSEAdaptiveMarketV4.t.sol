@@ -62,7 +62,7 @@ contract SSEAdaptiveMarketV4Test is Test {
     }
 
     // ---------------------------------------------------------------- helpers
-    function mon(uint256 i) private pure returns (address) { return address(uint160(0xA000 + i)); }
+    function mon(uint256 i) private pure returns (address) { return vm.addr(0xA000 + i); }
 
     function terms(bool conditional, bool responseReceipt) private pure returns (M.Terms memory) {
         return M.Terms({acceptSeconds: 1 days, confirmationRoundSeconds: 600, responseSeconds: 100,
@@ -440,7 +440,34 @@ contract SSEAdaptiveMarketV4Test is Test {
         market.startEpoch(id, keccak256("second"));
     }
 
-    function testMissingResponseIsNotProofOfViolation() public {
+    function testSignedFailureVoteBindsAuthenticatedResponse() public {
+        // Register known-key test monitors using the existing fixture identities.
+        uint256 id = open(true, false);
+        vm.prank(consumer); market.startEpoch(id, REQUEST);
+        respond(id, 0, REQUEST);
+        V.Epoch memory e = votes.epoch(id, 0);
+        vm.warp(uint256(e.responseDeadline) + 1);
+        address selected = votes.selected(id)[0];
+        uint256 key;
+        for (uint256 i; i < MONITORS; ++i) {
+            if (mon(i) == selected) { key = 0xA000 + i; break; }
+        }
+        assertGt(key, 0);
+        bytes32 evidence = keccak256("fixture negative evidence");
+        bytes32 typeHash = keccak256(
+            "MonitorVote(uint256 leaseId,uint256 epochId,bytes32 requestHash,uint8 outcome,bytes32 responseHash,bytes32 evidenceHash)");
+        bytes32 oldDigest = keccak256(abi.encodePacked("\x19\x01", votes.domainSeparator(),
+            keccak256(abi.encode(typeHash, id, uint256(0), REQUEST, uint8(V.Outcome.Failure), bytes32(0), evidence))));
+        bytes memory oldSig = sign(key, oldDigest);
+        vm.expectRevert(V.Unauthorized.selector);
+        votes.submitSignedVote(id, 0, V.Outcome.Failure, evidence, oldSig);
+        bytes32 digest = keccak256(abi.encodePacked("\x19\x01", votes.domainSeparator(),
+            keccak256(abi.encode(typeHash, id, uint256(0), REQUEST, uint8(V.Outcome.Failure), e.responseHash, evidence))));
+        votes.submitSignedVote(id, 0, V.Outcome.Failure, evidence, sign(key, digest));
+        assertEq(votes.epoch(id, 0).failureVotes, 1);
+    }
+
+
         // Even a full committee cannot turn silence into qualified failure.
         uint256 id = open(true, false);
         vm.prank(consumer); market.startEpoch(id, REQUEST);
