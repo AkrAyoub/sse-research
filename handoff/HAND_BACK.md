@@ -25,7 +25,9 @@ used sed/heredocs only. See logs/BUGS_AND_FIXES_LOG.md.
 | 18351e9 | Gas-parametrized formation tests n∈{7,10}, s∈{2,4} |
 | a6eb47a | Provider terms check for contract-wallet consumers; bid pagination and filters |
 | 189ad8d | One-entry-point setup orchestrator (plan first, per-step yes) over existing installers |
-| (this)  | Pass-4 docs refresh |
+| 184af44 | Pass-4 docs refresh |
+| 7770905 | Structured profile/policy/offer manifests; account balance/nonce/code and finalized history |
+| (this)  | Requirements traceability refresh |
 
 ## By status
 - **Existing live-verified (unchanged):** native chain31340 PoS; V2/V3 deployments; V3 experiments E1–E6, E8; V3 read-only
@@ -38,7 +40,7 @@ used sed/heredocs only. See logs/BUGS_AND_FIXES_LOG.md.
   - Python: planner, encoders, ABI layer, state/cursor/journal, role agents (incl. Terms decoding, self-keeping), signer
     unlock, job runner/prober adapters, provider output service, MPT proof verifier, console (marketplace, request builder,
     lease, provider, monitor, account, explorer, node/validator, rewards, consumer outputs), installer + unit templates;
-    42 Python tests (incl. tests/test_sse_setup.py).
+    43 Python tests (incl. tests/test_sse_setup.py).
 - **Awaiting deployment:** all V4 contracts (new version; V3 stays at its addresses).
 - **Not implemented / owner decision:** standby retainer (P-1), on-chain keeper bounty (P-2), misconduct penalties (P-3),
   stronger randomness for V4, arbitrary uploaded code (needs microVM isolation), single-format installer output (the new
