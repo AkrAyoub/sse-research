@@ -101,18 +101,22 @@ def ask_caps(input_fn=input):
 
 def wallet(keystore_dir, input_fn=input):
     keystore_dir.mkdir(mode=0o700, parents=True, exist_ok=True)
+    from sse_pos_r237_v2_approved_local_eip712_sign import safe_keystore
     existing = sorted(keystore_dir.glob("UTC--*"))
+    if len(existing) > 1:
+        raise Refused("multiple local wallets; explicit selection required")
     if existing:
-        doc = json.loads(existing[0].read_text())
+        doc = safe_keystore(existing[0])
         return "0x" + doc["address"].lower().removeprefix("0x"), existing[0]
     choice = input_fn("No V4 wallet found. [i]mport encrypted keystore path or [c]reate new? ").strip().lower()
     if choice == "i":
         src = Path(input_fn("Absolute path to encrypted UTC-V3 keystore: ").strip())
         from sse_pos_r237_v2_approved_local_eip712_sign import safe_keystore
         doc = safe_keystore(src)
-        dest = keystore_dir / src.name
-        dest.write_text(json.dumps(doc))
-        dest.chmod(0o600)
+        dest = keystore_dir / ("UTC--sse-v4--" + doc["address"].lower().removeprefix("0x"))
+        fd = os.open(dest, os.O_WRONLY | os.O_CREAT | os.O_EXCL, 0o600)
+        with os.fdopen(fd, "w") as fh:
+            json.dump(doc, fh)
         return "0x" + doc["address"].lower().removeprefix("0x"), dest
     if choice == "c":
         from eth_account import Account
@@ -149,9 +153,12 @@ def plan_actions(roles, publish, rpc):
             "note": "Re-running is idempotent: policy and wallet are never overwritten; units are re-rendered."}
 
 
-def install(roles, publish, rpc, python, input_fn=input):
+def install(roles, publish, rpc, python, input_fn=input, prepare_only=False):
     for d in (STATE, CONFIG, UNITS):
         d.mkdir(mode=0o700, parents=True, exist_ok=True)
+    import sse_v4_state as st
+    st.private_dir(STATE)
+    st.private_dir(CONFIG)
     pol_path = CONFIG / "policy.json"
     if pol_path.exists():
         existing = json.loads(pol_path.read_text())
@@ -178,6 +185,9 @@ def install(roles, publish, rpc, python, input_fn=input):
         (UNITS / name).write_text(text)
     subprocess.run(["systemctl", "--user", "daemon-reload"], check=True)
     for name in units:
+        if name == "sse-v4-agent.service" and prepare_only:
+            print("Agent unit prepared, not enabled or started; use interactive signer or verified encrypted credential.")
+            continue
         subprocess.run(["systemctl", "--user", "enable", "--now", name], check=True)
     print("Persistence across logout requires: loginctl enable-linger $USER (owner decision, needs sudo).")
     print("Public URL: run scripts/sse_publish_application_dashboard.sh against port 8791 (read-only instance).")
@@ -188,6 +198,7 @@ def main():
     p.add_argument("--roles", help="comma-separated subset of " + ",".join(ROLES))
     p.add_argument("--publish-readonly-console", action="store_true")
     p.add_argument("--plan", action="store_true", help="print the plan, change nothing")
+    p.add_argument("--prepare-only", action="store_true", help="prepare local policy and units, start console but not signing agent")
     a = p.parse_args()
     raw = a.roles or input("Roles (" + ",".join(ROLES) + "): ")
     roles = [r.strip() for r in raw.split(",") if r.strip()]
@@ -202,11 +213,13 @@ def main():
     manifest = st.load_manifest(MANIFEST)
     # LocalRPC only permits 127.0.0.1 endpoints; remote rpcHints need a verified local
     # TLS adapter (R361) that exposes them on loopback.
-    rpc = pick_rpc(manifest, lambda u: LocalRPC(u).request)
+    rpc = pick_rpc(manifest, lambda u: LocalRPC(u, timeout=15).request)
     if a.plan:
         print(json.dumps(plan_actions(roles, a.publish_readonly_console, rpc), indent=2))
         return
-    install(roles, a.publish_readonly_console, rpc, sys.executable)
+    if not a.prepare_only:
+        raise Refused("use --prepare-only first; agent activation requires a separately authorized credential or interactive signer")
+    install(roles, a.publish_readonly_console, rpc, sys.executable, prepare_only=True)
 
 
 if __name__ == "__main__":
