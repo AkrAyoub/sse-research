@@ -67,20 +67,24 @@ def draw_success_probability(population, eligible, count):
     if population < count or eligible < count:
         return Fraction(0)
     attempts = min(count * ATTEMPTS_PER_SEAT, MAX_ATTEMPTS)
-    state = [Fraction(0)] * (count + 1)
-    state[0] = Fraction(1)
+    # Integer mass DP with one shared denominator; avoid thousands of
+    # large rational gcd operations and account for rejected hash values.
+    space = 2 ** 256
+    per_entry = space // population
+    state = [0] * (count + 1)
+    state[0] = 1
     for _ in range(attempts):
-        nxt = [Fraction(0)] * (count + 1)
-        nxt[count] = state[count]
+        nxt = [0] * (count + 1)
+        nxt[count] = state[count] * space
         for found in range(count):
-            p = state[found]
-            if not p:
+            mass = state[found]
+            if not mass:
                 continue
-            hit = Fraction((eligible - found) * (2 ** 256 // population), 2 ** 256)
-            nxt[found + 1] += p * hit
-            nxt[found] += p * (1 - hit)
+            hit = (eligible - found) * per_entry
+            nxt[found + 1] += mass * hit
+            nxt[found] += mass * (space - hit)
         state = nxt
-    return state[count]
+    return Fraction(state[count], space ** attempts)
 
 
 def drawn_identity_risk(eligible, adversarial, drawn, fault_tolerance):
