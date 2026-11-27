@@ -23,7 +23,10 @@ if systemctl --user cat "$NAME" >/dev/null 2>&1; then
   fail "existing adapter unit; inspect rather than overwrite"
 fi
 [[ -z "$(ss -H -lnt 'sport = :28545')" ]] || fail "existing RPC listener; preserve"
-curl -6 -fsS --max-time 15 --cacert "$CERT" "https://[$REMOTE]:19443/" -H 'Content-Type: application/json' -d '{"jsonrpc":"2.0","id":1,"method":"eth_chainId","params":[]}' | /usr/bin/python3 -c 'import json,sys; assert json.load(sys.stdin).get("result")=="0x7a6c"'
+if ! RESPONSE="$(curl -6 -fsS --max-time 15 --cacert "$CERT" "https://[$REMOTE]:19443/" -H 'Content-Type: application/json' -d '{"jsonrpc":"2.0","id":1,"method":"eth_chainId","params":[]}')"; then
+  fail "authenticated upstream transport unavailable; inspect relay listener and overlay reachability; no adapter installed"
+fi
+printf '%s\n' "$RESPONSE" | /usr/bin/python3 -c 'import json,sys; r=json.load(sys.stdin); assert r.get("result")=="0x7a6c"' || fail "upstream chain identity probe rejected"
 DIR="$HOME/.config/systemd/user"
 mkdir -p "$DIR"
 UNIT="$DIR/$NAME"
