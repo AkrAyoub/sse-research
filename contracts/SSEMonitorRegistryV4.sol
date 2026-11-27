@@ -39,6 +39,17 @@ contract SSEMonitorRegistryV4 {
         bool exiting;
     }
 
+    // Memory-only parameters keep the sampler's live stack bounded without
+    // changing the public reservation interface or persistent storage layout.
+    struct DrawInput {
+        bytes32 seed;
+        bytes32 domain;
+        uint256 populationCut;
+        uint256 count;
+        address excludeA;
+        address excludeB;
+    }
+
     address public immutable market;
     uint256 public immutable perSeatBond;
 
@@ -168,20 +179,29 @@ contract SSEMonitorRegistryV4 {
             revert InvalidInput();
         if (populationCut > roster.length) populationCut = roster.length;
         if (populationCut < count) return (false, new address[](0));
-        address[] memory picked = new address[](count);
+        DrawInput memory input = DrawInput(seed, domain, populationCut, count, excludeA, excludeB);
+        uint256 attemptsUsed;
+        (ordered, attemptsUsed) = _drawSample(input);
+        if (ordered.length == 0) return (false, ordered);
+        _reservePicked(leaseId, ordered, attemptsUsed);
+        return (true, ordered);
+    }
+
+    /// @dev Read-only draw: no capacity is consumed unless the full sample exists.
+    function _drawSample(DrawInput memory input) private view returns (address[] memory picked, uint256 a) {
+        picked = new address[](input.count);
         uint256 found;
-        uint256 attempts = count * ATTEMPTS_PER_SEAT;
+        uint256 attempts = input.count * ATTEMPTS_PER_SEAT;
         if (attempts > MAX_ATTEMPTS) attempts = MAX_ATTEMPTS;
         // 2^256 mod N: values below this threshold are rejected (no modulo bias).
-        uint256 threshold = addmod(type(uint256).max, 1, populationCut);
-        uint256 a;
-        for (; a < attempts && found < count; ++a) {
-            uint256 x = uint256(keccak256(abi.encode("SSE_V4_MONITOR_DRAW", seed, domain, a)));
+        uint256 threshold = addmod(type(uint256).max, 1, input.populationCut);
+        for (; a < attempts && found < input.count; ++a) {
+            uint256 x = uint256(keccak256(abi.encode("SSE_V4_MONITOR_DRAW", input.seed, input.domain, a)));
             if (x < threshold) continue;
-            Entry storage e = roster[x % populationCut];
+            Entry storage e = roster[x % input.populationCut];
             if (!e.active) continue;
             address m = e.monitor;
-            if (m == excludeA || m == excludeB) continue;
+            if (m == input.excludeA || m == input.excludeB) continue;
             bool dup;
             for (uint256 j; j < found; ++j) if (picked[j] == m) { dup = true; break; }
             if (dup) continue;
@@ -189,14 +209,17 @@ contract SSEMonitorRegistryV4 {
             if (p.reserved >= p.capacity || p.reserved >= p.bond / perSeatBond) continue;
             picked[found++] = m;
         }
-        if (found < count) return (false, new address[](0));
+        if (found < input.count) return (new address[](0), a);
+    }
+
+    /// @dev Commit the complete ordered sample atomically after selection.
+    function _reservePicked(uint256 leaseId, address[] memory picked, uint256 attemptsUsed) private {
         address[] storage list = reservedByLease[leaseId];
-        for (uint256 i; i < count; ++i) {
+        for (uint256 i; i < picked.length; ++i) {
             ++positions[picked[i]].reserved;
             list.push(picked[i]);
         }
-        emit SeatsReserved(leaseId, picked, a);
-        return (true, picked);
+        emit SeatsReserved(leaseId, picked, attemptsUsed);
     }
 
     /// @notice Release every reservation of `leaseId` except addresses in `keep`.
