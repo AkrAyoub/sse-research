@@ -62,6 +62,35 @@ class AbiTest(unittest.TestCase):
         _, _, v = abi.award_and_fund(1, 0, terms, {"seats": 4, "perReportReward": 10}, {"epochFee": 100, "epochs": 3})
         self.assertEqual(v, 420)
 
+    def test_award_calldata_decodes_back_to_terms(self):
+        t = {f: (True if k == "bool" else 7) for f, k in abi.TERMS_FIELDS}
+        _, data, _ = abi.award_and_fund(5, 2, t, {"seats": 4, "perReportReward": 1}, {"epochFee": 1, "epochs": 1})
+        rid, bi, back = abi.decode_award_and_fund(data)
+        self.assertEqual((rid, bi, back), (5, 2, t))
+        with self.assertRaises(ValueError):
+            abi.decode_award_and_fund("0x12345678" + data[10:])
+        with self.assertRaises(ValueError):
+            abi.decode_award_and_fund(data[:40])
+
+    def test_provider_decodes_terms_only_from_consumer_direct_call(self):
+        import types
+        t = {f: (False if k == "bool" else 3) for f, k in abi.TERMS_FIELDS}
+        _, data, _ = abi.award_and_fund(9, 1, t, {"seats": 4, "perReportReward": 0}, {"epochFee": 1, "epochs": 1})
+        l = lease(requestId=9, bidIndex=1)
+
+        def run(tx):
+            fake = types.SimpleNamespace(ask=lambda m, p: tx, manifest={"modules": MODS})
+            idx = {"fundingTx": {"4": "0x" + "22" * 32}}
+            return agent.Agent._decoded_terms(fake, idx, 4, l), idx
+        good = {"to": MODS["market"], "from": OTHER, "input": data}
+        self.assertEqual(run(good)[0], t)
+        self.assertIsNone(run(dict(good, to=MODS["board"]))[0])        # not a direct market call
+        self.assertIsNone(run(dict(good, **{"from": ME}))[0])          # sender is not the consumer
+        self.assertIsNone(run(dict(good, input="0x" + data[10:]))[0])  # wrong selector
+        got, idx = run(None)                                            # tx not served: not cached
+        self.assertIsNone(got)
+        self.assertNotIn("4", idx.get("decodedTerms", {}))
+
     def test_struct_range_checks(self):
         r = {f: 0 for f, _ in abi.REQUEST_INPUT_FIELDS}
         r.update(profileHash=H, policyHash=H, artifactCommitment=H, seats=70000)
@@ -145,6 +174,41 @@ class ConsoleTest(unittest.TestCase):
         r1 = c.upload([("b.txt", b"2"), ("a.txt", b"1")])
         r2 = c.upload([("a.txt", b"1"), ("b.txt", b"2")])
         self.assertEqual(r1["artifactCommitment"], r2["artifactCommitment"])  # order independent
+
+    def test_output_verify_matches_only_finalized_response_hash(self):
+        from sse_v4_adapters import response_hash
+        out = {"result": "0x" + "ab" * 32, "iterations": 8192}
+
+        class R:
+            def __init__(self, h):
+                self.h = h
+
+            def market_epoch(self, lid, eid):
+                return {"responseHash": self.h}
+        c = console.Console(lambda m, p: {"number": "0x1", "hash": H}, {"modules": MODS}, "public")
+        c._meta = lambda tag: {"observedBlock": 1}
+        for onchain, expected in ((response_hash(out), True), ("0x" + "00" * 32, False), (H, False)):
+            c._reader = lambda f, h=onchain: (R(h), "0x1")
+            self.assertIs(c.output_verify({"leaseId": 1, "epochId": 0, "output": out})["verified"], expected)
+        with self.assertRaises(ValueError):
+            c.output_verify({"leaseId": "1", "epochId": 0, "output": out})
+
+    def test_output_fetch_local_only_and_endpoint_bound(self):
+        body = {"providerUrl": "https://provider.example/sse", "leaseId": 1, "epochId": 0, "expiry": 1, "signature": "0x"}
+        pub = console.Console(lambda m, p: None, {"modules": MODS}, "public")
+        with self.assertRaises(PermissionError):
+            pub.output_fetch(body)
+        loc = console.Console(lambda m, p: None, {"modules": MODS}, "local")
+        for bad in ("http://provider.example/sse", "https://user@host/x", "file:///etc/passwd", "http://10.0.0.1:80"):
+            with self.assertRaises(ValueError):
+                loc.output_fetch(dict(body, providerUrl=bad))
+
+        class R:
+            def lease(self, lid):
+                return {"endpointHash": H}  # does not commit to this URL
+        loc._reader = lambda f: (R(), "0x1")
+        with self.assertRaises(ValueError):  # StateError is a ValueError; no network request is made
+            loc.output_fetch(body)
 
     def test_unknown_intent_rejected(self):
         class FakeReader:

@@ -287,10 +287,42 @@ class Agent:
         if "keeper" in roles or mine:
             if lid not in idx["leases"]:
                 idx["leases"].append(lid)
+        if ev["event"] == "LeaseFunded" and ev.get("provider") == me:
+            # Remember the funding transaction so the provider can decode the
+            # consumer's Terms from calldata (authenticated later by termsHash).
+            idx.setdefault("fundingTx", {})[str(lid)] = ev["transactionHash"]
         if ev["event"] == "LeaseFunded":
             # consumer is not indexed in the event; resolved from lease view in step()
             if lid not in idx["leases"] and "consumer" in roles:
                 idx["leases"].append(lid)
+
+    def _decoded_terms(self, idx, lid, lease):
+        """Terms from the finalized funding transaction's calldata, cached in the
+        index. Only direct EOA calls to the market decode; a consumer using a
+        contract wallet must hand the provider its Terms (policy leaseTerms).
+        Never trusted alone: plan_provider accepts only if the recomputed
+        termsHash equals the on-chain lease.termsHash."""
+        key = str(lid)
+        cache = idx.setdefault("decodedTerms", {})
+        if key in cache:
+            return cache[key]
+        tx_hash = idx.get("fundingTx", {}).get(key)
+        if not tx_hash:
+            return None
+        try:
+            tx = self.ask("eth_getTransactionByHash", [tx_hash])
+            if not tx:
+                return None  # node has not served it (yet); retry next step, do not cache
+            st.require( (tx.get("to") or "").lower() == self.manifest["modules"]["market"],
+                       "funding tx is not a direct market call")
+            st.require((tx.get("from") or "").lower() == lease["consumer"], "funding tx sender is not the consumer")
+            rid, bid_index, t = abi.decode_award_and_fund(tx["input"])
+            st.require(rid == lease["requestId"] and bid_index == lease["bidIndex"], "calldata/lease mismatch")
+        except (ValueError, KeyError, TypeError):
+            cache[key] = None  # remembered: fall back to policy leaseTerms
+            return None
+        cache[key] = t
+        return t
 
     def step(self):
         events, new_cursor = self.cursor.poll()
@@ -323,7 +355,8 @@ class Agent:
             actions += plan_monitor(snap, self.policy, now)
         if "provider" in roles:
             for lid, b in snap["leases"].items():
-                lt = self.policy.get("provider", {}).get("leaseTerms", {}).get(str(lid))
+                lt = self.policy.get("provider", {}).get("leaseTerms", {}).get(str(lid)) \
+                    or self._decoded_terms(idx, lid, b["lease"])
                 b["leaseId"] = lid
                 b["termsHashRecomputed"] = verify_terms(b, self.manifest["modules"]["market"], st.CHAIN_ID, lt)
             acts, new_jobs = plan_provider(snap, self.policy, now, jobs)

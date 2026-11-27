@@ -23,14 +23,18 @@ BL Blocked · NO Not implemented. Commits are on branch handoff/claude-code-2026
 | A-13 | Stronger randomness (VRF/RSA adapters exist; not integrated with V4) | SSEVRFV25Adapter, RSA2048EntropyVerifier | NO for V4 | — | — |
 | B-01 | Committee planner (quorum, exact cost, draw success probability, conservative risk, non-weakening alternatives) | tools/sse_v4_committee_planner.py | NI, SR, TW | DRV-PY-01 | 6d8bcfe |
 | B-02 | V4 termsHash and EIP-712 digest encoders | tools/sse_v4_terms.py | NI, SR, TW | DRV-PY-01, DRV-V4-PARITY | 6d8bcfe |
-| B-03 | V4 consumer UI (request builder, uploads→commitment, planner, bid comparison, award intents, lease tracking) | tools/sse_v4_console.py, tools/sse_v4_console_static/ | NI, SR, TW (backend); output download UI NO | DRV-UI-V4 | b70f8b3 |
+| B-03 | V4 consumer UI (request builder, uploads→commitment, planner, bid comparison, award intents, lease tracking) | tools/sse_v4_console.py, tools/sse_v4_console_static/ | NI, SR, TW; output download/verify page NI (pass 3) | DRV-UI-V4, DRV-OUTPUTS-UI | b70f8b3, pass 3 |
 | B-04 | V4 provider UI: marketplace browse/filter, bid intents; monitor registration/exit; account credits | same | NI, SR | DRV-UI-V4 | b70f8b3 |
 | B-05 | V4 compute job runner + monitor prober (SHA256_CHAIN_8192, fail-closed otherwise) | tools/sse_v4_adapters.py | NI, SR; worker ET for V3 | DRV-AGENT-V4 | a2fd6ae |
+| B-06 | Provider output service: /v1/compute serves stored output by requestHash; /v1/output consumer-signed (EIP-191, ≤10 min expiry, consumer read from finalized state) | tools/sse_v4_provider_outputs.py, systemd/sse-v4-provider-outputs.service.in | NI, SR, TW | DRV-OUTPUTS-V4 | bb6976e |
 | C-01 | V4 role agents: finalized cursor, journal-before-broadcast, keeper/consumer/provider/monitor planners, signer unlock | tools/sse_v4_abi.py, sse_v4_state.py, sse_v4_agent.py, sse_v4_signer.py | NI, SR, TW | DRV-AGENT-V4 | a2fd6ae |
+| C-03 | Provider auto-decodes consumer Terms from the finalized awardAndFund calldata (direct EOA calls; sender must be the lease consumer; accepted only if recomputed termsHash equals on-chain); contract-wallet consumers still need policy leaseTerms | tools/sse_v4_abi.py decode_award_and_fund, sse_v4_agent.py _decoded_terms | NI, SR, TW | DRV-AGENT-V4 | pass 3 |
+| G-04 | Console POST hardening: same-origin JSON only; local mode requires loopback Host (CSRF/DNS rebinding) | tools/sse_v4_console.py do_POST | NI, SR | DRV-UI-V4 | pass 3 |
 | C-02 | R424 reward collector dashboard integration | tools/sse_native_reward_collector.py | ET (R425); integration NO | — | — |
 | D-01 | Unified installer: V4 application roles + console services (chain clients still via R151/R358) | scripts/sse_v4_app_install.py, systemd/sse-v4-*.service.in | NI, SR (app layer); chain-client unification NO | DRV-INST-V4 | e8c1df1 |
 | D-02 | Replaceable peer discovery hints in release manifest | release/chain31340-public-release.json | BL (owner infra) | — | — |
 | E-01 | Explorer: blocks, txs + decoded V4 events, priority fee, eth_getProof MPT verification with path view | tools/sse_v4_proof.py, sse_v4_console.py | NI, SR, TW | DRV-EXPLORER-01 | b70f8b3 |
+| E-02 | Node / validator page: EL peers, sync, head/safe/finalized, historical-state probe; validator balances via loopback beacon | tools/sse_v4_console.py (node, validators), static Node tab | NI, SR | DRV-NODE-V4 | bb6976e |
 | F-01 | V3 experiments E1–E6, E8 | evidence/, STATE_AND_EVIDENCE.md | LV | — | historical |
 | F-02 | E7, E9, E10 | — | NO / owner-run | REMAINING_EXPERIMENTS | — |
 | G-01 | Secret scan of tree + history | — | BL (needs tool execution) → DRV-SEC-01 | DRV-SEC-01 | — |

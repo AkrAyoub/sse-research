@@ -154,6 +154,25 @@ def award_and_fund(request_id, bid_index, terms, request, bid):
         (request_id, bid_index, as_tuple(TERMS_FIELDS, terms))), value
 
 
+AWARD_AND_FUND_SIG = "awardAndFund(uint256,uint256," + tuple_type(TERMS_FIELDS) + ")"
+
+
+def decode_award_and_fund(data):
+    """Decode direct awardAndFund calldata -> (requestId, bidIndex, terms dict).
+    Raises ValueError for any other selector or malformed input. The result is
+    NOT trusted by itself: callers must recompute termsHash and compare it with
+    the finalized on-chain lease.termsHash before acting on it."""
+    raw = bytes.fromhex(data[2:] if data.startswith("0x") else data)
+    if len(raw) < 4 or raw[:4] != selector(AWARD_AND_FUND_SIG):
+        raise ValueError("not a direct awardAndFund call")
+    t = tuple_type(TERMS_FIELDS)
+    try:
+        rid, bid_index, tv = decode(["uint256", "uint256", t], raw[4:])
+    except Exception as exc:  # eth_abi raises several decoding error types
+        raise ValueError("malformed awardAndFund calldata") from exc
+    return rid, bid_index, as_dict(TERMS_FIELDS, tv)
+
+
 def lease_call(name, lease_id):
     if name not in ("drawCommittee", "activateCommittee", "cancelExpiredDraw", "cancelUnformed",
                     "cancelUnaccepted", "closeLease", "forceCloseIdle"):

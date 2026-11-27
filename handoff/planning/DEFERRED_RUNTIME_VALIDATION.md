@@ -76,3 +76,18 @@ mode rejects /api/upload (403), that intents are unsigned and the browser wallet
 DRV-INST-V4 On a fresh Ubuntu 24.04 VM: `python3 scripts/sse_v4_app_install.py --roles consumer,monitor --plan` (must fail
 preflight until a V4 manifest exists), then with an isolated-chain manifest: install, reboot, `loginctl enable-linger`, verify
 services restart, re-run installer (idempotent: policy/wallet untouched).
+DRV-OUTPUTS-V4 `python3 -m unittest tests.test_sse_v4_provider_outputs -v` (all pass), then on the isolated chain start
+`tools/sse_v4_provider_outputs.py` (loopback 8881) after the provider agent completed one epoch: POST /v1/output with a
+consumer signature → 200 and the stored output whose keccak matches responseHash; wrong signer, expired (>10 min) or
+non-finalized lease → 400 with an error and no output; /v1/compute with an unknown requestHash → 400 "no delivered output" (never runs work).
+DRV-NODE-V4 With a synced local node and beacon at 127.0.0.1:25052: console "Node / validator" tab shows peers, syncing
+false, head ≥ safe ≥ finalized, historical-state probe result; validators query with 1–64 ids returns balances matching
+`curl 127.0.0.1:25052/eth/v1/beacon/states/finalized/validators?id=...`; 65 ids → 400; non-loopback --beacon refused.
+DRV-OUTPUTS-UI Local console on the isolated chain, consumer wallet in the browser: Lease tab → "My epoch output": wrong
+provider URL → "does not match the endpoint committed"; right URL → wallet personal_sign prompt showing the
+SSE_V4_OUTPUT message → output shown "Verified" with a Save link; edit one byte of the pasted output → "NOT verified".
+Public console: download button refuses, verify works. Cross-origin POST (e.g. `curl -H 'Origin: http://evil' ...`) and
+`Content-Type: text/plain` → 403; local console reached via a non-loopback Host header → 403.
+DRV-AGENT-V4-TERMS Provider agent with an EMPTY leaseTerms policy: after a consumer EOA funds a lease whose offerHash is
+approved, the agent accepts (decoded calldata reproduced termsHash). With a funding call routed through a contract wallet,
+the agent must NOT accept until the owner adds leaseTerms.

@@ -220,3 +220,33 @@ $("vLoad").onclick = async () => {
     show("vOut", "<p class='note'>State " + esc(j.state) + ", finalized flag " + esc(j.finalized) + ". " + esc(j.note) + "</p>" + table(rows, ["index", "status", "balanceGwei", "effectiveGwei", "slashed", "activationEpoch", "exitEpoch", "pubkey"]));
   } catch (e) { fail("vOut", e); }
 };
+
+// ------------------------------------------------- consumer epoch outputs
+function showOutput(j) {
+  const ok = j.verified ? "<p>Verified: output matches the finalized on-chain response hash.</p>"
+    : '<p class="err">NOT verified: output does not match the finalized on-chain response hash (or none is recorded yet).</p>';
+  let html = meta(j) + ok + table([j], ["onchainResponseHash", "outputResponseHash"]) + '<p class="note">' + esc(j.meaning) + "</p>";
+  if (j.output !== undefined) {
+    const blob = new Blob([JSON.stringify(j.output, null, 2)], { type: "application/json" });
+    html += '<p><a download="sse-lease-' + esc($("lId").value) + "-epoch-" + esc($("oEpoch").value) + '.json" href="' + URL.createObjectURL(blob) + '">Save output</a></p>';
+  }
+  show("oOut", html);
+}
+$("oFetch").onclick = async () => {
+  try {
+    if (MODE !== "local") throw new Error("Download runs only in the owner-local console; paste the output to verify here.");
+    if (!window.ethereum) throw new Error("No browser wallet detected.");
+    const lid = Number($("lId").value), eid = Number($("oEpoch").value);
+    const m = await api("output-message?lease=" + lid + "&epoch=" + eid);
+    const [from] = await window.ethereum.request({ method: "eth_requestAccounts" });
+    const msgHex = "0x" + Array.from(new TextEncoder().encode(m.message)).map((b) => b.toString(16).padStart(2, "0")).join("");
+    const signature = await window.ethereum.request({ method: "personal_sign", params: [msgHex, from] });
+    showOutput(await api("output-fetch", { providerUrl: $("oUrl").value.trim(), leaseId: lid, epochId: eid, expiry: m.expiry, signature }));
+  } catch (e) { fail("oOut", e); }
+};
+$("oVerify").onclick = async () => {
+  try {
+    const output = JSON.parse($("oPaste").value);
+    showOutput(await api("output-verify", { leaseId: Number($("lId").value), epochId: Number($("oEpoch").value), output }));
+  } catch (e) { fail("oOut", e); }
+};

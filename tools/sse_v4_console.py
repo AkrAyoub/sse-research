@@ -29,6 +29,7 @@ import sse_v4_state as st
 import sse_v4_terms as terms
 from sse_v4_committee_planner import plan as plan_committee, _render
 from sse_challenge import keccak256
+from sse_v4_adapters import endpoint_hash, response_hash
 
 MAX_JSON = 64 * 1024
 MAX_UPLOAD = 8 * 1024 * 1024
@@ -37,6 +38,10 @@ INT = re.compile(r"^[0-9]{1,20}$")
 HEX32 = re.compile(r"^0x[0-9a-fA-F]{64}$")
 ADDR = re.compile(r"^0x[0-9a-fA-F]{40}$")
 SAFE_NAME = re.compile(r"^[A-Za-z0-9._-]{1,96}$")
+PROVIDER_URL = re.compile(r"^(https://[A-Za-z0-9.-]{1,253}(:[0-9]{2,5})?(/[A-Za-z0-9._~/-]{0,200})?|http://127\.0\.0\.1:[0-9]{2,5}(/[A-Za-z0-9._~/-]{0,200})?)$")
+ZERO32 = "0x" + "00" * 32
+MAX_OUTPUT = 4 * 1024 * 1024
+OUTPUT_AUTH_SECONDS = 300
 STATIC = Path(__file__).resolve().parent / "sse_v4_console_static"
 
 
@@ -237,8 +242,8 @@ class Console:
     def validators(self, q):
         if not self.beacon:
             return {"available": False, "reason": "no local beacon node configured"}
-        ids = q.get("id", [])[:64]
-        if not ids:
+        ids = q.get("id", [])
+        if not 1 <= len(ids) <= 64:
             raise ValueError("1..64 validator ids required")
         for i in ids:
             if not (INT.fullmatch(i) or re.fullmatch(r"^0x[0-9a-fA-F]{96}$", i)):
@@ -321,6 +326,55 @@ class Console:
                 "privacy": "Provider will see plaintext inputs once authorized; confidentiality against the "
                            "executing provider is not provided."}
 
+    # ---------------------------------------------------------- consumer outputs
+    def output_message(self, q):
+        """Message the consumer signs (EIP-191 personal_sign) to download an
+        epoch output from the provider. Pure string; nothing is signed here."""
+        lid, eid = _int(q, "lease"), _int(q, "epoch")
+        expiry = int(time.time()) + OUTPUT_AUTH_SECONDS
+        market = self.manifest["modules"]["market"]
+        return {"message": f"SSE_V4_OUTPUT|{st.CHAIN_ID}|{market}|{lid}|{eid}|{expiry}", "expiry": expiry,
+                "note": "Sign in your wallet; the signature authorizes only this lease/epoch until expiry."}
+
+    def output_verify(self, body):
+        """Check an output against the FINALIZED on-chain responseHash. Read only."""
+        lid, eid, output = body["leaseId"], body["epochId"], body["output"]
+        if type(lid) is not int or type(eid) is not int or lid < 0 or eid < 0:
+            raise ValueError("bad lease/epoch")
+        r, tag = self._reader("finalized")
+        onchain = r.market_epoch(lid, eid)["responseHash"].lower()
+        got = response_hash(output).lower()
+        return dict(self._meta(tag), onchainResponseHash=onchain, outputResponseHash=got,
+                    verified=onchain != ZERO32 and got == onchain,
+                    meaning="Match proves this is the output the provider signed on-chain; it does not prove the "
+                            "output is correct beyond what the committed monitor policy measured.")
+
+    def output_fetch(self, body):
+        """Local mode only: fetch the consumer's output from the provider endpoint
+        committed in the awarded bid (keccak(url) must equal lease.endpointHash),
+        then verify it against the finalized responseHash."""
+        if self.mode != "local":
+            raise PermissionError("provider fetch is owner-local only; use output-verify in public mode")
+        url, lid, eid = body["providerUrl"], body["leaseId"], body["epochId"]
+        if not isinstance(url, str) or not PROVIDER_URL.fullmatch(url):
+            raise ValueError("provider URL must be https://host[:port][/path] or http://127.0.0.1:port")
+        if type(lid) is not int or type(eid) is not int:
+            raise ValueError("bad lease/epoch")
+        lease = self._reader("finalized")[0].lease(lid)
+        st.require(endpoint_hash(url).lower() == lease["endpointHash"].lower(),
+                   "URL does not match the endpoint committed in the awarded bid")
+        req = {"leaseId": lid, "epochId": eid, "expiry": int(body["expiry"]), "signature": str(body["signature"])}
+        from urllib.request import Request, urlopen
+        rq = Request(url.rstrip("/") + "/v1/output", data=json.dumps(req).encode(), method="POST",
+                     headers={"Content-Type": "application/json"})
+        with urlopen(rq, timeout=15) as resp:
+            raw = resp.read(MAX_OUTPUT + 1)
+        if len(raw) > MAX_OUTPUT:
+            raise ValueError("provider output exceeds console limit")
+        got = json.loads(raw)
+        check = self.output_verify({"leaseId": lid, "epochId": eid, "output": got["output"]})
+        return dict(check, output=got["output"], providerClaimedResponseHash=got.get("responseHash"))
+
 
 def make_handler(console):
     class H(BaseHTTPRequestHandler):
@@ -371,6 +425,8 @@ def make_handler(console):
                     return self._send(200, console.node())
                 if p == ["validators"]:
                     return self._send(200, console.validators(q))
+                if p == ["output-message"]:
+                    return self._send(200, console.output_message(q))
                 if p == ["plan"]:
                     return self._send(200, console.plan(q))
                 if len(p) == 2 and p[0] == "block":
@@ -389,12 +445,25 @@ def make_handler(console):
             u = urlsplit(self.path)
             parts = [p for p in u.path.split("/") if p]
             n = int(self.headers.get("Content-Length", "0") or 0)
+            # CSRF / DNS-rebinding guard: only same-origin JSON posts from this console.
+            origin, host = self.headers.get("Origin"), self.headers.get("Host", "")
+            local_host = re.fullmatch(r"(127\.0\.0\.1|localhost):[0-9]{2,5}", host) is not None
+            if (console.mode == "local" and not local_host) or \
+                    (origin is not None and origin not in ("http://" + host, "https://" + host)) or \
+                    not (self.headers.get("Content-Type") or "").startswith("application/json"):
+                return self._send(403, {"error": "same-origin application/json requests only"})
             try:
                 if len(parts) == 3 and parts[:2] == ["api", "intent"]:
                     if n > MAX_JSON:
                         return self._send(413, {"error": "too large"})
                     body = json.loads(self.rfile.read(n) or b"{}")
                     return self._send(200, console.intent(parts[2], body))
+                if parts in (["api", "output-verify"], ["api", "output-fetch"]):
+                    if n > MAX_OUTPUT + MAX_JSON:
+                        return self._send(413, {"error": "too large"})
+                    body = json.loads(self.rfile.read(n) or b"{}")
+                    fn = console.output_verify if parts[1] == "output-verify" else console.output_fetch
+                    return self._send(200, fn(body))
                 if parts == ["api", "upload"]:
                     if console.mode != "local":
                         return self._send(403, {"error": "uploads are owner-local only"})
@@ -406,8 +475,12 @@ def make_handler(console):
                     files = [(f["name"], base64.b64decode(f["base64"], validate=True)) for f in body["files"]]
                     return self._send(200, console.upload(files))
                 return self._send(404, {"error": "not found"})
+            except st.StateError as exc:
+                return self._send(400, {"error": str(exc)[:300]})
             except PermissionError as exc:
                 return self._send(403, {"error": str(exc)})
+            except OSError:
+                return self._send(502, {"error": "upstream endpoint (provider or RPC) unreachable or refused the request"})
             except (ValueError, KeyError, IndexError, TypeError) as exc:
                 return self._send(400, {"error": str(exc)[:300]})
             except Exception:  # noqa: BLE001
