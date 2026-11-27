@@ -187,7 +187,8 @@ class Console:
                 "gasUsed", "gasLimit", "baseFeePerGas", "miner", "withdrawalsRoot", "withdrawals", "transactions",
                 "parentBeaconBlockRoot", "blobGasUsed", "excessBlobGas", "logsBloom", "extraData", "size")
         out = {k: b[k] for k in keep if k in b}
-        out["finalized"] = int(b["number"], 16) <= fin
+        canonical = self.ask("eth_getBlockByNumber", [b["number"], False])
+        out["finalized"] = int(b["number"], 16) <= fin and bool(canonical) and canonical["hash"].lower() == b["hash"].lower()
         out["source"] = "configured RPC endpoint"
         return out
 
@@ -209,12 +210,13 @@ class Console:
         fin = st.finalized(self.ask)[0]
         inc = int(rc["blockNumber"], 16) if rc else None
         prio = None
+        canonical = self.ask("eth_getBlockByNumber", [rc["blockNumber"], False]) if rc else None
         if rc and "effectiveGasPrice" in rc:
             blk = self.ask("eth_getBlockByNumber", [rc["blockNumber"], False])
             if blk and blk.get("baseFeePerGas"):
                 prio = int(rc["effectiveGasPrice"], 16) - int(blk["baseFeePerGas"], 16)
         return {"transaction": t, "receipt": rc, "decodedEvents": events, "priorityFeePerGasWei": prio,
-                "finalized": inc is not None and inc <= fin}
+                "finalized": inc is not None and inc <= fin and bool(canonical) and canonical["hash"].lower() == rc["blockHash"].lower()}
 
     def proof(self, q):
         addr = q.get("address", [""])[0]
@@ -234,6 +236,9 @@ class Console:
         except ValueError as exc:
             return {"available": False, "reason": "node refused eth_getProof (historical state pruned or method "
                     "disabled): " + str(exc)[:160], "block": blk["number"]}
+        st.require(resp["address"].lower() == addr.lower(), "proof address mismatch")
+        returned_slots = [int(s["key"], 16) for s in resp.get("storageProof", [])]
+        st.require(sorted(returned_slots) == sorted(int(s, 16) for s in slots), "proof slot set mismatch")
         rep = proof.verify_get_proof(blk["stateRoot"], resp)
         rep.update(block=blk["number"], blockHash=blk["hash"],
                    note="Only nodes returned by eth_getProof are shown; the full trie is not enumerated.")
@@ -323,6 +328,19 @@ class Console:
                 "note": "Unavailable rewards are unknown, not zero. Values are beacon-API reports in Gwei."}
     # -------------------------------------------------------------- intents
     def intent(self, action, body):
+        # Browser inputs carry monetary uint256 values as exact decimal strings.
+        body = dict(body)
+        for field in ("maxEpochFee", "perReportReward", "epochFee"):
+            if field in body and isinstance(body[field], str):
+                st.require(re.fullmatch(r"[0-9]{1,78}", body[field]), "invalid wei value")
+                body[field] = int(body[field])
+        if "terms" in body and isinstance(body["terms"], dict):
+            body["terms"] = dict(body["terms"])
+            for field in ("reservationFee", "exposureBudget"):
+                val = body["terms"].get(field)
+                if isinstance(val, str):
+                    st.require(re.fullmatch(r"[0-9]{1,78}", val), "invalid wei value")
+                    body["terms"][field] = int(val)
         r, tag = self._reader("latest")
         if action == "createRequest":
             call = abi.create_request(body)
@@ -522,7 +540,15 @@ def make_handler(console):
         server_version = "SSEV4Console"
 
         def _send(self, code, obj, ctype="application/json"):
-            body = obj if isinstance(obj, bytes) else json.dumps(obj, default=str).encode()
+            def exact_numbers(value):
+                if type(value) is int and abs(value) > 2 ** 53 - 1:
+                    return str(value)
+                if isinstance(value, dict):
+                    return {k: exact_numbers(v) for k, v in value.items()}
+                if isinstance(value, (tuple, list)):
+                    return [exact_numbers(v) for v in value]
+                return value
+            body = obj if isinstance(obj, bytes) else json.dumps(exact_numbers(obj), default=str).encode()
             self.send_response(code)
             self.send_header("Content-Type", ctype)
             self.send_header("Content-Length", str(len(body)))
