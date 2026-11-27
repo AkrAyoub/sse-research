@@ -42,6 +42,7 @@ def load_policy(path):
     spend = p.get("spending", {})
     for k in ("maxFeePerGasWei", "maxPriorityFeePerGasWei", "maxGasPerTx", "dailyGasWeiBudget"):
         st.require(type(spend.get(k)) is int and spend[k] > 0, "spending." + k + " required (owner authorization)")
+    st.require(spend["maxPriorityFeePerGasWei"] <= spend["maxFeePerGasWei"], "priority fee exceeds max fee")
     p["wallet"] = p["wallet"].lower()
     return p
 
@@ -121,15 +122,18 @@ def plan_consumer(snapshot, policy, now):
 def plan_provider(snapshot, policy, now, jobs):
     """Accept only exact, locally approved offers; enqueue finalized admitted epochs."""
     me, out, new_jobs = policy["wallet"], [], []
-    approved = {o.lower() for o in policy.get("provider", {}).get("approvedOfferHashes", [])}
+    cfg = policy.get("provider", {})
+    approved = {o.lower() for o in cfg.get("approvedOfferHashes", [])}
+    approved_terms = {o.lower() for o in cfg.get("approvedTermsHashes", [])}
     for lid, b in snapshot["leases"].items():
         l = b["lease"]
         if l["provider"] != me:
             continue
         if (not l["providerAccepted"] and b["phase"] in ("PendingDraw", "Forming", "Active")
                 and now <= l["acceptDeadline"] and l["offerHash"] in approved
+                and l["termsHash"] in approved_terms
                 and b.get("termsHashRecomputed") == l["termsHash"]):
-            out.append(_act("market", abi.accept_lease(lid, l["termsHash"]), "offer approved, terms verified", "provider"))
+            out.append(_act("market", abi.accept_lease(lid, l["termsHash"]), "offer and exact lease terms owner-approved", "provider"))
         if b["phase"] != "Active" or not l["providerAccepted"]:
             continue
         for e in b["epochs"]:
