@@ -64,7 +64,7 @@ def _int(q, name, default=None, lo=0, hi=2 ** 63):
 
 class Console:
     def __init__(self, ask, manifest, mode, state_dir=None, beacon=None, rewards_dir=None):
-        self.ask, self.manifest, self.mode = ask, manifest, mode
+        self.ask, self.deployment, self.mode = ask, manifest, mode
         if beacon is not None and not re.fullmatch(r"http://127\.0\.0\.1:[0-9]{2,5}", beacon):
             raise ValueError("beacon API must be a loopback URL")
         self.beacon = beacon
@@ -74,10 +74,10 @@ class Console:
 
     def _reader(self, finality):
         if finality == "latest":
-            tag = "latest"
+            tag = hex(st.block_identity(self.ask("eth_getBlockByNumber", ["latest", False]))[0])
         else:
             tag = hex(st.finalized(self.ask)[0])
-        return st.Reader(self.ask, self.manifest, tag=tag), tag
+        return st.Reader(self.ask, self.deployment, tag=tag), tag
 
     def _meta(self, tag):
         b = self.ask("eth_getBlockByNumber", [tag, False])
@@ -472,7 +472,7 @@ class Console:
         epoch output from the provider. Pure string; nothing is signed here."""
         lid, eid = _int(q, "lease"), _int(q, "epoch")
         expiry = int(time.time()) + OUTPUT_AUTH_SECONDS
-        market = self.manifest["modules"]["market"]
+        market = self.deployment["modules"]["market"]
         return {"message": f"SSE_V4_OUTPUT|{st.CHAIN_ID}|{market}|{lid}|{eid}|{expiry}", "expiry": expiry,
                 "note": "Sign in your wallet; the signature authorizes only this lease/epoch until expiry."}
 
@@ -504,10 +504,11 @@ class Console:
         st.require(endpoint_hash(url).lower() == lease["endpointHash"].lower(),
                    "URL does not match the endpoint committed in the awarded bid")
         req = {"leaseId": lid, "epochId": eid, "expiry": int(body["expiry"]), "signature": str(body["signature"])}
-        from urllib.request import Request, urlopen
+        from urllib.request import Request, build_opener
+        from sse_v4_adapters import NoRedirect
         rq = Request(url.rstrip("/") + "/v1/output", data=json.dumps(req).encode(), method="POST",
                      headers={"Content-Type": "application/json"})
-        with urlopen(rq, timeout=15) as resp:
+        with build_opener(NoRedirect()).open(rq, timeout=15) as resp:
             raw = resp.read(MAX_OUTPUT + 1)
         if len(raw) > MAX_OUTPUT:
             raise ValueError("provider output exceeds console limit")
@@ -588,7 +589,12 @@ def make_handler(console):
         def do_POST(self):
             u = urlsplit(self.path)
             parts = [p for p in u.path.split("/") if p]
-            n = int(self.headers.get("Content-Length", "0") or 0)
+            try:
+                n = int(self.headers.get("Content-Length", "0") or 0)
+                if n < 0 or self.headers.get("Transfer-Encoding") is not None:
+                    raise ValueError("invalid body framing")
+            except ValueError:
+                return self._send(400, {"error": "invalid body framing"})
             # CSRF / DNS-rebinding guard: only same-origin JSON posts from this console.
             origin, host = self.headers.get("Origin"), self.headers.get("Host", "")
             local_host = re.fullmatch(r"(127\.0\.0\.1|localhost):[0-9]{2,5}", host) is not None
