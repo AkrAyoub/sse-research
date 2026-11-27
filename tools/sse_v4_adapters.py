@@ -126,7 +126,11 @@ def make_prober(policy, reader_factory, state_dir):
                     # Durable evidence survives crash or gas-cap refusal.
                     record = st.read_json(done)
                     st.require(record["leaseId"] == lid and record["epochId"] == e["id"] and
-                               record["monitor"] == me, "stored evidence context mismatch")
+                               record["monitor"] == me and record.get("policyHash") == l["policyHash"] and
+                               record.get("requestHash") == v["requestHash"], "stored evidence context mismatch")
+                    if record["verdict"] != "inconclusive":
+                        st.require(v["responseAuthenticated"] and record.get("onchainResponseHash") == v["responseHash"],
+                                   "stored evidence response mismatch")
                     if policy_ok and record["verdict"] != "inconclusive" and (record["verdict"] != "qualified_failure" or
                             (approved.get("failureEvidence") == "conditional-quorum" and l["conditionalQuorumPolicy"] is True)):
                         results.append({"leaseId": lid, "epochId": e["id"], "verdict": record["verdict"],
