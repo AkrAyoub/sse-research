@@ -31,7 +31,7 @@ ACK_TYPEHASH = keccak256(b"ProviderAck(uint256 leaseId,uint256 epochId,bytes32 r
 VOTE_TYPEHASH = keccak256(
     b"MonitorVote(uint256 leaseId,uint256 epochId,bytes32 requestHash,uint8 outcome,bytes32 responseHash,bytes32 evidenceHash)")
 MARKET_NAME = "SSEAdaptiveMarketV4"
-LEDGER_NAME = "SSEAdaptiveCommitteeVotesV4Candidate"
+LEDGER_NAME = "SSEAdaptiveCommitteeVotesV4"
 
 
 def _b32(v):
