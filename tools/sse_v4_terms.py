@@ -88,7 +88,9 @@ def ack_digest(domain, lease_id, epoch_id, request_hash):
 def vote_digest(ledger_domain, lease_id, epoch_id, request_hash, outcome, response_hash, evidence_hash):
     if outcome not in (1, 2):
         raise ValueError("outcome must be 1 (Success) or 2 (Failure)")
-    resp = _b32(response_hash) if outcome == 1 else b"\x00" * 32
+    resp = _b32(response_hash)
+    if resp == bytes(32):
+        raise ValueError("both verdicts require an authenticated nonzero response hash")
     return typed_digest(ledger_domain, keccak256(encode(
         ["bytes32", "uint256", "uint256", "bytes32", "uint8", "bytes32", "bytes32"],
         [VOTE_TYPEHASH, lease_id, epoch_id, _b32(request_hash), outcome, resp, _b32(evidence_hash)])))
