@@ -60,6 +60,13 @@ class TermsTest(unittest.TestCase):
         with self.assertRaises(ValueError):
             t.allocation_digest(domain, 0, 0, Z, a)
 
+    def test_v4_ledger_domain_short_and_version_bound(self):
+        self.assertEqual(t.LEDGER_NAME, "SSEAdaptiveCommitteeVotesV4")
+        self.assertLessEqual(len(t.LEDGER_NAME.encode()), 31)
+        old = t.domain_separator("SSEAdaptiveCommitteeVotesV4Candidate", 31340, MARKET)
+        new = t.domain_separator(t.LEDGER_NAME, 31340, MARKET)
+        self.assertNotEqual(old, new)
+
     def test_domains_differ(self):
         self.assertNotEqual(t.domain_separator(t.MARKET_NAME, 31340, MARKET),
                             t.domain_separator(t.LEDGER_NAME, 31340, MARKET))
