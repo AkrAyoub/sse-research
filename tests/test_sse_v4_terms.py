@@ -45,6 +45,34 @@ class TermsTest(unittest.TestCase):
         with self.assertRaises(ValueError):
             t.vote_digest(d, 1, 0, Z, 0, r1, Z)
 
+    def test_response_ack_and_both_votes_match_independent_encoder(self):
+        from eth_account.messages import encode_typed_data
+        from sse_challenge import keccak256
+        ledger = "0x" + "dd" * 20
+        response = "0x" + "22" * 32
+        evidence = "0x" + "33" * 32
+        context = dict(leaseId=7, epochId=2, requestHash=Z)
+        base = [("leaseId", "uint256"), ("epochId", "uint256"), ("requestHash", "bytes32")]
+        md = t.domain_separator(t.MARKET_NAME, 31340, MARKET)
+        ld = t.domain_separator(t.LEDGER_NAME, 31340, ledger)
+        cases = [
+            (t.MARKET_NAME, MARKET, "ProviderResponse", base + [("responseHash", "bytes32")],
+             dict(context, responseHash=response), t.response_digest(md, 7, 2, Z, response)),
+            (t.MARKET_NAME, MARKET, "ProviderAck", base, context, t.ack_digest(md, 7, 2, Z)),
+        ]
+        for outcome in (1, 2):
+            cases.append((t.LEDGER_NAME, ledger, "MonitorVote",
+                          base + [("outcome", "uint8"), ("responseHash", "bytes32"), ("evidenceHash", "bytes32")],
+                          dict(context, outcome=outcome, responseHash=response, evidenceHash=evidence),
+                          t.vote_digest(ld, 7, 2, Z, outcome, response, evidence)))
+        for name, contract, primary, fields, data, actual in cases:
+            with self.subTest(primary=primary, outcome=data.get("outcome")):
+                msg = encode_typed_data(
+                    domain_data=dict(name=name, version="1", chainId=31340, verifyingContract=contract),
+                    message_types={primary: [{"name": k, "type": v} for k, v in fields]},
+                    message_data=data)
+                self.assertEqual(actual, keccak256(b"\x19" + msg.version + msg.header + msg.body))
+
     def test_residual_digest_matches_independent_typed_data_encoder(self):
         from eth_account.messages import encode_typed_data
         a = dict(unresolvedAmount=20, providerShare=7, consumerShare=13, nonce=0, expiry=1000)
