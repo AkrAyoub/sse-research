@@ -167,6 +167,35 @@ class PlannerTest(unittest.TestCase):
         snap["leases"][2] = bundle("Active", dict(l), [epoch(0)], termsHashRecomputed=H)
         self.assertEqual(agent.plan_provider(snap, policy, now=10, jobs={})[1], [])
 
+    def test_provider_worker_inspection_and_output(self):
+        from unittest.mock import patch
+        import sse_v4_adapters as adapters
+        from compute_workload import compute_result
+        policy, l = self.resource_fixture()
+        job = dict(l, leaseId=1, epochId=0, requestHash=H, responseDeadline=10**12)
+        inspection = {"containerId":"test-container", "trustedHardwareAttestation":False}
+        with tempfile.TemporaryDirectory() as d:
+            run = adapters.make_job_runner(policy, d)
+            with patch.object(adapters, "require_local_owner_rootless_socket"), \
+                 patch.object(adapters, "inspect_container", return_value=inspection) as inspect, \
+                 patch.object(adapters, "_post", return_value=compute_result(1,0,H)) as post:
+                result = run(job)
+                self.assertEqual(result["state"], "DONE")
+                self.assertEqual(inspect.call_count, 2)
+                self.assertTrue(inspect.call_args.kwargs["strict_hardening"])
+                self.assertFalse(result["resourceObservation"]["trustedHardwareAttestation"])
+                post.assert_called_once()
+            with patch.object(adapters, "require_local_owner_rootless_socket"), \
+                 patch.object(adapters, "inspect_container", side_effect=ValueError("quota mismatch")), \
+                 patch.object(adapters, "_post") as post:
+                self.assertEqual(run(job)["state"], "REFUSED_RESOURCE_BINDING")
+                post.assert_not_called()
+            with patch.object(adapters, "require_local_owner_rootless_socket"), \
+                 patch.object(adapters, "inspect_container", side_effect=[inspection, dict(inspection, containerId="changed")]), \
+                 patch.object(adapters, "_post", return_value=compute_result(1,0,H)):
+                with self.assertRaisesRegex(ValueError, "worker changed"):
+                    run(job)
+
     def test_provider_single_lease_admission_and_release(self):
         policy, l = self.resource_fixture()
         snap = {"market": MODS["market"], "leases": {
