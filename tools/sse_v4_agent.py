@@ -125,15 +125,31 @@ def plan_provider(snapshot, policy, now, jobs):
     cfg = policy.get("provider", {})
     approved = {o.lower() for o in cfg.get("approvedOfferHashes", [])}
     approved_terms = {o.lower() for o in cfg.get("approvedTermsHashes", [])}
-    for lid, b in snapshot["leases"].items():
+    # Reserve a single lease across the entire provider wallet, not per
+    # profile or offer. Finalized active commitments survive process restart.
+    # Pending local acceptance transactions must also block further acceptance.
+    from sse_v4_adapters import resource_binding
+    occupied = {lid for lid, b in snapshot["leases"].items()
+                if b["lease"]["provider"] == me and b["lease"]["providerAccepted"]
+                and b["phase"] not in ("Closed", "Cancelled")}
+    for lid, b in sorted(snapshot["leases"].items()):
         l = b["lease"]
         if l["provider"] != me:
+            continue
+        try:
+            resource_binding(cfg, l)
+        except (ValueError, KeyError, TypeError, OSError):
+            continue
+        if l["offerHash"] not in approved or l["termsHash"] not in approved_terms or b.get("termsHashRecomputed") != l["termsHash"]:
+            continue
+        if occupied - {lid}:
             continue
         if (not l["providerAccepted"] and b["phase"] in ("PendingDraw", "Forming", "Active")
                 and now <= l["acceptDeadline"] and l["offerHash"] in approved
                 and l["termsHash"] in approved_terms
                 and b.get("termsHashRecomputed") == l["termsHash"]):
             out.append(_act("market", abi.accept_lease(lid, l["termsHash"]), "offer and exact lease terms owner-approved", "provider"))
+            occupied.add(lid)
         if b["phase"] != "Active" or not l["providerAccepted"]:
             continue
         for e in b["epochs"]:
@@ -141,7 +157,9 @@ def plan_provider(snapshot, policy, now, jobs):
             jid = job_id(snapshot["market"], lid, e["id"], m["requestHash"])
             if m["exists"] and not m["accounted"] and jid not in jobs and now <= e["votes"]["responseDeadline"]:
                 new_jobs.append({"jobId": jid, "leaseId": lid, "epochId": e["id"], "requestHash": m["requestHash"],
-                                 "profileHash": l["profileHash"], "artifactCommitment": l["artifactCommitment"],
+                                 "profileHash": l["profileHash"], "offerHash": l["offerHash"],
+                                 "endpointHash": l["endpointHash"], "responseSeconds": l["responseSeconds"],
+                                 "termsHash": l["termsHash"], "artifactCommitment": l["artifactCommitment"],
                                  "responseDeadline": e["votes"]["responseDeadline"]})
     return out, new_jobs
 
@@ -405,6 +423,15 @@ class Agent:
                             jobs[jid] = dict(j, state="STALE_AUTHORIZATION")
                             st.atomic_write_json(self.jobs_path, jobs)
                             continue
+                        # Old queues cannot bypass the new resource admission policy.
+                        eligible = {x["jobId"]: x for x in plan_provider(snap, self.policy, int(self.clock()), {})[1]}
+                        if jid not in eligible or any(j.get(k) != eligible[jid][k] for k in
+                                ("profileHash", "offerHash", "endpointHash", "responseSeconds", "termsHash", "artifactCommitment")):
+                            jobs[jid] = dict(j, state="REFUSED_RESOURCE_ADMISSION")
+                            st.atomic_write_json(self.jobs_path, jobs)
+                            continue
+                        if any(other.get("state") in ("RUNNING", "EXECUTION_UNKNOWN") for other in jobs.values()):
+                            continue  # ambiguous execution requires operator reconciliation
                         jobs[jid] = dict(j, state="RUNNING")
                         st.atomic_write_json(self.jobs_path, jobs)
                         try:
