@@ -60,6 +60,27 @@ def verify(artifacts):
         entry=functions[m].get(sig)
         if not entry or fields(entry["inputs"][index].get("components",[]))!=expected:
             errors.append(f"{m}: input tuple mismatch {sig}")
+    # Scalar and array return types used by Reader and deployment verification.
+    views = {
+        "market": {"scientificAccounting(uint256)": ["uint256"]*6+["bool"],
+                   "nextLeaseId()": ["uint256"], "domainSeparator()": ["bytes32"],
+                   **{n+"()":["address"] for n in ("board","registry","standby","votes")}},
+        "board": {"nextRequestId()":["uint256"], "market()":["address"]},
+        "registry": {"position(address)":["uint256"]*4+["bool"], "available(address)":["uint256"],
+                     "rosterLength()":["uint256"], "activeEntries()":["uint256"], "perSeatBond()":["uint256"],
+                     "eligibleInRange(uint256,uint256,address,address)":["uint256","uint256"],
+                     "reservedFor(uint256)":["address[]"], "market()":["address"]},
+        "standby": {"confirmed(uint256,address)":["bool"], "market()":["address"]},
+        "ledger": {"selected(uint256)":["address[]"], "voted(uint256,uint256,address)":["bool"],
+                   "settlement()":["address"]},
+    }
+    for m in ("market","registry","ledger"):
+        views[m]["withdrawable(address)"]=["uint256"]
+    for m, signatures in views.items():
+        for sig, expected in signatures.items():
+            entry=functions[m].get(sig)
+            if not entry or [typ(x) for x in entry["outputs"]]!=expected:
+                errors.append(f"{m}: view return mismatch {sig}")
     bid=functions["board"].get("bidsInRange(uint256,uint256,uint256)")
     if not bid or len(bid["outputs"])!=1 or bid["outputs"][0]["type"]!="tuple[]" or fields(bid["outputs"][0].get("components",[]))!=a.BID_FIELDS:
         errors.append("board: bid array output mismatch")
