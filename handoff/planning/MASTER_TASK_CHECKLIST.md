@@ -17,8 +17,9 @@ BL Blocked · NO Not implemented. Commits are on branch handoff/claude-code-2026
 | A-07 | V4 deployment script (owner-run, nonce-predicted wiring) | script/DeploySSEV4Candidate31340.s.sol | NI, SR, AD | DRV-V4-05 | 5d5867b |
 | A-08 | Explicit response-as-receipt term (V3 unchanged) | market `responseAdmitsReceipt` | NI, SR, TW | DRV-V4-01 | 5d5867b |
 | A-09 | Keeper bounties for permissionless transitions | — | NO | — | — |
-| A-10 | Standby retainer payment | — | NO (design D-05) | — | — |
-| A-11 | Provable-misconduct penalties for monitor bonds | — | NO | — | — |
+| A-10 | Standby retainer payment | — | NO — owner economics decision P-1 (DESIGN_DECISIONS) | — | — |
+| A-14 | Keeper incentive: self-keeping of own leases by consumer/provider agents (D-09); on-chain bounty = owner decision P-2 | tools/sse_v4_agent.py step, installer selfKeep | NI, SR (self-keeping) | DRV-AGENT-V4 | pass 3 |
+| A-11 | Provable-misconduct penalties for monitor bonds | — | NO — owner decision P-3 (equivocation-only proposal) | — | — |
 | A-12 | Qualified negative evidence beyond conditional quorum (E7 adapter) | — | NO (design D-07) | E7 | — |
 | A-13 | Stronger randomness (VRF/RSA adapters exist; not integrated with V4) | SSEVRFV25Adapter, RSA2048EntropyVerifier | NO for V4 | — | — |
 | B-01 | Committee planner (quorum, exact cost, draw success probability, conservative risk, non-weakening alternatives) | tools/sse_v4_committee_planner.py | NI, SR, TW | DRV-PY-01 | 6d8bcfe |

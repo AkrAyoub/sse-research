@@ -106,6 +106,17 @@ class PlannerTest(unittest.TestCase):
         acts = agent.plan_keeper(snap, now=10, head=400)
         self.assertEqual(acts[0]["reason"], "entropy expired")
 
+    def test_self_keep_only_own_leases_and_only_when_authorized(self):
+        snap = {"market": MODS["market"], "leases": {1: bundle("PendingDraw", lease()),
+                                                     2: bundle("PendingDraw", lease(consumer=OTHER, provider=OTHER))}}
+        pol = {"roles": ["provider"], "wallet": ME, "selfKeep": True}
+        self.assertEqual(list(agent.self_keep_scope(snap, pol)["leases"]), [1])
+        self.assertEqual(agent.self_keep_scope(snap, dict(pol, selfKeep=False))["leases"], {})
+        self.assertEqual(agent.self_keep_scope(snap, {"roles": ["provider"], "wallet": ME})["leases"], {})
+        self.assertEqual(agent.self_keep_scope(snap, dict(pol, roles=["monitor"]))["leases"], {})
+        acts = agent.plan_keeper(agent.self_keep_scope(snap, pol), now=10, head=101)
+        self.assertTrue(acts and all(a["value"] == 0 for a in acts))
+
     def test_keeper_advance_keyed_by_round(self):
         a = {"phaseName": "Confirming", "deadline": 50, "primary": [], "standby": []}
         snap = {"market": MODS["market"], "leases": {1: bundle("Forming", lease(), assignment=a)}}

@@ -89,6 +89,18 @@ def plan_keeper(snapshot, now, head):
     return out
 
 
+def self_keep_scope(snapshot, policy):
+    """Design D-09 self-keeping: with no on-chain keeper bounty, a consumer or
+    provider (not a keeper) advances ONLY leases where it is the consumer or
+    provider, and only if the owner set policy selfKeep=true."""
+    roles = set(policy["roles"])
+    if policy.get("selfKeep") is not True or "keeper" in roles or not roles & {"consumer", "provider"}:
+        return dict(snapshot, leases={})
+    me = policy["wallet"]
+    return dict(snapshot, leases={lid: b for lid, b in snapshot["leases"].items()
+                                  if me in (b["lease"]["consumer"], b["lease"]["provider"])})
+
+
 def plan_consumer(snapshot, policy, now):
     me, out = policy["wallet"], []
     plans = policy.get("consumer", {}).get("epochRequests", {})
@@ -349,6 +361,10 @@ class Agent:
         roles = set(self.policy["roles"])
         if "keeper" in roles:
             actions += plan_keeper(snap, now, head)
+        else:
+            scope = self_keep_scope(snap, self.policy)  # design D-09
+            if scope["leases"]:
+                actions += plan_keeper(scope, now, head)
         if "consumer" in roles:
             actions += plan_consumer(snap, self.policy, now)
         if "monitor" in roles:

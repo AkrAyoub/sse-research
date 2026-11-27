@@ -73,7 +73,7 @@ def pick_rpc(manifest, ask_factory):
 
 def policy_for(roles, wallet, keystore, caps, extra):
     p = {"schema": "SSE_V4_AGENT_POLICY_V1", "roles": roles, "wallet": wallet.lower(), "keystore": str(keystore),
-         "spending": caps,
+         "spending": caps, "selfKeep": True,  # advance only own leases (D-09); owner may set false
          "consumer": {"epochRequests": {}},
          "provider": {"approvedOfferHashes": [], "leaseTerms": {}, "services": {},
                       "workerUrl": "http://127.0.0.1:8877"},
