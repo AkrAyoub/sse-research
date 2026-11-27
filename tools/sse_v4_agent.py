@@ -125,37 +125,46 @@ def plan_provider(snapshot, policy, now, jobs):
     cfg = policy.get("provider", {})
     approved = {o.lower() for o in cfg.get("approvedOfferHashes", [])}
     approved_terms = {o.lower() for o in cfg.get("approvedTermsHashes", [])}
-    # Reserve a single lease across the entire provider wallet, not per
-    # profile or offer. Finalized active commitments survive process restart.
-    # Pending local acceptance transactions must also block further acceptance.
-    from sse_v4_adapters import resource_binding
-    occupied = {lid for lid, b in snapshot["leases"].items()
-                if b["lease"]["provider"] == me and b["lease"]["providerAccepted"]
-                and b["phase"] not in ("Closed", "Cancelled")}
+    from sse_v4_adapters import resource_binding, allocation_fits
+    reserved = []
+    # Account for all accepted, nonterminal leases, even those no longer
+    # approved. Unknown or overcommitted reservations block new work.
+    try:
+        for lid, b in sorted(snapshot["leases"].items()):
+            l = b["lease"]
+            if l["provider"] == me and l["providerAccepted"] and b["phase"] not in ("Closed", "Cancelled"):
+                p, o, w = resource_binding(cfg, dict(l, leaseId=lid))
+                reserved.append((l["profileHash"], l["offerHash"], p, o, w))
+        if not allocation_fits(cfg, reserved):
+            return [], []
+    except (ValueError, KeyError, TypeError, OSError):
+        return [], []
     for lid, b in sorted(snapshot["leases"].items()):
         l = b["lease"]
         if l["provider"] != me:
             continue
         try:
-            resource_binding(cfg, l)
+            p, o, w = resource_binding(cfg, dict(l, leaseId=lid))
         except (ValueError, KeyError, TypeError, OSError):
             continue
         if l["offerHash"] not in approved or l["termsHash"] not in approved_terms or b.get("termsHashRecomputed") != l["termsHash"]:
             continue
-        if occupied - {lid}:
+        candidate = (l["profileHash"], l["offerHash"], p, o, w)
+        if not l["providerAccepted"] and not allocation_fits(cfg, reserved + [candidate]):
             continue
-        if (not l["providerAccepted"] and b["phase"] in ("PendingDraw", "Forming", "Active")
+        if (not out and not l["providerAccepted"] and b["phase"] in ("PendingDraw", "Forming", "Active")
                 and now <= l["acceptDeadline"] and l["offerHash"] in approved
                 and l["termsHash"] in approved_terms
                 and b.get("termsHashRecomputed") == l["termsHash"]):
             out.append(_act("market", abi.accept_lease(lid, l["termsHash"]), "offer and exact lease terms owner-approved", "provider"))
-            occupied.add(lid)
+            reserved.append(candidate)
+            # Submit at most one new acceptance per finalized snapshot.
         if b["phase"] != "Active" or not l["providerAccepted"]:
             continue
         for e in b["epochs"]:
             m = e["market"]
             jid = job_id(snapshot["market"], lid, e["id"], m["requestHash"])
-            if m["exists"] and not m["accounted"] and jid not in jobs and now <= e["votes"]["responseDeadline"]:
+            if m["exists"] and not m["accounted"] and not e["votes"].get("responseAuthenticated", False) and jid not in jobs and now <= e["votes"]["responseDeadline"]:
                 new_jobs.append({"jobId": jid, "leaseId": lid, "epochId": e["id"], "requestHash": m["requestHash"],
                                  "profileHash": l["profileHash"], "offerHash": l["offerHash"],
                                  "endpointHash": l["endpointHash"], "responseSeconds": l["responseSeconds"],
@@ -408,7 +417,21 @@ class Agent:
                     or self._decoded_terms(idx, lid, b["lease"])
                 b["leaseId"] = lid
                 b["termsHashRecomputed"] = verify_terms(b, self.manifest["modules"]["market"], st.CHAIN_ID, lt)
-            acts, new_jobs = plan_provider(snap, self.policy, now, jobs)
+            # Do not allocate against an incomplete historical event index.
+            caught_up = new_cursor["height"] >= height
+            acts, new_jobs = plan_provider(snap, self.policy, now, jobs) if caught_up else ([], [])
+            if self.job_runner and persist and acts:
+                from sse_v4_adapters import resource_binding, inspect_bound_worker
+                checked = []
+                for act in acts:
+                    try:
+                        lid = int(act["calldata"][10:74], 16)
+                        p, _, w = resource_binding(self.policy["provider"], dict(snap["leases"][lid]["lease"], leaseId=lid))
+                        inspect_bound_worker(p, w)
+                        checked.append(act)
+                    except (ValueError, KeyError, TypeError, OSError):
+                        continue
+                acts = checked
             pending_accept = False
             if self.sender:
                 # A pending acceptance may not yet appear in finalized views.
@@ -428,7 +451,7 @@ class Agent:
                 jobs[j["jobId"]] = dict(j, state="QUEUED", queuedAt=now)
             if persist:
                 st.atomic_write_json(self.jobs_path, jobs)  # persist BEFORE any execution
-            if self.job_runner and persist and not pending_accept:
+            if self.job_runner and persist and not pending_accept and caught_up:
                 for jid, j in jobs.items():
                     if j["state"] == "QUEUED":
                         b = snap["leases"].get(j["leaseId"])
