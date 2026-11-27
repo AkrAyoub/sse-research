@@ -138,7 +138,7 @@ def worker_quarantined(key, jobs):
     return False
 
 
-def dispatch_provider_jobs(jobs, eligible, runner, persist, clock, limit):
+def dispatch_provider_jobs(jobs, eligible, runner, persist, clock, limit, on_complete=None):
     """One bounded batch; only this coordinator mutates the job journal.
     Persist RUNNING before submitting work. A crash leaves a quarantine,
     never an automatic retry. Independent workers can continue.
@@ -184,6 +184,8 @@ def dispatch_provider_jobs(jobs, eligible, runner, persist, clock, limit):
             except Exception as exc:
                 jobs[jid] = dict(jobs[jid], state="EXECUTION_UNKNOWN", error=type(exc).__name__)
             persist(jobs)
+            if on_complete is not None and jobs[jid].get("state") == "DONE":
+                on_complete(jobs[jid])
 
 
 def plan_provider(snapshot, policy, now, jobs):
@@ -472,6 +474,7 @@ class Agent:
         snap["leases"] = {lid: b for lid, b in snap["leases"].items() if relevant(b)}
         idx["leases"] = sorted(snap["leases"])
         actions, jobs = [], st.read_json(self.jobs_path) or {}
+        early_results = []
         roles = set(self.policy["roles"])
         if "keeper" in roles:
             actions += plan_keeper(snap, now, head)
@@ -525,9 +528,23 @@ class Agent:
                 st.atomic_write_json(self.jobs_path, jobs)  # persist BEFORE any execution
             if self.job_runner and persist and not pending_accept and caught_up:
                 eligible = {x["jobId"]: x for x in plan_provider(snap, self.policy, int(self.clock()), {})[1]}
+                def relay_completed(j):
+                    # Coordinator thread only; never sign from a worker.
+                    if self.sender is None:
+                        return
+                    try:
+                        for entry in self.sender.j.unresolved(self.policy["wallet"]):
+                            self.sender.j.reconcile(self.ask, entry)
+                        for act in provider_response_actions({j["jobId"]: j}, self.manifest,
+                                                             self.sender, snap, int(self.clock())):
+                            early_results.append(self.sender.send(act, int(self.clock())))
+                    except Exception as exc:
+                        # DONE remains durable; retry through the normal journal path.
+                        early_results.append({"refused": type(exc).__name__, "action": "early provider response"})
                 dispatch_provider_jobs(jobs, eligible, self.job_runner,
                                        lambda data: st.atomic_write_json(self.jobs_path, data),
-                                       self.clock, self.policy["provider"].get("maxParallelJobs", 1))
+                                       self.clock, self.policy["provider"].get("maxParallelJobs", 1),
+                                       on_complete=relay_completed)
             if self.sender:
                 actions += provider_response_actions(jobs, self.manifest, self.sender, snap, int(self.clock()))
         if "monitor" in roles and self.prober:
@@ -537,7 +554,7 @@ class Agent:
             with open(log, "a") as fh:
                 for a in abstentions:
                     fh.write(json.dumps(dict(a, at=now)) + "\n")
-        results = []
+        results = early_results
         if self.sender:
             for e in self.sender.j.unresolved(self.policy["wallet"]):
                 self.sender.j.reconcile(self.ask, e)
