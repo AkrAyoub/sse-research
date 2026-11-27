@@ -559,6 +559,10 @@ def make_handler(console):
             self.end_headers()
             self.wfile.write(body)
 
+        def setup(self):
+            super().setup()
+            self.connection.settimeout(15)
+
         def log_message(self, fmt, *args):  # no client IPs or query strings in logs
             pass
 
