@@ -321,6 +321,9 @@ class Journal:
         if r is None:
             tx = ask("eth_getTransactionByHash", [entry["transactionHash"]])
             return self.update(entry, status="KNOWN_PENDING" if tx else "UNKNOWN_NO_RECEIPT")
+        require(r.get("transactionHash", "").lower() == entry["transactionHash"], "receipt transaction identity mismatch")
+        require(r.get("from", "").lower() == entry["sender"], "receipt sender mismatch")
+        require(r.get("to", "").lower() == entry["target"], "receipt target mismatch")
         n = int(r["blockNumber"], 16)
         canon = block_identity(ask("eth_getBlockByNumber", [hex(n), False]))
         if canon[1] != r["blockHash"].lower():
