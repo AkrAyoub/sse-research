@@ -315,10 +315,12 @@ def provider_response_actions(jobs, manifest, sender, snapshot, now):
     out = []
     for j in jobs.values():
         b = snapshot["leases"].get(j["leaseId"])
-        if not b or b["phase"] != "Active":
+        if not b or b["phase"] != "Active" or not b["lease"]["providerAccepted"] or b["lease"]["provider"] != sender.p["wallet"]:
+            continue
+        if any(j.get(k) != b["lease"][k] for k in ("profileHash", "offerHash", "endpointHash", "termsHash", "artifactCommitment")):
             continue
         e = next((e for e in b["epochs"] if e["id"] == j["epochId"]), None)
-        if not e or e["market"]["requestHash"] != j["requestHash"] or e["votes"]["responseAuthenticated"] or now > e["votes"]["responseDeadline"]:
+        if not e or not e["market"]["exists"] or e["market"]["accounted"] or e["market"]["requestHash"] != j["requestHash"] or e["votes"]["responseAuthenticated"] or now > e["votes"]["responseDeadline"]:
             continue
         if j.get("state") == "DONE" and j.get("responseHash") and j.get("resourceObservation"):
             d = terms.response_digest(domain, j["leaseId"], j["epochId"], j["requestHash"], j["responseHash"])
