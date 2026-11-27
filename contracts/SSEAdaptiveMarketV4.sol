@@ -341,7 +341,9 @@ contract SSEAdaptiveMarketV4 is EIP712 {
         Phase prior = l.phase;
         l.phase = Phase.Cancelled;
         if (prior == Phase.Forming) {
-            if (standby.assignment(leaseId).phase == Standby.Phase.Confirming) standby.cancel(leaseId);
+            Standby.Phase assignmentPhase = standby.assignment(leaseId).phase;
+            if (assignmentPhase == Standby.Phase.Confirming || assignmentPhase == Standby.Phase.Ready)
+                standby.cancel(leaseId);
         } else if (prior == Phase.Active) {
             // Committee frozen but unused: ledger refunds its report budget to consumer.
             votes.closeReporting(leaseId);
@@ -468,10 +470,13 @@ contract SSEAdaptiveMarketV4 is EIP712 {
     function resolveResidual(uint256 leaseId, uint256 epochId, Evidence.Allocation calldata a,
         bytes calldata consumerSig, bytes calldata providerSig) external
     {
+        _verifyResidual(leaseId, epochId, a, consumerSig, providerSig);
+        _allocateResidual(leaseId, epochId, a);
+    }
+
+    function _allocateResidual(uint256 leaseId, uint256 epochId, Evidence.Allocation calldata a) private {
         Lease storage l = leases[leaseId];
         Epoch storage e = epochs[leaseId][epochId];
-        if (!e.exists || e.resolved || !accounts[leaseId].epochs[epochId].evidenceClosed) revert InvalidPhase();
-        _verifyResidual(leaseId, epochId, a, consumerSig, providerSig);
         ++e.nonce;
         accounts[leaseId].allocateResidual(epochId, a.providerShare, a.consumerShare);
         e.resolved = true;
@@ -487,13 +492,15 @@ contract SSEAdaptiveMarketV4 is EIP712 {
     function _verifyResidual(uint256 leaseId, uint256 epochId, Evidence.Allocation calldata a,
         bytes calldata consumerSig, bytes calldata providerSig) private view
     {
+        Epoch storage e = epochs[leaseId][epochId];
+        if (!e.exists || e.resolved || !accounts[leaseId].epochs[epochId].evidenceClosed) revert InvalidPhase();
         if (block.timestamp > a.expiry) revert Evidence.Expired();
         Lease storage l = leases[leaseId];
         if (l.provider == address(0) || l.consumer == address(0) || l.provider == l.consumer ||
             a.unresolvedAmount != accounts[leaseId].epochs[epochId].unresolved ||
-            a.nonce != epochs[leaseId][epochId].nonce) revert Evidence.InvalidEvidence();
+            a.nonce != e.nonce) revert Evidence.InvalidEvidence();
         bytes32 digest = Evidence.allocationDigest(_domainSeparatorV4(),
-            Evidence.Context(leaseId, epochId, epochs[leaseId][epochId].requestHash), a);
+            Evidence.Context(leaseId, epochId, e.requestHash), a);
         if (ECDSA.recover(digest, providerSig) != l.provider ||
             ECDSA.recover(digest, consumerSig) != l.consumer) revert Evidence.InvalidSignature();
     }
