@@ -78,7 +78,7 @@ def policy_for(roles, wallet, keystore, caps, extra):
          "consumer": {"epochRequests": {}},
          "provider": {"approvedOfferHashes": [], "approvedTermsHashes": [], "leaseTerms": {},
                       "profiles": {}, "offers": {}, "workers": {},
-                      "capacity": {"cpuCores": 0, "memoryMiB": 0, "maxConcurrentLeases": 0}},
+                      "capacity": {"cpuCores": 0, "memoryMiB": 0, "maxConcurrentLeases": 0}, "maxParallelJobs": 1},
          "monitor": {"autoConfirm": False, "allowFailureVotes": False, "providerEndpoints": {}, "services": {},
                      "approvedPolicies": {}}}
     for k, v in extra.items():
