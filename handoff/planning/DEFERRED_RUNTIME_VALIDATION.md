@@ -95,3 +95,7 @@ DRV-REWARDS-V4 With the R424 reward timer running (scripts/sse_install_native_re
 execution-tested), start the console with `--rewards-dir ~/.local/share/sse-native-rewards`: Node tab → "Load reward
 summary" shows per-validator netGwei equal to the sum over `latest.json` attestationRewards, unavailable epochs listed as
 unavailable (never as 0), and "STALE" after stopping the timer for >5 minutes.
+DRV-SETUP-01 `python3 -m unittest tests.test_sse_setup -v` (all pass). On a fresh Ubuntu 24.04 VM (not an existing VM):
+`python3 scripts/sse_setup.py --roles consumer,monitor --commit <sha>` prints the plan and changes nothing (check
+`find ~ -newer /tmp/marker` is empty). With `--apply`, answer "yes" step by step; the V4 step must refuse until a V4
+manifest exists; answering anything other than "yes" stops with exit 3 and runs nothing further.
