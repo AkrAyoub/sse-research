@@ -78,7 +78,8 @@ def policy_for(roles, wallet, keystore, caps, extra):
          "consumer": {"epochRequests": {}},
          "provider": {"approvedOfferHashes": [], "approvedTermsHashes": [], "leaseTerms": {}, "services": {},
                       "workerUrl": "http://127.0.0.1:8877"},
-         "monitor": {"autoConfirm": False, "allowFailureVotes": False, "providerEndpoints": {}, "services": {}}}
+         "monitor": {"autoConfirm": False, "allowFailureVotes": False, "providerEndpoints": {}, "services": {},
+                     "approvedPolicies": {}}}
     for k, v in extra.items():
         p[k].update(v)
     return p
