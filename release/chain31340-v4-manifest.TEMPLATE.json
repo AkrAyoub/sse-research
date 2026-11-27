@@ -1,0 +1,12 @@
+{
+  "schema": "SSE_V4_DEPLOYMENT_MANIFEST_V1",
+  "status": "TEMPLATE - V4 NOT DEPLOYED. Owner fills after DRV-V4-05 and renames to chain31340-v4-manifest.json.",
+  "chainId": 31340,
+  "genesisHash": "0x5f7cbcd4f1ddfbbedbdd2b180b83d9eff49d4b7263643858d7be2e9c243936bf",
+  "deploymentBlock": 0,
+  "modules": {"market": "", "board": "", "registry": "", "standby": "", "ledger": ""},
+  "runtimeSha256": {},
+  "rpcHints": [],
+  "sourceCommit": "",
+  "compiler": {"forge": "1.9.0", "solc": "0.8.24", "optimizerRuns": 200}
+}

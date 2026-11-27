@@ -1,0 +1,18 @@
+# SSE V4 node console (user service), mode @MODE@ on 127.0.0.1:@PORT@. SOURCE-ONLY template.
+[Unit]
+Description=SSE V4 console (@MODE@)
+After=network-online.target
+
+[Service]
+Type=simple
+ExecStart=@PYTHON@ @REPO@/tools/sse_v4_console.py --manifest @MANIFEST@ --rpc @RPC@ --mode @MODE@ --port @PORT@ --state @STATE@
+Restart=on-failure
+RestartSec=10
+NoNewPrivileges=yes
+PrivateTmp=yes
+ProtectSystem=strict
+ReadWritePaths=@STATE@
+UMask=0077
+
+[Install]
+WantedBy=default.target

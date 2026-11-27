@@ -1,0 +1,21 @@
+# SSE V4 role agent (user service). SOURCE-ONLY template, never installed by the coding agent.
+[Unit]
+Description=SSE V4 role agent (finalized-event driven, journaled sends)
+After=network-online.target
+
+[Service]
+Type=simple
+ExecStart=@PYTHON@ @REPO@/tools/sse_v4_agent.py --manifest @MANIFEST@ --policy @POLICY@ --state @STATE@ --rpc @RPC@
+# Unattended unlock (owner tradeoff): place the passphrase in an encrypted
+# systemd credential, e.g. `systemd-creds encrypt` + LoadCredentialEncrypted=sse-v4-passphrase:...
+# Without it the agent refuses to start unattended (no TTY).
+Restart=on-failure
+RestartSec=30
+NoNewPrivileges=yes
+PrivateTmp=yes
+ProtectSystem=strict
+ReadWritePaths=@STATE@
+UMask=0077
+
+[Install]
+WantedBy=default.target
