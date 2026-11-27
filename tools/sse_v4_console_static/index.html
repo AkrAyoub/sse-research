@@ -30,6 +30,25 @@
   <label>Max fee per epoch (wei) <input id="mMaxFee" type="number" min="0"></label>
   <div id="mList"></div>
   <div id="mDetail"></div>
+  <form id="awardForm">
+    <fieldset><legend>Award one bid and fund service + monitoring escrow</legend>
+      <label>Request id <input name="requestId" type="number" min="1" required></label>
+      <label>Bid index <input name="bidIndex" type="number" min="0" required></label>
+      <label>Acceptance window (s) <input name="acceptSeconds" type="number" min="600" max="604800" value="86400" required></label>
+      <label>Confirmation round (s) <input name="confirmationRoundSeconds" type="number" min="60" max="86400" value="1800" required></label>
+      <label>Response window (s) <input name="responseSeconds" type="number" min="1" max="604800" value="1800" required></label>
+      <label>Monitoring window (s) <input name="monitoringSeconds" type="number" min="1" max="604800" value="1800" required></label>
+      <label>Evidence window (s) <input name="evidenceSeconds" type="number" min="1" max="604800" value="3600" required></label>
+      <label>Idle window (s) <input name="idleSeconds" type="number" min="600" max="604800" value="86400" required></label>
+      <label>Reservation fee (wei) <input name="reservationFee" inputmode="numeric" pattern="[0-9]+" value="0" required></label>
+      <label>Exposure budget (wei) <input name="exposureBudget" inputmode="numeric" pattern="[0-9]+" required></label>
+      <label><input name="conditionalQuorumPolicy" type="checkbox"> Explicitly accept conditional quorum evidence</label>
+      <label><input name="responseAdmitsReceipt" type="checkbox"> Explicitly treat signed response as binding receipt</label>
+      <p class="note">Review these terms against the committed profile, policy and bid. Windows must allow actual chain finalization, worker execution and report inclusion; finality is not guaranteed within any fixed interval.</p>
+      <button type="submit">Prepare award and funding</button>
+      <div id="awardOut"></div>
+    </fieldset>
+  </form>
 </section>
 <section id="request" class="tab" hidden>
   <h2>Create a service request</h2>
@@ -76,6 +95,13 @@
   <h2>Lease</h2>
   <label>Lease id <input id="lId" type="number" min="1"></label> <button id="lLoad">Load</button>
   <div id="lOut"></div>
+  <form id="epochForm">
+    <fieldset><legend>Admit a new service epoch (consumer)</legend>
+      <label>Unique request hash <input name="requestHash" pattern="0x[0-9a-fA-F]{64}" required></label>
+      <button type="submit">Prepare epoch admission</button>
+      <div id="epochOut"></div>
+    </fieldset>
+  </form>
   <fieldset>
     <legend>My epoch output (consumer)</legend>
     <p class="note">Download fetches from the provider URL committed in the awarded bid (checked against the on-chain endpoint hash; owner-local console only) after you sign a short-lived authorization in your wallet. Verify checks any output against the finalized on-chain response hash. A match proves origin and integrity, not correctness beyond what the committed monitor policy measured.</p>
@@ -131,6 +157,9 @@
   <h2>Account</h2>
   <label>Address <input id="aAddr" pattern="0x[0-9a-fA-F]{40}"></label> <button id="aLoad">Load</button>
   <div id="aOut"></div>
+  <label>Credit source <select id="withdrawModule"><option>market</option><option>ledger</option><option>registry</option></select></label>
+  <button id="withdrawGo">Prepare withdrawal</button>
+  <div id="withdrawOut"></div>
   <button id="aHist">Load finalized history (latest 2000 blocks)</button>
   <div id="aHistOut"></div>
 </section>
