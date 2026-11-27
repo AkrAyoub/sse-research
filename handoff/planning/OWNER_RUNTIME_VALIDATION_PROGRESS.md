@@ -16,7 +16,7 @@ Only owner-observed results count as runtime evidence.
 | F06 Compile/size repairs | Passed at 374cce8 | All five modules within limits; market runtime 22986 bytes; size test passed |
 | F07 Full Foundry regression | Passed at 374cce8 | 305 passed, zero failed/skipped, 32 suites |
 | F08 Focused V4 tests/fuzz | Passed at 374cce8 | 52 passed, zero failed/skipped; three fuzz tests 1024 runs each |
-| F09 Python regression | V4 subset passed; full historical suite pending | 47 V4 tests at 374cce8; 4 setup tests at 68c6f4d |
+| F09 Python regression | Passed offline baseline at 374cce8 | 1609 discovered, 1606 passed, 3 explicitly opt-in integration tests skipped; integration coverage tracked under F12/F14 |
 | F10 ABI/EIP-712 parity | Partial | Compiled ABI checker passed at 374cce8; cross-language Solidity digest parity pending |
 | F11 Security/science review | Active; mandatory pre-use gate | Static remediation pass 1 committed; open findings in audit report; no certification |
 | F12 Isolated deployment/lifecycle | Pending | Disposable keys, isolated RPC |
@@ -39,14 +39,14 @@ Only owner-observed results count as runtime evidence.
 
 DEV-001 (closed): initial fresh clone with --no-checkout was incorrectly checked for a clean tree before materialization. Owner verified empty index/worktree, checked out exact S1 SHA and reported V4_SOURCE_CHECKOUT_VERIFIED=true. No repository defect.
 
-DEV-002 (open, source repair committed):
+DEV-002 (closed at 374cce8; historical incident details):
 - Owner ran forge build --sizes with original compiler settings, 91 files, Solc 0.8.24. Both dynamic and native test linking failed. Error: Stack too deep, contracts/SSEMonitorRegistryV4.sol:193:50 (reservedByLease[leaseId]). Exit 1.
 - Owner log: ~/sse-v4-validation-logs/2c899f8591848bdc6948f98d6049f6f855ad5004/01-build-sizes.txt.
 - Source correction 03225209fba0a0d5fcaeeb5f0c626795bb9430a4: memory-only DrawInput, private read-only selection and private atomic reservation helper. ABI, draw hash/threshold/order/budget, authorization, persistent storage and events preserved by static review; compilation not yet demonstrated.
 - Regression source f96b0ed41cfad30df538709ca4ff90809c1fdbac: exact first draw/attempt event, incomplete draw leaves no reservations. Not executed.
 - Owner retry at 111265b passed the former compiler error location but failed elsewhere; DEV-002 remains pending regression validation.
 
-DEV-003 (open, source repair committed): owner retry at 111265bd25fabbc0c0d751a8e1681bbba700a2cb failed stack too deep at SSEAdaptiveMarketV4.sol:475:46, exit 1. Residual verification and allocation split; no compiler setting changes. Further static fixes and regression source recorded in [audit pass 1](../audits/OWNER_VALIDATION_AUDIT_PASS_1.md). Mandatory audit and isolated validation before use; no live deployment authorization. Audit report commit 20ff4a150655e1b5a8978dde6eea680cc168cb2b.
+DEV-003 (closed at 374cce8; historical incident details): owner retry at 111265bd25fabbc0c0d751a8e1681bbba700a2cb failed stack too deep at SSEAdaptiveMarketV4.sol:475:46, exit 1. Residual verification and allocation split; no compiler setting changes. Further static fixes and regression source recorded in [audit pass 1](../audits/OWNER_VALIDATION_AUDIT_PASS_1.md). Mandatory audit and isolated validation before use; no live deployment authorization. Audit report commit 20ff4a150655e1b5a8978dde6eea680cc168cb2b.
 
 Owner decisions unchanged: P-1 standby retainer rejected; P-2 keeper bounty and P-3 provable misconduct slashing remain undecided. Report2.pdf and Report3.pdf stay untracked. Preserve original chain31340/V3 and private wallet state.
 
@@ -68,3 +68,6 @@ Owner decisions unchanged: P-1 standby retainer rejected; P-2 keeper bounty and 
 
 ## Owner validation at 374cce84d71496e5d8acde892d8ccb30034fffec
 All six checks exit 0: build, V4 Python (47), compiled ABI (zero mismatches), focused Foundry (52), full Foundry (305 across 32 suites), explicit size test (1; overlaps other suites). No failed/skipped tests in these runs. Focused fuzz runs 1024 each for conservation, reservation accounting and ordered sampling. Full suite uses default 256 fuzz runs. DEV-002/003/004/005/006 closed for observed failures at this checkpoint. Clean checkout. Runtime/initcode bytes: market 22986/24530, ledger 11023/11762, registry 6409/6664, board 6226/6408, standby 4636/4821. Market runtime margin 1590 bytes. Formation gas draw/activate: n7 s2 1064197/1015140; n7 s4 1229028/1044562; n10 s2 1373128/1255686; n10 s4 1541745/1287010. Foundry measurements only; E9 distributed experiment remains pending. Logs ~/sse-v4-validation-logs/374cce84d71496e5d8acde892d8ccb30034fffec. Full Python regression, browser validation, actual cross-language digest parity, resource enforcement, public endpoint security, installer readiness, qualified negative evidence, independent participation and isolated rehearsal remain open. No deployment approval.
+
+## Full Python regression at 374cce84d71496e5d8acde892d8ccb30034fffec
+Owner VM4707: 1609 tests in 21.407 seconds, exit 0, no failures/errors, 1606 passed, 3 skipped. Skips: test_sse_direct_delivery_anvil and test_sse_node_marketplace_anvil (explicit SSE_RUN_ANVIL_INTEGRATION opt-in); test_sse_docker_sla_live (explicit SSE_RUN_DOCKER_INTEGRATION opt-in plus local immutable worker image). These are historical integration paths, not V4 end-to-end proof. Keep their skipped status visible until individually executed. Clean source. Log ~/sse-v4-validation-logs/374cce84d71496e5d8acde892d8ccb30034fffec/07-full-python-regression.log. F09 offline baseline passed; F12/F14 retain integration acceptance requirements. No deployment approval.
