@@ -5,3 +5,9 @@
 - VM-specific assumptions remain in many r-numbered scripts (vm4706/vm4707/vm4709/vm4714 names, fixed overlay endpoints).
 - No unified one-command multi-role installer; no V4 contract discovery (release manifest has no V4 addresses — correct,
   as V4 is undeployed). Nothing was run. Unification is Not implemented (MASTER_TASK_CHECKLIST D-*).
+
+## Pass 2 update
+scripts/sse_v4_app_install.py (e8c1df1) installs the V4 application roles as hardened user services from a verified manifest,
+verifying RPC by chain id + genesis + module wiring, with role/wallet/spending caps as the only prompts. It refuses to run
+until a real V4 manifest exists. Chain client installation remains in the existing R151/R358 installers (not unified).
+`loginctl enable-linger` needs sudo and is left as an explicit owner step.

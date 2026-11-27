@@ -56,3 +56,23 @@ install, E7/E9/E10.
 ## Security
 DRV-SEC-01 Secret scan of tree and history with an owner-approved scanner (e.g. `gitleaks detect --source . --log-opts=--all`).
 If anything is found: do not print it; rotate; do not rewrite history unilaterally.
+
+## Stage 3b — V4 Python application layer (added pass 2, new, awaiting validation)
+DRV-PY-02 `python3 -m unittest tests.test_sse_v4_agent tests.test_sse_v4_proof -v`. Acceptance: all pass.
+DRV-V4-ABI After compiling: `forge inspect SSEAdaptiveMarketV4 abi > /tmp/m.json` (same for SSEServiceBoardV4,
+SSEMonitorRegistryV4, SSEStandbyCommittee, SSEAdaptiveVoteLedgerV4Candidate) and diff every function/event signature and
+struct field order against tools/sse_v4_abi.py (LEASE_FIELDS etc.). Acceptance: identical; any mismatch is a source bug.
+DRV-EXPLORER-01 Against a synced local node: `curl -s -X POST 127.0.0.1:28545 -H 'content-type: application/json' -d
+'{"jsonrpc":"2.0","id":1,"method":"eth_getProof","params":["<V3 market>",["0x0"],"finalized"]}'` saved as a fixture, then
+verify with `python3 -c 'import sys,json;sys.path.insert(0,"tools");import sse_v4_proof as p;...'` against the finalized
+block stateRoot. Expected: account "verified", slot "verified" or "proven-zero-absent". Record whether the node serves
+historical proofs (archive) or only recent state (full node, pruned → "unavailable", which is not zero).
+DRV-AGENT-V4 On the Stage 4 isolated chain only, with disposable keys: run `tools/sse_v4_agent.py --dry-run` for each role and
+confirm planned actions match the lifecycle; then without --dry-run for keeper + monitor + provider (worker at 127.0.0.1:8877,
+historically live-verified V3 worker image) and observe: no job before finalized EpochStarted; one job per epoch after agent
+restart; journal blocks sends after a killed broadcast; abstention file written for inconclusive probes.
+DRV-UI-V4 Start `tools/sse_v4_console.py --mode local` and `--mode public` on the isolated chain; check every tab, that public
+mode rejects /api/upload (403), that intents are unsigned and the browser wallet refuses a wrong chain, and keyboard navigation.
+DRV-INST-V4 On a fresh Ubuntu 24.04 VM: `python3 scripts/sse_v4_app_install.py --roles consumer,monitor --plan` (must fail
+preflight until a V4 manifest exists), then with an isolated-chain manifest: install, reboot, `loginctl enable-linger`, verify
+services restart, re-run installer (idempotent: policy/wallet untouched).
