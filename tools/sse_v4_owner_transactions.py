@@ -31,16 +31,35 @@ def require(ok,msg):
 def q(ask,method,params):
     return int(ask(method,params),16)
 
+def monitor_intent(position, capacity, bond_per_seat, resize=False):
+    """Explicit capacity admission; no implicit resizing of an existing position."""
+    require(type(capacity) is int and 1 <= capacity <= 64,"capacity must be 1..64")
+    require(bond_per_seat == 10**15,"unexpected immutable bond")
+    bond, old_capacity, reserved, entry, exiting = position
+    require(not exiting,"exiting monitor must complete exit first")
+    if not entry:
+        require(not resize and tuple(position)==(0,0,0,0,False),"new position requires registration")
+        return a.register_monitor(capacity, capacity*bond_per_seat)
+    if old_capacity == capacity:
+        return None
+    require(resize,"existing capacity differs; explicit --resize required")
+    require(capacity>=reserved,"capacity below reserved seats")
+    return a.update_bond(capacity, max(0,capacity*bond_per_seat-bond))
+
 def main():
     p=argparse.ArgumentParser(description=__doc__)
     p.add_argument("--fund",action="append",help="public participant address; repeat for batch")
     p.add_argument("--register",action="store_true")
+    p.add_argument("--capacity",type=int,default=1,help="concurrent monitor seats, 1..64; measure actual host capacity")
+    p.add_argument("--resize",action="store_true",help="explicitly update existing monitor capacity")
     p.add_argument("--fund-to-wei",type=int,default=2*10**16)
     p.add_argument("--apply",action="store_true")
     p.add_argument("--status",action="store_true")
     args=p.parse_args()
     require(bool(args.fund)!=args.register,"choose funding OR registration")
     require(not(args.apply and args.status),"choose apply OR status")
+    require(1<=args.capacity<=64 and (not args.resize or args.register),"invalid capacity/resize request")
+    require(not args.fund or args.capacity==1,"capacity is registration-only")
     require(os.geteuid()!=0,"nonroot owner only")
     manifest=st.load_manifest(ROOT/"release/chain31340-v4-manifest.json")
     ask=LocalRPC("http://127.0.0.1:28545",timeout=20).request
@@ -88,18 +107,17 @@ def main():
             return a.view(ask,reg,"position(address)",("address",),(sender,),("uint256",)*4+("bool",),tag)
         pos=position("finalized")
         require(pos==position("latest"),"registration not finalized")
-        if pos[3]:
+        bond=a.view(ask,reg,"perSeatBond()")[0]
+        intent=monitor_intent(pos,args.capacity,bond,args.resize)
+        if intent is None:
             print("EXISTING_MONITOR_POSITION=",pos)
             return
-        require(pos==(0,0,0,0,False),"unexpected previous monitor position")
-        bond=a.view(ask,reg,"perSeatBond()")[0]
-        require(bond==10**15,"unexpected immutable bond")
-        _,data,value=a.register_monitor(1,bond)
+        _,data,value=intent
         call={"from":sender,"to":reg,"data":data,"value":hex(value)}
         ask("eth_call",[call,"latest"])
         gas=q(ask,"eth_estimateGas",[call])*12//10
         require(0<gas<=500000,"registration gas above cap")
-        actions.append((reg,data,value,gas,"register capacity 1"))
+        actions.append((reg,data,value,gas,("resize" if pos[3] else "register")+" capacity "+str(args.capacity)))
     if not actions:
         print("NO_NEW_TRANSACTION_REQUIRED=true")
         return
