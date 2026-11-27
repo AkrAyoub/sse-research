@@ -234,6 +234,46 @@ class PlannerTest(unittest.TestCase):
         self.assertTrue(agent.worker_quarantined(agent.worker_key(cfg["workers"]["2"]), {"legacy":{"state":"RUNNING"}}))
         agent.dispatch_provider_jobs(jobs, eligible, lambda j:self.fail("must never repeat"), lambda d:None, lambda:10, 2)
 
+    def test_completed_response_callback_precedes_slow_worker(self):
+        from threading import Event
+        from copy import deepcopy
+        release = Event()
+        policy, l = self.resource_fixture()
+        cfg = policy["provider"]
+        from sse_v4_adapters import response_hash
+        offer = dict(cfg["offers"][l["offerHash"]],
+                     resources=dict(cpuCores=2, memoryMiB=1024, storageMiB=0),
+                     maxConcurrentLeases=2)
+        oh = response_hash(offer)
+        cfg["offers"][oh] = offer
+        cfg["approvedOfferHashes"] = [oh]
+        cfg["capacity"] = dict(cpuCores=2, memoryMiB=1024, maxConcurrentLeases=2)
+        cfg["workers"]["2"] = dict(cfg["workers"]["1"], container="sse-compute-second",
+                                    url="http://127.0.0.1:8878")
+        l.update(offerHash=oh, providerAccepted=True)
+        snap = {"market":MODS["market"], "leases":{
+            i:bundle("Active", dict(l), [epoch(0)], termsHashRecomputed=H) for i in (1,2)}}
+        _, planned = agent.plan_provider(snap, policy, 10, {})
+        self.assertEqual(len(planned), 2)
+        eligible = {j["jobId"]:j for j in planned}
+        jobs = {jid:dict(j,state="QUEUED") for jid,j in eligible.items()}
+        writes, completed = [], []
+        def run(j):
+            if j["leaseId"] == 2:
+                if not release.wait(timeout=5):
+                    raise TimeoutError("completion callback did not release slow worker")
+            return dict(state="DONE", responseHash=H, finishedAt=11, resourceObservation={"test":True})
+        def on_complete(j):
+            self.assertEqual(writes[-1][j["jobId"]]["state"], "DONE")
+            completed.append(j["leaseId"])
+            if j["leaseId"] == 1:
+                self.assertTrue(any(x["leaseId"] == 2 and x["state"] == "RUNNING" for x in jobs.values()))
+                release.set()
+        agent.dispatch_provider_jobs(jobs, eligible, run, lambda d:writes.append(deepcopy(d)),
+                                     lambda:10, 2, on_complete=on_complete)
+        self.assertEqual(completed, [1,2])
+        self.assertTrue(all(j["state"] == "DONE" for j in jobs.values()))
+
     def test_dispatch_refuses_changed_worker_binding(self):
         policy, l = self.resource_fixture()
         l["providerAccepted"] = True
