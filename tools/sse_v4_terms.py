@@ -92,3 +92,21 @@ def vote_digest(ledger_domain, lease_id, epoch_id, request_hash, outcome, respon
     return typed_digest(ledger_domain, keccak256(encode(
         ["bytes32", "uint256", "uint256", "bytes32", "uint8", "bytes32", "bytes32"],
         [VOTE_TYPEHASH, lease_id, epoch_id, _b32(request_hash), outcome, resp, _b32(evidence_hash)])))
+
+
+# Bilateral residual allocation; consent does not refine the history mask.
+ALLOCATION_TYPEHASH = keccak256(
+    b"ResidualAgreement(uint256 leaseId,uint256 epochId,bytes32 requestHash,uint256 unresolvedAmount,uint256 providerShare,uint256 consumerShare,uint256 nonce,uint256 expiry)")
+
+
+def allocation_digest(domain, lease_id, epoch_id, request_hash, allocation):
+    fields = ("unresolvedAmount", "providerShare", "consumerShare", "nonce", "expiry")
+    values = [allocation[k] for k in fields]
+    if any(type(v) is not int or not 0 <= v < 2**256 for v in values):
+        raise ValueError("invalid allocation integer")
+    residual, provider, consumer, nonce, expiry = values
+    if residual == 0 or provider + consumer != residual:
+        raise ValueError("allocation must conserve the exact residual")
+    return typed_digest(domain, keccak256(encode(
+        ["bytes32", "uint256", "uint256", "bytes32"] + ["uint256"] * 5,
+        [ALLOCATION_TYPEHASH, lease_id, epoch_id, _b32(request_hash)] + values)))
