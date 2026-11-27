@@ -119,13 +119,80 @@ def plan_consumer(snapshot, policy, now):
     return out
 
 
+def worker_key(w):
+    return [w["dockerSocket"], w["container"], w["url"]]
+
+
+def worker_quarantined(key, jobs):
+    """Unknown execution survives restart and closure; never reuse that worker.
+    Older ambiguous records without identity conservatively block all workers.
+    """
+    for j in jobs.values():
+        if j.get("state") not in ("RUNNING", "EXECUTION_UNKNOWN"):
+            continue
+        old = j.get("workerKey")
+        if not isinstance(old, list) or len(old) != 3:
+            return True
+        if old[:2] == key[:2] or old[2] == key[2]:
+            return True
+    return False
+
+
+def dispatch_provider_jobs(jobs, eligible, runner, persist, clock, limit):
+    """One bounded batch; only this coordinator mutates the job journal.
+    Persist RUNNING before submitting work. A crash leaves a quarantine,
+    never an automatic retry. Independent workers can continue.
+    """
+    from concurrent.futures import ThreadPoolExecutor, as_completed
+    st.require(type(limit) is int and 1 <= limit <= 64, "invalid parallel job limit")
+    selected = []
+    for jid, j in sorted(jobs.items(), key=lambda item: (item[1].get("responseDeadline", 0), item[0])):
+        if j.get("state") != "QUEUED":
+            continue
+        fresh = eligible.get(jid)
+        if not fresh or any(j.get(k) != fresh[k] for k in
+                           ("profileHash", "offerHash", "endpointHash", "responseSeconds",
+                            "termsHash", "artifactCommitment", "requestHash", "responseDeadline", "workerKey", "workerBindingHash")):
+            jobs[jid] = dict(j, state="REFUSED_RESOURCE_ADMISSION")
+            persist(jobs)
+            continue
+        if clock() >= j["responseDeadline"]:
+            jobs[jid] = dict(j, state="MISSED_DEADLINE")
+            persist(jobs)
+            continue
+        if worker_quarantined(j["workerKey"], jobs):
+            continue
+        if len(selected) >= limit:
+            continue
+        jobs[jid] = dict(j, state="RUNNING")
+        persist(jobs)
+        selected.append((jid, dict(j)))
+    if not selected:
+        return
+    with ThreadPoolExecutor(max_workers=len(selected)) as pool:
+        pending = {pool.submit(runner, j): jid for jid, j in selected}
+        for future in as_completed(pending):
+            jid = pending[future]
+            try:
+                result = future.result()
+                st.require(isinstance(result, dict) and result.get("state") in
+                           ("DONE", "REFUSED_RESOURCE_BINDING", "MISSED_DEADLINE", "WORKER_MISMATCH"),
+                           "invalid worker result")
+                # Never permit a result to overwrite immutable job identity.
+                fields = {k: result[k] for k in ("state", "responseHash", "finishedAt", "resourceObservation") if k in result}
+                jobs[jid] = dict(jobs[jid], **fields)
+            except Exception as exc:
+                jobs[jid] = dict(jobs[jid], state="EXECUTION_UNKNOWN", error=type(exc).__name__)
+            persist(jobs)
+
+
 def plan_provider(snapshot, policy, now, jobs):
     """Accept only exact, locally approved offers; enqueue finalized admitted epochs."""
     me, out, new_jobs = policy["wallet"], [], []
     cfg = policy.get("provider", {})
     approved = {o.lower() for o in cfg.get("approvedOfferHashes", [])}
     approved_terms = {o.lower() for o in cfg.get("approvedTermsHashes", [])}
-    from sse_v4_adapters import resource_binding, allocation_fits
+    from sse_v4_adapters import resource_binding, allocation_fits, response_hash
     reserved = []
     # Account for all accepted, nonterminal leases, even those no longer
     # approved. Unknown or overcommitted reservations block new work.
@@ -149,6 +216,8 @@ def plan_provider(snapshot, policy, now, jobs):
             continue
         if l["offerHash"] not in approved or l["termsHash"] not in approved_terms or b.get("termsHashRecomputed") != l["termsHash"]:
             continue
+        if worker_quarantined(worker_key(w), jobs):
+            continue
         candidate = (l["profileHash"], l["offerHash"], p, o, w)
         if not l["providerAccepted"] and not allocation_fits(cfg, reserved + [candidate]):
             continue
@@ -169,6 +238,7 @@ def plan_provider(snapshot, policy, now, jobs):
                                  "profileHash": l["profileHash"], "offerHash": l["offerHash"],
                                  "endpointHash": l["endpointHash"], "responseSeconds": l["responseSeconds"],
                                  "termsHash": l["termsHash"], "artifactCommitment": l["artifactCommitment"],
+                                 "workerKey": worker_key(w), "workerBindingHash": response_hash(w),
                                  "responseDeadline": e["votes"]["responseDeadline"]})
     return out, new_jobs
 
@@ -452,31 +522,10 @@ class Agent:
             if persist:
                 st.atomic_write_json(self.jobs_path, jobs)  # persist BEFORE any execution
             if self.job_runner and persist and not pending_accept and caught_up:
-                for jid, j in jobs.items():
-                    if j["state"] == "QUEUED":
-                        b = snap["leases"].get(j["leaseId"])
-                        e = next((e for e in b["epochs"] if e["id"] == j["epochId"]), None) if b else None
-                        if not b or b["phase"] != "Active" or not b["lease"]["providerAccepted"] or not e or e["market"]["accounted"] or e["market"]["requestHash"] != j["requestHash"] or self.clock() > j["responseDeadline"]:
-                            jobs[jid] = dict(j, state="STALE_AUTHORIZATION")
-                            st.atomic_write_json(self.jobs_path, jobs)
-                            continue
-                        # Old queues cannot bypass the new resource admission policy.
-                        eligible = {x["jobId"]: x for x in plan_provider(snap, self.policy, int(self.clock()), {})[1]}
-                        if jid not in eligible or any(j.get(k) != eligible[jid][k] for k in
-                                ("profileHash", "offerHash", "endpointHash", "responseSeconds", "termsHash", "artifactCommitment")):
-                            jobs[jid] = dict(j, state="REFUSED_RESOURCE_ADMISSION")
-                            st.atomic_write_json(self.jobs_path, jobs)
-                            continue
-                        if any(other.get("state") in ("RUNNING", "EXECUTION_UNKNOWN") for other in jobs.values()):
-                            continue  # ambiguous execution requires operator reconciliation
-                        jobs[jid] = dict(j, state="RUNNING")
-                        st.atomic_write_json(self.jobs_path, jobs)
-                        try:
-                            jobs[jid] = dict(jobs[jid], **self.job_runner(j))
-                        except Exception as exc:
-                            # Execution may have occurred: never automatically repeat it.
-                            jobs[jid] = dict(jobs[jid], state="EXECUTION_UNKNOWN", error=type(exc).__name__)
-                        st.atomic_write_json(self.jobs_path, jobs)
+                eligible = {x["jobId"]: x for x in plan_provider(snap, self.policy, int(self.clock()), {})[1]}
+                dispatch_provider_jobs(jobs, eligible, self.job_runner,
+                                       lambda data: st.atomic_write_json(self.jobs_path, data),
+                                       self.clock, self.policy["provider"].get("maxParallelJobs", 1))
             if self.sender:
                 actions += provider_response_actions(jobs, self.manifest, self.sender, snap, int(self.clock()))
         if "monitor" in roles and self.prober:
