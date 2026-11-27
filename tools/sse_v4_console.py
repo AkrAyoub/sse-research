@@ -420,6 +420,9 @@ class Console:
         clean = {}
         for name, kind in abi.TERMS_FIELDS:
             v = t.get(name)
+            if name in ("reservationFee", "exposureBudget") and isinstance(v, str):
+                st.require(re.fullmatch(r"[0-9]{1,78}", v), "invalid wei value")
+                v = int(v)
             if kind == "bool":
                 if type(v) is not bool:
                     raise ValueError(name + " must be true/false")
