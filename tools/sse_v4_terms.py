@@ -100,6 +100,8 @@ ALLOCATION_TYPEHASH = keccak256(
 
 
 def allocation_digest(domain, lease_id, epoch_id, request_hash, allocation):
+    if _b32(domain) == bytes(32) or _b32(request_hash) == bytes(32) or type(lease_id) is not int or lease_id <= 0:
+        raise ValueError("invalid allocation context")
     fields = ("unresolvedAmount", "providerShare", "consumerShare", "nonce", "expiry")
     values = [allocation[k] for k in fields]
     if any(type(v) is not int or not 0 <= v < 2**256 for v in values):
