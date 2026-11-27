@@ -76,7 +76,7 @@ def policy_for(roles, wallet, keystore, caps, extra):
     p = {"schema": "SSE_V4_AGENT_POLICY_V1", "roles": roles, "wallet": wallet.lower(), "keystore": str(keystore),
          "spending": caps, "selfKeep": True,  # advance only own leases (D-09); owner may set false
          "consumer": {"epochRequests": {}},
-         "provider": {"approvedOfferHashes": [], "leaseTerms": {}, "services": {},
+         "provider": {"approvedOfferHashes": [], "approvedTermsHashes": [], "leaseTerms": {}, "services": {},
                       "workerUrl": "http://127.0.0.1:8877"},
          "monitor": {"autoConfirm": False, "allowFailureVotes": False, "providerEndpoints": {}, "services": {}}}
     for k, v in extra.items():
@@ -152,6 +152,9 @@ def install(roles, publish, rpc, python, input_fn=input):
         d.mkdir(mode=0o700, parents=True, exist_ok=True)
     pol_path = CONFIG / "policy.json"
     if pol_path.exists():
+        existing = json.loads(pol_path.read_text())
+        if set(existing.get("roles", [])) != set(roles):
+            raise Refused("existing policy roles differ; review and update the policy explicitly before reinstall")
         print("Keeping existing policy", pol_path)
     else:
         addr, ks = wallet(CONFIG / "keystore", input_fn)
