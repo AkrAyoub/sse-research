@@ -21,7 +21,11 @@ used sed/heredocs only. See logs/BUGS_AND_FIXES_LOG.md.
 | bc21914 | Provider decodes consumer Terms from funding calldata (hash-authenticated); consumer output download/verify page; console CSRF/DNS-rebinding guard |
 | c8dced9 | Console native reward summary from the R424 collector (read only) |
 | 7d47c4e | Self-keeping of own leases (D-09); economics proposals P-1..P-3 for the owner |
-| (this)  | Audits/logs/HAND_BACK/WORK_LOG refresh |
+| 3bfc051 | Pass-3 audits/logs/HAND_BACK/WORK_LOG refresh |
+| 18351e9 | Gas-parametrized formation tests n∈{7,10}, s∈{2,4} |
+| a6eb47a | Provider terms check for contract-wallet consumers; bid pagination and filters |
+| 189ad8d | One-entry-point setup orchestrator (plan first, per-step yes) over existing installers |
+| (this)  | Pass-4 docs refresh |
 
 ## By status
 - **Existing live-verified (unchanged):** native chain31340 PoS; V2/V3 deployments; V3 experiments E1–E6, E8; V3 read-only
@@ -30,14 +34,15 @@ used sed/heredocs only. See logs/BUGS_AND_FIXES_LOG.md.
   (R342e), R425 collector tests.
 - **Newly implemented, statically reviewed, tests written but not executed (awaiting compilation / runtime validation):**
   - Contracts: SSEAdaptiveMarketV4, SSEServiceBoardV4, SSEMonitorRegistryV4, SSEStandbyCommittee.cancel, deploy script;
-    35 Foundry tests.
+    39 Foundry tests.
   - Python: planner, encoders, ABI layer, state/cursor/journal, role agents (incl. Terms decoding, self-keeping), signer
     unlock, job runner/prober adapters, provider output service, MPT proof verifier, console (marketplace, request builder,
     lease, provider, monitor, account, explorer, node/validator, rewards, consumer outputs), installer + unit templates;
-    37 Python tests.
+    42 Python tests (incl. tests/test_sse_setup.py).
 - **Awaiting deployment:** all V4 contracts (new version; V3 stays at its addresses).
 - **Not implemented / owner decision:** standby retainer (P-1), on-chain keeper bounty (P-2), misconduct penalties (P-3),
-  stronger randomness for V4, arbitrary uploaded code (needs microVM isolation), chain-client installer unification,
+  stronger randomness for V4, arbitrary uploaded code (needs microVM isolation), single-format installer output (the new
+  scripts/sse_setup.py orders the existing installers but does not merge them),
   E7/E9/E10.
 
 ## What V4 does end to end (source)

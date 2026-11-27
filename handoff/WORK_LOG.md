@@ -34,5 +34,11 @@ standby + preconfirmed ledger → source task in planning/MASTER_TASK_CHECKLIST.
   design (R151/R358 → one entry point); (5) owner decisions P-1..P-3 then contract work. Constraints unchanged: source-only,
   V3 untouched, no push, `git -c core.autocrlf=true`, edit with sed/heredoc/editor only (no interpreters).
 
+### 2026-11-27 S1 pass 4 (Claude, source-only)
+- Commits 18351e9, a6eb47a, 189ad8d (+ docs). Tests written, NOT executed: 42 Python, 39 Foundry.
+- NEXT exact steps (source-only): (1) owner decisions P-1..P-3 then contract work; (2) REQUIREMENTS_TRACEABILITY refresh for
+  pass 3–4 rows; (3) console accessibility pass (labels/focus order) review; (4) E7 deterministic-reference adapter design
+  (D-07). Constraints unchanged.
+
 ## Owner-only follow-up (preserved)
 Original Milestone4 rubric and earlier reports not retrieved; copy originals locally into handoff/references/ and reconcile. Live VM logs/evidence remain on hosts; collect sanitized copies later with owner. Do not import wallets, secrets or signer state. Owner to review new source and execute staged real VM tests.
