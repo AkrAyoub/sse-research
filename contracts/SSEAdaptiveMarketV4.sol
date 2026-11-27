@@ -195,6 +195,7 @@ contract SSEAdaptiveMarketV4 is EIP712 {
             revert InsufficientFunding();
         leaseId = nextLeaseId++;
         _recordLease(leaseId, requestId, bidIndex, q, b, t);
+        _initializeLeaseAccounting(leaseId, t);
     }
 
     /// @dev Split from awardAndFund to bound stack depth (static review; compile unverified).
@@ -236,10 +237,17 @@ contract SSEAdaptiveMarketV4 is EIP712 {
         // Canonical terms commitment the provider must accept verbatim. q is the
         // board record AFTER award (status Awarded, awardedBid = bidIndex).
         l.termsHash = keccak256(abi.encode(block.chainid, address(this), leaseId, bidIndex, q, b, t));
-        accounts[leaseId].initialize(b.epochFee, t.reservationFee, t.exposureBudget, b.epochs, service);
-        totalServiceEscrow += service;
-        totalPendingMonitorFunding += monitorBudget;
-        emit LeaseFunded(leaseId, requestId, b.provider, bidIndex, l.termsHash);
+    }
+
+    /// @dev Read the already populated lease to avoid keeping the request,
+    /// bid and ABI-encoding temporaries live during accounting initialization.
+    /// Both steps remain atomic in the same awardAndFund transaction.
+    function _initializeLeaseAccounting(uint256 leaseId, Terms calldata t) private {
+        Lease storage l = leases[leaseId];
+        accounts[leaseId].initialize(l.epochFee, t.reservationFee, t.exposureBudget, l.maxEpochs, l.serviceRemaining);
+        totalServiceEscrow += l.serviceRemaining;
+        totalPendingMonitorFunding += l.monitorBudget;
+        emit LeaseFunded(leaseId, l.requestId, l.provider, l.bidIndex, l.termsHash);
         emit DrawCommitted(leaseId, l.entropyBlock, l.populationCut);
     }
 
