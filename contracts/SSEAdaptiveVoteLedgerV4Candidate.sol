@@ -105,9 +105,9 @@ contract SSEAdaptiveVoteLedgerV4Candidate is EIP712 {
     event ReportRewardEarned(uint256 indexed leaseId, uint256 indexed epochId, address indexed monitor, uint256 amount);
     event SeatSelected(uint256 indexed leaseId, address indexed monitor);
     event ReportingClosed(uint256 indexed leaseId, uint256 unspentRefunded);
-    event Withdrawal(address indexed beneficiary, uint256 amount);
+    event Withdrawal(address indexed account, uint256 amount);
 
-    constructor(address settlement_) EIP712("SSEAdaptiveCommitteeVotesV4Candidate", "1") {
+    constructor(address settlement_) EIP712("SSEAdaptiveCommitteeVotesV4", "1") {
         if (settlement_ == address(0)) revert InvalidArgument();
         settlement = settlement_;
     }
