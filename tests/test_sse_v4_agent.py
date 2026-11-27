@@ -129,6 +129,8 @@ class PlannerTest(unittest.TestCase):
         acts, _ = agent.plan_provider(snap, policy, now=10, jobs={})
         self.assertEqual(acts, [])
         policy["provider"]["approvedOfferHashes"] = [H]
+        self.assertEqual(agent.plan_provider(snap, policy, now=10, jobs={})[0], [])
+        policy["provider"]["approvedTermsHashes"] = [H]
         snap["leases"][1]["termsHashRecomputed"] = "0x" + "22" * 32
         acts, _ = agent.plan_provider(snap, policy, now=10, jobs={})
         self.assertEqual(acts, [])
