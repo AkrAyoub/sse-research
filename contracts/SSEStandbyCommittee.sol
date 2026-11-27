@@ -105,6 +105,22 @@ contract SSEStandbyCommittee {
         }
         a.deadline=deadlineAfter(a.roundSeconds);
     }
+    /// @notice Market-only cancellation of a still-confirming assignment (e.g.
+    /// provider never accepted). Clears active seats; no funds are held here.
+    /// @dev Added 2026-11-27 (source-only, not compiled/tested). R429 tests
+    /// covered the contract before this addition.
+    function cancel(uint256 leaseId) external {
+        if(msg.sender!=market) revert Unauthorized();
+        Assignment storage a=assignments[leaseId];
+        if(a.phase!=Phase.Confirming) revert InvalidPhase();
+        a.phase=Phase.Expired;
+        for(uint256 i=0;i<a.primary.length;++i){
+            activeSeat[leaseId][a.primary[i]]=false;
+            confirmed[leaseId][a.primary[i]]=false;
+        }
+        a.confirmedCount=0;
+        emit Expired(leaseId);
+    }
     function assignment(uint256 leaseId) external view returns(Assignment memory){
         return assignments[leaseId];
     }

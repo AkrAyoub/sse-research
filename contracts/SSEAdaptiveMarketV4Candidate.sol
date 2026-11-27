@@ -9,7 +9,9 @@ import {SSEAuthenticatedEvidence as Evidence} from "./SSEAuthenticatedEvidence.s
 import {AdaptiveMonitorQuorum} from "./AdaptiveMonitorQuorum.sol";
 import {SSEAdaptiveVoteLedger} from "./SSEAdaptiveVoteLedger.sol";
 
-/// @notice Research SSE V4 capacity candidate (not deployed): exposure-aware service escrow + dynamically
+/// @notice SUPERSEDED 2026-11-27 by SSEAdaptiveMarketV4.sol (integrated board/registry/standby/ledger).
+/// Kept unchanged for provenance; never compiled/tested/deployed; do not deploy.
+/// Research SSE V4 capacity candidate (not deployed): exposure-aware service escrow + dynamically
 /// selected and funded monitor ledger. No synthetic SLA outcomes.
 /// @dev Research caveats: bounded, bond-gated EOA roster is NOT proof of
 /// physically independent monitors. Future blockhash entropy is proposer-
