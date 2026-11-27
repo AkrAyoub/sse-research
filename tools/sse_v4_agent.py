@@ -147,7 +147,7 @@ def plan_monitor(snapshot, policy, now):
     allow = policy.get("monitor", {}).get("autoConfirm", False)
     for lid, b in snapshot["leases"].items():
         a = b.get("assignment")
-        if b["phase"] == "Forming" and allow and a and a["phaseName"] == "Confirming" and now <= a["deadline"]:
+        if b["phase"] == "Forming" and allow is True and a and a["phaseName"] == "Confirming" and now <= a["deadline"]:
             if me in a["primary"] and me not in b.get("confirmedByMe", ()):
                 out.append(_act("standby", abi.standby_call("confirm", lid), "active seat, policy autoConfirm", "monitor"))
     return out
@@ -166,7 +166,7 @@ def vote_actions(results, policy):
         if r["verdict"] == "success":
             out.append(_act("ledger", abi.submit_vote_direct(r["leaseId"], r["epochId"], 1, r["evidenceHash"]),
                             "probe success", "monitor"))
-        elif r["verdict"] == "qualified_failure" and policy.get("monitor", {}).get("allowFailureVotes", False):
+        elif r["verdict"] == "qualified_failure" and policy.get("monitor", {}).get("allowFailureVotes", False) is True:
             out.append(_act("ledger", abi.submit_vote_direct(r["leaseId"], r["epochId"], 2, r["evidenceHash"]),
                             "qualified negative evidence under committed policy", "monitor"))
         else:
@@ -262,7 +262,8 @@ class Sender:
         entry = st.read_json(path)
         self.j.update(entry, signedAt=int(now), maxCostWei=max_cost)
         try:
-            self.ask("eth_sendRawTransaction", ["0x" + bytes(raw).hex()])
+            returned = self.ask("eth_sendRawTransaction", ["0x" + bytes(raw).hex()])
+            st.require(isinstance(returned, str) and returned.lower() == h, "RPC returned unexpected transaction hash")
         except Exception as exc:  # noqa: BLE001 - outcome unknown; never resend automatically
             self.j.update(st.read_json(path), status="BROADCAST_ERROR_UNKNOWN", error=str(exc)[:200])
             raise
@@ -341,7 +342,9 @@ class Agent:
         idx = self._index()
         for ev in events:
             self._interesting(ev, idx)
-        reader = st.Reader(self.ask, self.manifest, tag="finalized")
+        # Pin one finalized block for the decision snapshot.
+        height, _ = st.finalized(self.ask)
+        reader = st.Reader(self.ask, self.manifest, tag=hex(height))
         now = int(self.clock())
         head = int(self.ask("eth_blockNumber", []), 16)
         snap = snapshot(reader, self.manifest, idx["leases"], self.policy["wallet"])
