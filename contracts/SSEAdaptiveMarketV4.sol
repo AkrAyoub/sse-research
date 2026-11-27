@@ -471,9 +471,7 @@ contract SSEAdaptiveMarketV4 is EIP712 {
         Lease storage l = leases[leaseId];
         Epoch storage e = epochs[leaseId][epochId];
         if (!e.exists || e.resolved || !accounts[leaseId].epochs[epochId].evidenceClosed) revert InvalidPhase();
-        Evidence.verifyAllocation(_domainSeparatorV4(), Evidence.Context(leaseId, epochId, e.requestHash), a,
-            l.provider, l.consumer, accounts[leaseId].epochs[epochId].unresolved, e.nonce,
-            providerSig, consumerSig);
+        _verifyResidual(leaseId, epochId, a, consumerSig, providerSig);
         ++e.nonce;
         accounts[leaseId].allocateResidual(epochId, a.providerShare, a.consumerShare);
         e.resolved = true;
@@ -482,6 +480,22 @@ contract SSEAdaptiveMarketV4 is EIP712 {
         _credit(l.consumer, a.consumerShare);
         _credit(l.provider, a.providerShare);
         emit InconclusiveAllocated(leaseId, epochId, a.consumerShare, a.providerShare);
+    }
+
+    /// @dev Preserve the exact library validation and typed digest, but
+    /// split the multi-argument call to reduce legacy compiler stack pressure.
+    function _verifyResidual(uint256 leaseId, uint256 epochId, Evidence.Allocation calldata a,
+        bytes calldata consumerSig, bytes calldata providerSig) private view
+    {
+        if (block.timestamp > a.expiry) revert Evidence.Expired();
+        Lease storage l = leases[leaseId];
+        if (l.provider == address(0) || l.consumer == address(0) || l.provider == l.consumer ||
+            a.unresolvedAmount != accounts[leaseId].epochs[epochId].unresolved ||
+            a.nonce != epochs[leaseId][epochId].nonce) revert Evidence.InvalidEvidence();
+        bytes32 digest = Evidence.allocationDigest(_domainSeparatorV4(),
+            Evidence.Context(leaseId, epochId, epochs[leaseId][epochId].requestHash), a);
+        if (ECDSA.recover(digest, providerSig) != l.provider ||
+            ECDSA.recover(digest, consumerSig) != l.consumer) revert Evidence.InvalidSignature();
     }
 
     // ------------------------------------------------------------------
