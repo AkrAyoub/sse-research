@@ -1,0 +1,101 @@
+{
+  "provenance": "Transcribed from owner-run VM4707 audit output; not independently queried by assistant",
+  "auditSource": "7721ec18aead07d64b287ca79bd8d6e62f2fa94b",
+  "manifest": {
+    "schema": "SSE_V4_DEPLOYMENT_MANIFEST_V1",
+    "status": "FINALIZED_NATIVE_DEPLOYMENT",
+    "chainId": 31340,
+    "genesisHash": "0x5f7cbcd4f1ddfbbedbdd2b180b83d9eff49d4b7263643858d7be2e9c243936bf",
+    "deploymentBlock": 46188,
+    "modules": {
+      "board": "0xc2f63744d1064e309289e0235d13c8d1bcf93753",
+      "registry": "0xe69cdd558cda8fd7fc2e34aa04d79fd979fe074d",
+      "ledger": "0x98f5148218ece27dc43991bdc54bb354d4905a22",
+      "standby": "0x3134657a0d2e1b9c347d8d1e4f99e52355d9273d",
+      "market": "0x808b3c5797b47e393e95f00c12dbd80c8c9c742e"
+    },
+    "runtimeSha256": {
+      "board": "448253006fd06a5e8d6a0be4ac0143a58731cf25b32f3d9de7be9fd56dc0edc9",
+      "registry": "81313ed082c673fdafc01888a0a092fcc85ff08372b6ce6337ea2c127fe5d0c4",
+      "ledger": "c7f408392892d88a362f229e6deba052775199e090e937260c952e64455c9f6d",
+      "standby": "e5a752b52d597452e7f5aa3e016be6bc43b8e8c27e38e154a90e3e0fb4e786b3",
+      "market": "87e6e9c3ca6ecbd2aa16098b52335ff666ad3a89466d9892fa2dfd20baab7506"
+    },
+    "rpcHints": [],
+    "sourceCommit": "f0ea53355e9367991a8f42f635282594b1999bee",
+    "compiler": {
+      "forge": "1.9.0",
+      "solc": "0.8.24",
+      "optimizerRuns": 200
+    }
+  },
+  "receipts": [
+    {
+      "module": "board",
+      "address": "0xc2f63744d1064e309289e0235d13c8d1bcf93753",
+      "block": 46184,
+      "transactionHash": "0x1828357713bb1408984f3ef7122803d5c42df5752f77d1aee675a04ad1a4a153",
+      "blockHash": "0x10d92fbce5ed131669abef56b8a30a15f326a4f6c5279bcf89457e02b4444f59",
+      "gasUsed": 1423524,
+      "runtimeBytes": 6226,
+      "immutableBytes": 64,
+      "creationSha256": "1b791c57bf5ce64db64255848e50ecf5952e26d3ed977d7be25df785a869dd23",
+      "runtimeSha256": "448253006fd06a5e8d6a0be4ac0143a58731cf25b32f3d9de7be9fd56dc0edc9"
+    },
+    {
+      "module": "registry",
+      "address": "0xe69cdd558cda8fd7fc2e34aa04d79fd979fe074d",
+      "block": 46185,
+      "transactionHash": "0x0b2f095fe8b9dcfa37aad6e523ea2739efc56a398abc714048801abb1fcf56f0",
+      "blockHash": "0xfe7cab113fde22b719c4a604921d662f52a6d38446240668a8c8ef6239b4e705",
+      "gasUsed": 1440429,
+      "runtimeBytes": 6409,
+      "immutableBytes": 288,
+      "creationSha256": "197944081ac13cb70acb626da560aa6aad3d81ba5f6235f248afe902c902c8d3",
+      "runtimeSha256": "81313ed082c673fdafc01888a0a092fcc85ff08372b6ce6337ea2c127fe5d0c4"
+    },
+    {
+      "module": "ledger",
+      "address": "0x98f5148218ece27dc43991bdc54bb354d4905a22",
+      "block": 46186,
+      "transactionHash": "0x8a3040b2f738f98c6a7667f7e220cd0de35d9e68b167b02a16f45265c0ce9a46",
+      "blockHash": "0xed723ea322f96081fa552e3bd6566826a68760247e148d2247069c8efea745a9",
+      "gasUsed": 2430894,
+      "runtimeBytes": 10960,
+      "immutableBytes": 416,
+      "creationSha256": "85f1c44ebd6bc2be2be8ac18ff5c4c39e416e55bff643731a2e278c35a386ac8",
+      "runtimeSha256": "c7f408392892d88a362f229e6deba052775199e090e937260c952e64455c9f6d"
+    },
+    {
+      "module": "standby",
+      "address": "0x3134657a0d2e1b9c347d8d1e4f99e52355d9273d",
+      "block": 46187,
+      "transactionHash": "0x595f277e8ab4b18d6f24e4f68fbf055adabc07c0c77e39e6b030366988cf7558",
+      "blockHash": "0xbec4726d2c37d37a27475954f95583ca3bedffa6983352ed040980ce3c9f2c1f",
+      "gasUsed": 1057513,
+      "runtimeBytes": 4636,
+      "immutableBytes": 96,
+      "creationSha256": "e4ed9cba70a98ed2f322148ca32b8d919e1b7b07061cce960a2d49ab80dbe0af",
+      "runtimeSha256": "e5a752b52d597452e7f5aa3e016be6bc43b8e8c27e38e154a90e3e0fb4e786b3"
+    },
+    {
+      "module": "market",
+      "address": "0x808b3c5797b47e393e95f00c12dbd80c8c9c742e",
+      "block": 46188,
+      "transactionHash": "0x0329c5a87453e8095378270e17b3fd34de61f6a8e80b356f6c31f0b151095ce2",
+      "blockHash": "0xe079cf42bdb337dc533f5cc451d6e63fa290acf164eadd7619f91edaaeabb95f",
+      "gasUsed": 5073756,
+      "runtimeBytes": 22986,
+      "immutableBytes": 992,
+      "creationSha256": "e0e389019821e7cd32e109b2c1763ab73c6fdae70bca167ebd8b656682aab582",
+      "runtimeSha256": "87e6e9c3ca6ecbd2aa16098b52335ff666ad3a89466d9892fa2dfd20baab7506"
+    }
+  ],
+  "finalizedHeight": 48366,
+  "finalizedHash": "0x147f8f5adb03c8abd73fa4967d69a05bafb7842cbadaafd8e5406e1e257b387f",
+  "actualDeploymentGas": 11426116,
+  "exactCreationInputs": true,
+  "runtimeOutsideImmutableSlotsMatched": true,
+  "bondAndDomainsMatched": true,
+  "scope": "Native canonical deployment; not SLA evidence"
+}

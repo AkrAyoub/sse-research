@@ -1,0 +1,28 @@
+{
+  "schema": "SSE_V4_DEPLOYMENT_MANIFEST_V1",
+  "status": "FINALIZED_NATIVE_DEPLOYMENT",
+  "chainId": 31340,
+  "genesisHash": "0x5f7cbcd4f1ddfbbedbdd2b180b83d9eff49d4b7263643858d7be2e9c243936bf",
+  "deploymentBlock": 46188,
+  "modules": {
+    "board": "0xc2f63744d1064e309289e0235d13c8d1bcf93753",
+    "registry": "0xe69cdd558cda8fd7fc2e34aa04d79fd979fe074d",
+    "ledger": "0x98f5148218ece27dc43991bdc54bb354d4905a22",
+    "standby": "0x3134657a0d2e1b9c347d8d1e4f99e52355d9273d",
+    "market": "0x808b3c5797b47e393e95f00c12dbd80c8c9c742e"
+  },
+  "runtimeSha256": {
+    "board": "448253006fd06a5e8d6a0be4ac0143a58731cf25b32f3d9de7be9fd56dc0edc9",
+    "registry": "81313ed082c673fdafc01888a0a092fcc85ff08372b6ce6337ea2c127fe5d0c4",
+    "ledger": "c7f408392892d88a362f229e6deba052775199e090e937260c952e64455c9f6d",
+    "standby": "e5a752b52d597452e7f5aa3e016be6bc43b8e8c27e38e154a90e3e0fb4e786b3",
+    "market": "87e6e9c3ca6ecbd2aa16098b52335ff666ad3a89466d9892fa2dfd20baab7506"
+  },
+  "rpcHints": [],
+  "sourceCommit": "f0ea53355e9367991a8f42f635282594b1999bee",
+  "compiler": {
+    "forge": "1.9.0",
+    "solc": "0.8.24",
+    "optimizerRuns": 200
+  }
+}
