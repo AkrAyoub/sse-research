@@ -429,6 +429,7 @@ contract SSEAdaptiveMarketV4Test is Test {
     function testConservativeModeNeverInfersVerdictFromVotes() public {
         uint256 id = open(false, false);
         vm.prank(consumer); market.startEpoch(id, REQUEST);
+        respond(id, 0, REQUEST);
         vote(id, 0, V.Outcome.Failure, 4);
         conclude(id, 0);
         assertEq(market.withdrawable(consumer), 0);
@@ -440,10 +441,17 @@ contract SSEAdaptiveMarketV4Test is Test {
     }
 
     function testMissingResponseIsNotProofOfViolation() public {
-        // No response, no failure quorum: all histories remain admissible.
+        // Even a full committee cannot turn silence into qualified failure.
         uint256 id = open(true, false);
         vm.prank(consumer); market.startEpoch(id, REQUEST);
-        vote(id, 0, V.Outcome.Failure, 2); // below quorum 3
+        vm.warp(uint256(votes.epoch(id, 0).responseDeadline) + 1);
+        address[] memory selected = votes.selected(id);
+        for (uint256 i; i < selected.length; ++i) {
+            vm.prank(selected[i]);
+            vm.expectRevert(V.InvalidPhase.selector);
+            votes.submitVoteDirect(id, 0, V.Outcome.Failure, keccak256(abi.encode(i)));
+        }
+        assertEq(votes.epoch(id, 0).failureVotes, 0);
         conclude(id, 0);
         assertEq(uint8(votes.epoch(id, 0).outcome), uint8(V.Outcome.None));
         assertEq(market.scientificEpoch(id, 0).mask, 7);
@@ -453,6 +461,7 @@ contract SSEAdaptiveMarketV4Test is Test {
     function testResidualConsentAfterEvidenceClosureAndReplay() public {
         uint256 id = open(true, false);
         vm.prank(consumer); market.startEpoch(id, REQUEST);
+        respond(id, 0, REQUEST);
         vote(id, 0, V.Outcome.Failure, 3);
         conclude(id, 0);
         assertEq(market.scientificEpoch(id, 0).unresolved, 20);
@@ -583,7 +592,7 @@ contract SSEAdaptiveMarketV4Test is Test {
             try market.startEpoch(id, req) returns (uint256) {} catch { break; }
             if (k == 1 || k == 2) respond(id, ep, req);
             if (k == 1) vote(id, ep, V.Outcome.Success, 3);
-            if (k == 2 || k == 3) vote(id, ep, V.Outcome.Failure, 3);
+            if (k == 2) vote(id, ep, V.Outcome.Failure, 3);
             conclude(id, ep);
             (,,,,,, bool conserved) = market.scientificAccounting(id);
             assertTrue(conserved);
