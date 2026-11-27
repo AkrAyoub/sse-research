@@ -62,6 +62,35 @@ contract SSEMonitorRegistryV4Test is Test {
         for (uint256 i; i < 5; ++i) assertEq(r.available(address(uint160(0xB000 + i))), 1);
     }
 
+    function testSingleDrawPreservesExactHashAndAttemptCount() public {
+        for (uint256 i; i < 4; ++i) join(i, 1);
+        bytes32 seed = keccak256("exact-draw");
+        bytes32 domain = keccak256("exact-domain");
+        uint256 index = uint256(keccak256(abi.encode("SSE_V4_MONITOR_DRAW", seed, domain, uint256(0)))) % 4;
+        address[] memory expected = new address[](1);
+        expected[0] = address(uint160(0xB000 + index));
+        // For N=4 the rejection threshold is zero; first candidate is eligible.
+        vm.expectEmit(true, false, false, true, address(r));
+        emit Registry.SeatsReserved(12, expected, 1);
+        (bool ok, address[] memory ordered) = r.reserveSample(12, seed, domain, 4, 1, address(0), address(0));
+        assertTrue(ok);
+        assertEq(ordered.length, 1);
+        assertEq(ordered[0], expected[0]);
+        assertEq(r.available(expected[0]), 0);
+    }
+
+    function testIncompleteDrawDoesNotReservePartialSample() public {
+        for (uint256 i; i < 4; ++i) join(i, 1);
+        (bool ok, address[] memory ordered) = r.reserveSample(
+            13, keccak256("partial"), keccak256("domain"), 4, 3,
+            address(uint160(0xB000)), address(uint160(0xB001))
+        );
+        assertFalse(ok);
+        assertEq(ordered.length, 0);
+        assertEq(r.reservedFor(13).length, 0);
+        for (uint256 i; i < 4; ++i) assertEq(r.available(address(uint160(0xB000 + i))), 1);
+    }
+
     function testFullCapacityAndExitedEntriesSkipped() public {
         for (uint256 i; i < 6; ++i) join(i, 1);
         vm.prank(address(uint160(0xB000))); r.requestExit();
