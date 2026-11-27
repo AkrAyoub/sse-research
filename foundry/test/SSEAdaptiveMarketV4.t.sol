@@ -468,6 +468,7 @@ contract SSEAdaptiveMarketV4Test is Test {
     }
 
 
+    function testMissingResponseIsNotProofOfViolation() public {
         // Even a full committee cannot turn silence into qualified failure.
         uint256 id = open(true, false);
         vm.prank(consumer); market.startEpoch(id, REQUEST);

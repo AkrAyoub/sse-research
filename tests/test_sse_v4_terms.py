@@ -41,7 +41,7 @@ class TermsTest(unittest.TestCase):
             b = t.vote_digest(d, 1, 0, Z, outcome, r2, Z)
             self.assertNotEqual(a, b)
             with self.assertRaises(ValueError):
-                t.vote_digest(d, 1, 0, Z, outcome, Z, Z)
+                t.vote_digest(d, 1, 0, Z, outcome, "0x" + "00" * 32, Z)
         with self.assertRaises(ValueError):
             t.vote_digest(d, 1, 0, Z, 0, r1, Z)
 

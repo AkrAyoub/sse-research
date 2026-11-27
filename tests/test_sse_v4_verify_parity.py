@@ -18,7 +18,7 @@ class ParityVerifierTest(unittest.TestCase):
         b = ("0x"+"bb"*20, False, 3, 2000, 100, h, h)
         terms = (86400, 600, 100, 100, 1000, 86400, 20, 150, True, False)
         raw = encode(["uint256","address","uint256","uint256",
-                      t.REQUEST_TUPLE,t.BID_TUPLE,t.TERMS_TUPLE"],
+                      t.REQUEST_TUPLE,t.BID_TUPLE,t.TERMS_TUPLE],
                      [31340,market,1,0,q,b,terms])
         return dict(TERMS=raw, TERMS_HASH=keccak256(raw),
                     LEDGER=bytes.fromhex(ledger[2:]),
