@@ -267,7 +267,7 @@ contract SSEAdaptiveVoteLedgerV4Candidate is EIP712 {
         if (!e.exists) revert InvalidPhase();
         bytes32 voteHash = keccak256(abi.encode(
             VOTE_TYPEHASH, leaseId, epochId, e.requestHash,
-            uint8(outcome), outcome == Outcome.Success ? e.responseHash : bytes32(0),
+            uint8(outcome), e.responseHash,
             evidenceHash
         ));
         address signer = ECDSA.recover(_hashTypedDataV4(voteHash), signature);
@@ -286,8 +286,10 @@ contract SSEAdaptiveVoteLedgerV4Candidate is EIP712 {
         if (!confirmedMonitor[leaseId][signer]) revert Unauthorized();
         if (voted[leaseId][epochId][signer]) revert AlreadyVoted();
         if (evidenceHash == bytes32(0) || outcome == Outcome.None) revert InvalidArgument();
+        // Both verdicts must concern the immutable authenticated response.
+        // Silence, timeout and unreachable endpoints are not proven violations.
+        if (!e.responseAuthenticated) revert InvalidPhase();
         if (outcome == Outcome.Failure && block.timestamp < e.responseDeadline) revert InvalidPhase();
-        if (outcome == Outcome.Success && !e.responseAuthenticated) revert InvalidPhase();
         voted[leaseId][epochId][signer] = true;
         evidenceHashByMonitor[leaseId][epochId][signer] = evidenceHash;
         ++e.totalVotes;
