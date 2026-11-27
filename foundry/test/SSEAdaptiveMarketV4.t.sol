@@ -338,6 +338,20 @@ contract SSEAdaptiveMarketV4Test is Test {
         assertEq(totalReserved(), 0);
     }
 
+    function testReadyButNotActivatedCancellationClearsSeats() public {
+        uint256 id = fund(true, false);
+        draw(id);
+        confirmAll(id);
+        assertEq(uint8(standby.assignment(id).phase), uint8(Standby.Phase.Ready));
+        vm.prank(consumer);
+        market.cancelUnaccepted(id);
+        assertEq(uint8(market.lease(id).phase), uint8(M.Phase.Cancelled));
+        assertEq(uint8(standby.assignment(id).phase), uint8(Standby.Phase.Expired));
+        assertEq(market.withdrawable(consumer), TOTAL);
+        assertEq(totalReserved(), 0);
+        covered();
+    }
+
     function testCounterpartiesNeverDrawn() public {
         vm.prank(provider); registry.register{value: 2 * BOND}(2);
         vm.prank(consumer); registry.register{value: 2 * BOND}(2);
