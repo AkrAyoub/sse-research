@@ -108,14 +108,16 @@ def verify_deployment(ask, manifest):
     require(height >= manifest["deploymentBlock"], "deployment not finalized")
     tag = hex(height)
     mods = manifest["modules"]
+    expected_hashes = manifest.get("runtimeSha256")
+    require(isinstance(expected_hashes, dict) and set(expected_hashes) == set(mods) and
+            all(isinstance(x, str) and re.fullmatch(r"[0-9a-f]{64}", x) for x in expected_hashes.values()),
+            "complete verified runtime hashes required")
     hashes = {}
     for name, address in mods.items():
         code = bytes.fromhex(ask("eth_getCode", [address, tag])[2:])
         require(len(code) > 0, name + " has no code")
         hashes[name] = hashlib.sha256(code).hexdigest()
-        expected = (manifest.get("runtimeSha256") or {}).get(name)
-        if expected is not None:
-            require(hashes[name] == expected, name + " runtime hash mismatch")
+        require(hashes[name] == expected_hashes[name], name + " runtime hash mismatch")
     m = mods["market"]
     for getter, module in (("board()", "board"), ("registry()", "registry"), ("standby()", "standby"),
                            ("votes()", "ledger")):
@@ -124,7 +126,7 @@ def verify_deployment(ask, manifest):
                            ("ledger", "settlement()")):
         require(abi.view(ask, mods[module], getter, out=("address",), tag=tag)[0].lower() == m, "back-wiring " + module)
     return {"finalizedHeight": height, "finalizedHash": fhash, "runtimeSha256": hashes,
-            "compiledParityVerified": "runtimeSha256" in manifest}
+            "manifestRuntimeHashesMatched": True}
 
 
 # ------------------------------------------------------------- read model
