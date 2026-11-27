@@ -131,10 +131,11 @@ class PlannerTest(unittest.TestCase):
         o = dict(schema="SSE_V4_OFFER_V1", services=["SHA256_CHAIN_8192"],
                  resources=dict(r), maxConcurrentLeases=1, endpointUrl="https://provider.example")
         ph, oh = response_hash(p), response_hash(o)
-        cfg = dict(profiles={ph:p}, offers={oh:o}, workers={ph:dict(
+        cfg = dict(profiles={ph:p}, offers={oh:o}, workers={"1":dict(
             imageId="sha256:"+"ab"*32, container="sse-compute-test",
             url="http://127.0.0.1:8877", dockerSocket="/run/user/1001/docker.sock")},
-            approvedOfferHashes=[oh], approvedTermsHashes=[H])
+            approvedOfferHashes=[oh], approvedTermsHashes=[H],
+            capacity=dict(cpuCores=1, memoryMiB=512, maxConcurrentLeases=1))
         l = lease(profileHash=ph, offerHash=oh, endpointHash=endpoint_hash(o["endpointUrl"]), responseSeconds=100)
         return {"wallet":ME,"provider":cfg}, l
 
@@ -196,8 +197,34 @@ class PlannerTest(unittest.TestCase):
                 with self.assertRaisesRegex(ValueError, "worker changed"):
                     run(job)
 
+    def test_provider_multi_worker_capacity(self):
+        from sse_v4_adapters import response_hash
+        policy, l = self.resource_fixture()
+        cfg = policy["provider"]
+        old = cfg["offers"][l["offerHash"]]
+        offer = dict(old, resources=dict(cpuCores=2, memoryMiB=1024, storageMiB=0), maxConcurrentLeases=2)
+        oh = response_hash(offer)
+        cfg["offers"][oh] = offer
+        cfg["approvedOfferHashes"] = [oh]
+        cfg["capacity"] = dict(cpuCores=2, memoryMiB=1024, maxConcurrentLeases=2)
+        cfg["workers"]["2"] = dict(cfg["workers"]["1"], container="sse-compute-second", url="http://127.0.0.1:8878")
+        l["offerHash"] = oh
+        l["providerAccepted"] = True
+        snap = {"market":MODS["market"], "leases":{
+            1:bundle("Active", l, [epoch(0)], termsHashRecomputed=H),
+            2:bundle("Forming", dict(l, providerAccepted=False), termsHashRecomputed=H)}}
+        self.assertEqual(len(agent.plan_provider(snap, policy, 10, {})[0]), 1)
+        snap["leases"][2] = bundle("Active", dict(l), [epoch(0)], termsHashRecomputed=H)
+        self.assertEqual(len(agent.plan_provider(snap, policy, 10, {})[1]), 2)
+        cfg["capacity"]["memoryMiB"] = 1023
+        self.assertEqual(agent.plan_provider(snap, policy, 10, {}), ([], []))
+        cfg["capacity"]["memoryMiB"] = 1024
+        cfg["workers"]["2"]["url"] = cfg["workers"]["1"]["url"]
+        self.assertEqual(agent.plan_provider(snap, policy, 10, {}), ([], []))
+
     def test_provider_single_lease_admission_and_release(self):
         policy, l = self.resource_fixture()
+        policy["provider"]["workers"]["2"] = dict(policy["provider"]["workers"]["1"], container="sse-compute-second", url="http://127.0.0.1:8878")
         snap = {"market": MODS["market"], "leases": {
             1: bundle("Forming", l, termsHashRecomputed=H),
             2: bundle("Forming", dict(l), termsHashRecomputed=H)}}
