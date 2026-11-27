@@ -21,6 +21,7 @@ import getpass
 import json
 import os
 import shutil
+import subprocess
 import sys
 from pathlib import Path
 
@@ -137,6 +138,8 @@ def render_unit(name, **values):
 def plan_actions(roles, publish, rpc):
     acts = [("dir", STATE), ("dir", CONFIG), ("policy", CONFIG / "policy.json"),
             ("unit", "sse-v4-agent.service"), ("unit", "sse-v4-console.service")]
+    if "provider" in roles:
+        acts.append(("unit", "sse-v4-provider-outputs.service"))
     if publish:
         acts.append(("unit", "sse-v4-console-public.service"))
     acts.append(("enable", [a[1] for a in acts if a[0] == "unit"]))
@@ -168,9 +171,9 @@ def install(roles, publish, rpc, python, input_fn=input):
         units["sse-v4-console-public.service"] = render_unit("sse-v4-console.service.in", MODE="public", PORT=8791, **common)
     for name, text in units.items():
         (UNITS / name).write_text(text)
-    os.system("systemctl --user daemon-reload")  # noqa: S605 - fixed command, no user input
+    subprocess.run(["systemctl", "--user", "daemon-reload"], check=True)
     for name in units:
-        os.system(f"systemctl --user enable --now {name}")  # noqa: S605
+        subprocess.run(["systemctl", "--user", "enable", "--now", name], check=True)
     print("Persistence across logout requires: loginctl enable-linger $USER (owner decision, needs sudo).")
     print("Public URL: run scripts/sse_publish_application_dashboard.sh against port 8791 (read-only instance).")
 
