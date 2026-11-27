@@ -12,13 +12,13 @@ Only owner-observed results count as runtime evidence.
 | F02 GitHub handoff | Complete | S1 remote matched exact SHA |
 | F03 Isolated checkout | Passed | Owner verified exact SHA and clean worktree |
 | F04 Dependency/toolchain | Passed | R429 and S1 identical pins; forge-std f3dae6e6ee381f25eb6a246f7da9b85c91a68219; OpenZeppelin cab19933c33c2ad1d4c7a84864a3601dddfd16f3; Forge 1.9.0, Python 3.12.3, Solc 0.8.24 |
-| F05 Solidity compile | Failed on S1; repair pending validation | 91 files, stack too deep in registry at line 193; retry new exact SHA |
-| F06 Compile/size repairs | Active | DEV-002 below; EIP-170/3860 measurements not available |
+| F05 Solidity compile | Failed on S1 and 111265b | Registry error progressed to market line 475; both source repairs pending full build |
+| F06 Compile/size repairs | Active | DEV-002/003 below; EIP-170/3860 measurements not available |
 | F07 Full Foundry regression | Pending | After successful compilation |
 | F08 Focused V4 tests/fuzz | Pending | Includes two new DEV-002 tests |
 | F09 Python regression | Pending | Pinned venv |
 | F10 ABI/EIP-712 parity | Pending | Compiled ABI and cross-language fixtures |
-| F11 Security/science review | Pending | Include randomness, capacity, evidence, incentives |
+| F11 Security/science review | Active; mandatory pre-use gate | Static remediation pass 1 committed; open findings in audit report; no certification |
 | F12 Isolated deployment/lifecycle | Pending | Disposable keys, isolated RPC |
 | F13 Consumer marketplace/UI | Source, unvalidated | Owner-run |
 | F14 Provider bidding/execution/outputs | Source, unvalidated | Owner-run |
@@ -44,6 +44,8 @@ DEV-002 (open, source repair committed):
 - Owner log: ~/sse-v4-validation-logs/2c899f8591848bdc6948f98d6049f6f855ad5004/01-build-sizes.txt.
 - Source correction 03225209fba0a0d5fcaeeb5f0c626795bb9430a4: memory-only DrawInput, private read-only selection and private atomic reservation helper. ABI, draw hash/threshold/order/budget, authorization, persistent storage and events preserved by static review; compilation not yet demonstrated.
 - Regression source f96b0ed41cfad30df538709ca4ff90809c1fdbac: exact first draw/attempt event, incomplete draw leaves no reservations. Not executed.
-- Next: fetch continuation branch, verify exact SHA and clean tree, run pinned forge build --sizes. Stop on failure. No compiler configuration change or via_ir. No live-chain interactions.
+- Owner retry at 111265b passed the former compiler error location but failed elsewhere; DEV-002 remains pending regression validation.
+
+DEV-003 (open, source repair committed): owner retry at 111265bd25fabbc0c0d751a8e1681bbba700a2cb failed stack too deep at SSEAdaptiveMarketV4.sol:475:46, exit 1. Residual verification and allocation split; no compiler setting changes. Further static fixes and regression source recorded in [audit pass 1](../audits/OWNER_VALIDATION_AUDIT_PASS_1.md). Mandatory audit and isolated validation before use; no live deployment authorization. Audit report commit 20ff4a150655e1b5a8978dde6eea680cc168cb2b.
 
 Owner decisions unchanged: P-1 standby retainer rejected; P-2 keeper bounty and P-3 provable misconduct slashing remain undecided. Report2.pdf and Report3.pdf stay untracked. Preserve original chain31340/V3 and private wallet state.
