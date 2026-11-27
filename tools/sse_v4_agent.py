@@ -221,7 +221,12 @@ def plan_provider(snapshot, policy, now, jobs):
         if worker_quarantined(worker_key(w), jobs):
             continue
         candidate = (l["profileHash"], l["offerHash"], p, o, w)
-        if not l["providerAccepted"] and not allocation_fits(cfg, reserved + [candidate]):
+        # An uncertain job can outlive its lease and still consume resources.
+        # Until operator reconciliation proves termination, do not grant any
+        # additional capacity. Existing admitted independent workers may run.
+        if not l["providerAccepted"] and (any(
+                j.get("state") in ("RUNNING", "EXECUTION_UNKNOWN")
+                for j in jobs.values()) or not allocation_fits(cfg, reserved + [candidate])):
             continue
         if (not out and not l["providerAccepted"] and b["phase"] in ("PendingDraw", "Forming", "Active")
                 and now <= l["acceptDeadline"] and l["offerHash"] in approved
