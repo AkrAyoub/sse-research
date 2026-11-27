@@ -256,7 +256,8 @@ class Sender:
         max_cost = gas * sp["maxFeePerGasWei"]
         st.require(self._gas_spent_24h(now) + max_cost <= sp["dailyGasWeiBudget"], "daily gas budget exhausted")
         nonce = int(self.ask("eth_getTransactionCount", [self.p["wallet"], "pending"]), 16)
-        tx = {"chainId": st.CHAIN_ID, "nonce": nonce, "to": target, "value": 0, "data": action["calldata"],
+        from eth_utils import to_checksum_address
+        tx = {"chainId": st.CHAIN_ID, "nonce": nonce, "to": to_checksum_address(target), "value": 0, "data": action["calldata"],
               "gas": gas, "maxFeePerGas": sp["maxFeePerGasWei"], "maxPriorityFeePerGas": sp["maxPriorityFeePerGasWei"],
               "type": 2}
         signed = self.acct.sign_transaction(tx)
