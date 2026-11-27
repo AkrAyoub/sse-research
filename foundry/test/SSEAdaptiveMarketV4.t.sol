@@ -206,9 +206,10 @@ contract SSEAdaptiveMarketV4Test is Test {
         vm.prank(provider);
         vm.expectRevert(M.InvalidPhase.selector);
         market.acceptLease(id, keccak256("other terms"));
+        bytes32 committed = market.lease(id).termsHash;
         vm.prank(consumer);
         vm.expectRevert(M.Unauthorized.selector);
-        market.acceptLease(id, market.lease(id).termsHash);
+        market.acceptLease(id, committed);
     }
 
     function testEarlyAwardOfSingleBidClosesRequest() public {
@@ -257,8 +258,9 @@ contract SSEAdaptiveMarketV4Test is Test {
         assertEq(r3, 0);
         assertEq(totalReserved(), SEATS);
         assertEq(votes.committee(id).quorum, 3);
+        bytes32 committed = market.lease(id).termsHash;
         vm.prank(provider);
-        market.acceptLease(id, market.lease(id).termsHash);
+        market.acceptLease(id, committed);
         vm.prank(consumer);
         market.startEpoch(id, REQUEST);
         respond(id, 0, REQUEST);
@@ -310,9 +312,10 @@ contract SSEAdaptiveMarketV4Test is Test {
         vm.expectRevert(M.Unauthorized.selector);
         market.cancelUnaccepted(id);           // stranger before deadline
         vm.warp(uint256(market.lease(id).acceptDeadline) + 1);
+        bytes32 committed = market.lease(id).termsHash;
         vm.prank(provider);
         vm.expectRevert(M.InvalidPhase.selector);
-        market.acceptLease(id, market.lease(id).termsHash); // too late
+        market.acceptLease(id, committed); // too late
         vm.prank(address(0xBEEF));
         market.cancelUnaccepted(id);
         assertEq(market.withdrawable(consumer), SERVICE);
