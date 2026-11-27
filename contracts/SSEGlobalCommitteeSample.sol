@@ -30,4 +30,35 @@ library SSEGlobalCommitteeSample {
             selected[i]=duplicate?j:r;
         }
     }
+    /// @notice Uniform ordered primary + standby indices, conditional on a
+    /// uniform seed/hash model. Unlike Floyd's output order, every position
+    /// is randomized. Standby ordering must be fixed before confirmations.
+    /// @dev This is a sampling primitive, not committee activation or VRF.
+    function drawOrdered(uint256 population,uint256 primary,uint256 standby,
+                         bytes32 seed,bytes32 context)
+        internal pure returns(uint256[] memory ordered)
+    {
+        if(primary==0 || primary>64 || standby>64-primary ||
+           primary+standby>population) revert InvalidSample();
+        uint256 count=primary+standby;
+        // Uniform subset from Floyd, then independent Fisher-Yates shuffle.
+        // Separate domains ensure the permutation does not reuse draw hashes.
+        bytes32 domain=keccak256(abi.encode(
+            "SSE_ORDERED_PRIMARY_STANDBY_V1",context,population,primary,standby
+        ));
+        ordered=draw(population,count,seed,domain);
+        for(uint256 i=count;i>1;--i){
+            uint256 threshold=addmod(type(uint256).max,1,i);
+            uint256 r;
+            bool accepted;
+            for(uint256 attempt=0;attempt<16;++attempt){
+                uint256 x=uint256(keccak256(abi.encode(
+                    "SSE_STANDBY_PERMUTATION_V1",seed,domain,i,attempt
+                )));
+                if(x>=threshold){r=x%i;accepted=true;break;}
+            }
+            if(!accepted) revert InvalidSample();
+            (ordered[i-1],ordered[r])=(ordered[r],ordered[i-1]);
+        }
+    }
 }
