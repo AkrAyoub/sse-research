@@ -93,10 +93,10 @@ def ask_caps(input_fn=input):
         if not raw.isdigit() or int(raw) <= 0:
             raise Refused("positive integer required")
         return int(raw)
-    return {"maxFeePerGasWei": num("Max fee per gas (wei)", 50 * 10**9),
-            "maxPriorityFeePerGasWei": num("Max priority fee per gas (wei)", 2 * 10**9),
+    return {"maxFeePerGasWei": num("Max fee per gas (wei)", 10**6),
+            "maxPriorityFeePerGasWei": num("Max priority fee per gas (wei)", 1000),
             "maxGasPerTx": num("Max gas per transaction", 3_000_000),
-            "dailyGasWeiBudget": num("Max total gas spend per 24h (wei)", 10**17)}
+            "dailyGasWeiBudget": num("Max total gas spend per 24h (wei)", 10**15)}
 
 
 def wallet(keystore_dir, input_fn=input):

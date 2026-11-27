@@ -24,6 +24,7 @@ def main():
     p=argparse.ArgumentParser(description=__doc__)
     p.add_argument("--source-sha",required=True)
     p.add_argument("--apply",action="store_true")
+    p.add_argument("--enable-raw-send",action="store_true",help="explicitly enable forwarding signed raw transactions if currently read-only")
     args=p.parse_args()
     repo=Path(__file__).resolve().parents[1]
     require(os.geteuid()!=0 and run("id","-un")=="ayoubakrvm4709","existing relay owner only")
@@ -47,10 +48,13 @@ def main():
     require(hashlib.sha256(der).hexdigest()=="967643892bf4eeb3028acd87ab8f849073d0e1ff6f93e122dae4640b69c03d3d","unexpected TLS identity")
     new=argv[:2]+[str(repo/"tools/sse_pos_r299_optional_tls_rpc_relay.py")]+argv[3:]
     require(all(re.fullmatch(r"[a-zA-Z0-9_./:@-]+",x) for x in new),"unsafe unit argument")
-    require("--allow-raw-send" in new,"existing relay is read-only; separate raw-send authorization needed")
+    was_raw="--allow-raw-send" in new
+    if not was_raw:
+        require(args.enable_raw_send,"existing relay is read-only; pass --enable-raw-send for explicit owner approval")
+        new.append("--allow-raw-send")
     drop=Path.home()/".config/systemd/user"/(unit+".d")/"90-v4-source.conf"
     require(not drop.exists() and not drop.is_symlink(),"existing override: inspect, do not overwrite")
-    print(json.dumps({"service":unit,"oldSource":argv[2],"newSource":new[2],"sameTLS":True,"sameUpstream":True,"rawSendAlreadyEnabled":True},indent=2))
+    print(json.dumps({"service":unit,"oldSource":argv[2],"newSource":new[2],"sameTLS":True,"sameUpstream":True,"rawSendAlreadyEnabled":was_raw,"rawSendAfter":True},indent=2))
     if not args.apply:
         return
     require(input("Type UPGRADE-V4-RPC-RELAY to replace only this service source: ")=="UPGRADE-V4-RPC-RELAY","not approved")
