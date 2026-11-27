@@ -586,7 +586,7 @@ def main():
     p.add_argument("--interval", type=int, default=12)
     a = p.parse_args()
     from sse_chain_read import LocalRPC
-    rpc = LocalRPC(a.rpc)
+    rpc = LocalRPC(a.rpc, timeout=20)
     ask = rpc.request
     manifest = st.load_manifest(a.manifest)
     policy = load_policy(a.policy)

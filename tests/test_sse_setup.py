@@ -10,6 +10,9 @@ class SetupPlanTest(unittest.TestCase):
         s=setup.plan(["consumer","monitor","keeper"],SHA)
         self.assertEqual([x["id"] for x in s],["app-host-prerequisites","v4-app-roles","linger"])
         self.assertIn("--prepare-only",s[1]["argv"])
+    def test_existing_app(self):
+        s=setup.plan(["monitor","keeper"],SHA,existing_app=True)
+        self.assertEqual([x["id"] for x in s],["app-python","verify-existing-rpc","v4-app-roles","linger"])
     def test_fresh_native_blocked(self):
         self.assertTrue(setup.plan(["validator","provider"],SHA)[0]["blocked"])
     def test_existing_native_preserved(self):

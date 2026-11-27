@@ -189,6 +189,10 @@ def install(roles, publish, rpc, python, input_fn=input, prepare_only=False):
             print(name + " prepared, not started; provider output requires agent deployment identity.")
             continue
         subprocess.run(["systemctl", "--user", "enable", "--now", name], check=True)
+    from sse_v4_agent import load_policy
+    loaded = load_policy(pol_path)
+    print("PUBLIC_WALLET_ADDRESS="+loaded["wallet"])
+    print("V4_ROLES="+",".join(loaded["roles"]))
     print("Persistence across logout requires: loginctl enable-linger $USER (owner decision, needs sudo).")
     print("Public URL: run scripts/sse_publish_application_dashboard.sh against port 8791 (read-only instance).")
 

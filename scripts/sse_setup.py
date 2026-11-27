@@ -25,7 +25,7 @@ SHA=re.compile(r"^[0-9a-f]{40}$")
 class Refused(ValueError):
     pass
 
-def plan(roles,commit,publish_console=False,transport="auto",existing_native=False):
+def plan(roles,commit,publish_console=False,transport="auto",existing_native=False,existing_app=False):
     roles=list(dict.fromkeys(roles))
     if not roles or any(r not in ROLES for r in roles):
         raise Refused("invalid roles")
@@ -47,7 +47,12 @@ def plan(roles,commit,publish_console=False,transport="auto",existing_native=Fal
         steps.append(dict(id=id,argv=argv,note=note))
     if existing_native:
         add("verify-existing-native",[sys.executable,"-B","tools/sse_setup_verify_local_native.py"],"Verify actual local original EL/CL finality; preserve containers and keys.")
-    if app and transport=="relay":
+    if existing_app and not app:
+        raise Refused("existing application transport needs application roles")
+    if app and transport=="relay" and existing_app:
+        add("app-python",["bash","scripts/sse_v4_prepare_python.sh",commit],"Owner-local Python environment.")
+        add("verify-existing-rpc",["bash","scripts/sse_v4_verify_existing_rpc.sh",commit],"Check and update existing pinned adapter if needed; no native changes.")
+    if app and transport=="relay" and not existing_app:
         add("app-host-prerequisites",["bash","scripts/sse_v4_prepare_app_host.sh",commit],"Fresh lightweight host only: Python and pinned optional TLS RPC adapter.")
     if app and transport=="local":
         add("app-python",["bash","scripts/sse_v4_prepare_python.sh",commit],"Owner-local application environment; no native changes.")
@@ -70,13 +75,14 @@ def main(argv=None):
     p.add_argument("--commit",required=True)
     p.add_argument("--transport",choices=("auto","local","relay"),default="auto")
     p.add_argument("--existing-native",action="store_true")
+    p.add_argument("--existing-app",action="store_true",help="preserve existing application transport and wallets")
     p.add_argument("--publish-readonly-console",action="store_true")
     p.add_argument("--apply",action="store_true")
     a=p.parse_args(argv)
     try:
         if os.geteuid()==0:
             raise Refused("unprivileged owner required")
-        steps=plan(a.roles.split(","),a.commit,a.publish_readonly_console,a.transport,a.existing_native)
+        steps=plan(a.roles.split(","),a.commit,a.publish_readonly_console,a.transport,a.existing_native,a.existing_app)
         print(json.dumps(dict(schema="SSE_SETUP_PLAN_V2",steps=steps,activationClaimed=False),indent=2),flush=True)
         if not a.apply:
             return 0

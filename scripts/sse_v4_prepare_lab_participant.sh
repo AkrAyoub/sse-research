@@ -23,22 +23,11 @@ echo "VM=$(id -un)"
 echo "PROPOSED_ROLES=$ROLES"
 VENV="$HOME/.venvs/sse-v4"
 PY="$VENV/bin/python"
-if [[ ! -x "$PY" ]]; then python3 -m venv "$VENV"; fi
-"$PY" -m pip install -q -r requirements.txt
-"$PY" -m pip check
-probe(){
-  curl -fsS --max-time 20 http://127.0.0.1:28545 -H 'Content-Type: application/json' \
-    -d '{"jsonrpc":"2.0","id":1,"method":"eth_blockNumber","params":[]}' | "$PY" -c 'import json,sys; n=int(json.load(sys.stdin)["result"],16); assert n>0; print("RPC_HEAD="+str(n))'
-}
-if ! probe; then
-  systemctl --user is-active --quiet sse-rpc-adapter.service || { echo "Existing RPC transport needs inspection" >&2; exit 2; }
-  python3 -B scripts/sse_v4_upgrade_rpc_client.py --source-sha "$SHA" --apply
-  sleep 3
+EXISTING=(--existing-app)
+if [[ "$(id -un)" == ayoubakrvm4707 ]]; then
+  EXISTING=(--existing-native)
 fi
-probe
-"$PY" -B scripts/sse_v4_app_install.py --roles "$ROLES" --plan
-"$PY" -B scripts/sse_v4_app_install.py --roles "$ROLES" --prepare-only
-sudo -n loginctl enable-linger "$(id -un)"
+python3 -B scripts/sse_setup.py --commit "$SHA" --roles "$ROLES" "${EXISTING[@]}" --apply
 sleep 3
 systemctl --user is-active sse-v4-console.service
 curl -fsS --max-time 15 http://127.0.0.1:8790/ -o /dev/null
