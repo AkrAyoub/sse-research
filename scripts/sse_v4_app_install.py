@@ -76,8 +76,8 @@ def policy_for(roles, wallet, keystore, caps, extra):
     p = {"schema": "SSE_V4_AGENT_POLICY_V1", "roles": roles, "wallet": wallet.lower(), "keystore": str(keystore),
          "spending": caps, "selfKeep": True,  # advance only own leases (D-09); owner may set false
          "consumer": {"epochRequests": {}},
-         "provider": {"approvedOfferHashes": [], "approvedTermsHashes": [], "leaseTerms": {}, "services": {},
-                      "workerUrl": "http://127.0.0.1:8877"},
+         "provider": {"approvedOfferHashes": [], "approvedTermsHashes": [], "leaseTerms": {},
+                      "profiles": {}, "offers": {}, "workers": {}},
          "monitor": {"autoConfirm": False, "allowFailureVotes": False, "providerEndpoints": {}, "services": {},
                      "approvedPolicies": {}}}
     for k, v in extra.items():
