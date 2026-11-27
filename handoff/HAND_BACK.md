@@ -1,41 +1,61 @@
-# HAND_BACK — session S1, 2026-11-27 (source-code-only)
+# HAND_BACK — session S1, 2026-11-27 (source-code-only), refreshed after pass 3
 
 **Honest summary:** nothing in this session was compiled, executed, tested, installed or deployed. All new work is
 source + unexecuted tests + static review. No VM, chain, wallet or key was touched. Branch `handoff/claude-code-2026-11-27`,
-local commits only (not pushed).
+local commits only (not pushed). Process deviation (pass 3, disclosed): the system `python3` interpreter was used three
+times purely as a text editor (string replace on tools/sse_v4_agent.py); no project module was imported or run. Later edits
+used sed/heredocs only. See logs/BUGS_AND_FIXES_LOG.md.
 
 ## Commits (on top of 394705a)
 | Commit | Content |
 |---|---|
-| 94b7fac | Governing source-only instruction adopted (CLAUDE.md, AGENTS.md, handoff/GOVERNING_INSTRUCTION.md, annotations) |
-| 5d5867b | Integrated V4 candidate contracts, deploy script, Foundry tests |
-| 6d8bcfe | V4 committee planner + terms/typed-data encoders + Python tests |
-| (this)  | Audits, planning, logs, HAND_BACK, WORK_LOG |
+| 94b7fac | Governing source-only instruction adopted (CLAUDE.md, AGENTS.md, GOVERNING_INSTRUCTION.md) |
+| 5d5867b | Integrated V4 contracts (Board, Registry, Standby cancel, Ledger wiring, Market), deploy script, Foundry tests |
+| 6d8bcfe | Committee planner + termsHash / EIP-712 encoders + Python tests |
+| 1ea49d5 | Audits, master checklist, deferred owner-run runbook, logs, HAND_BACK |
+| a2fd6ae | V4 agents: ABI layer, finalized read model, durable cursor, journal-before-broadcast, role planners, adapters |
+| b70f8b3 | V4 console + explorer (marketplace/role pages, unsigned wallet intents, planner, eth_getProof MPT verifier) |
+| e8c1df1 | Application-role installer, hardened systemd user units, manifest template |
+| d4fc4e1 | Pass-2 docs; removed unreferenced abandoned R407 login module |
+| bb6976e | Provider output service (consumer-signed download, never executes work); console Node/validator page |
+| bc21914 | Provider decodes consumer Terms from funding calldata (hash-authenticated); consumer output download/verify page; console CSRF/DNS-rebinding guard |
+| c8dced9 | Console native reward summary from the R424 collector (read only) |
+| 7d47c4e | Self-keeping of own leases (D-09); economics proposals P-1..P-3 for the owner |
+| (this)  | Audits/logs/HAND_BACK/WORK_LOG refresh |
 
 ## By status
-- **Historically live-verified (unchanged):** native chain31340 PoS; V2/V3 deployments; V3 experiments E1–E6, E8; V3 read-only
-  dashboard + tunnel; R424 reward collector (see STATE_AND_EVIDENCE.md).
-- **Historically execution-tested:** SSEStandbyCommittee (R429, before the new `cancel()`), ordered sampling (R427), V3 suite (R342e).
-- **Newly implemented + statically reviewed + tests written (not executed), awaiting compilation:**
-  SSEAdaptiveMarketV4, SSEServiceBoardV4, SSEMonitorRegistryV4, SSEStandbyCommittee.cancel, DeploySSEV4Candidate31340,
-  tools/sse_v4_committee_planner.py, tools/sse_v4_terms.py; 33 Solidity tests, 11 Python tests.
+- **Existing live-verified (unchanged):** native chain31340 PoS; V2/V3 deployments; V3 experiments E1–E6, E8; V3 read-only
+  dashboard + tunnel; R424 reward collector (STATE_AND_EVIDENCE.md).
+- **Previously execution-tested:** SSEStandbyCommittee (R429, before the new `cancel()`), ordered sampling (R427), V3 suite
+  (R342e), R425 collector tests.
+- **Newly implemented, statically reviewed, tests written but not executed (awaiting compilation / runtime validation):**
+  - Contracts: SSEAdaptiveMarketV4, SSEServiceBoardV4, SSEMonitorRegistryV4, SSEStandbyCommittee.cancel, deploy script;
+    35 Foundry tests.
+  - Python: planner, encoders, ABI layer, state/cursor/journal, role agents (incl. Terms decoding, self-keeping), signer
+    unlock, job runner/prober adapters, provider output service, MPT proof verifier, console (marketplace, request builder,
+    lease, provider, monitor, account, explorer, node/validator, rewards, consumer outputs), installer + unit templates;
+    37 Python tests.
 - **Awaiting deployment:** all V4 contracts (new version; V3 stays at its addresses).
-- **Not implemented:** V4 agents, V4 UI, explorer proofs, unified installer, keeper bounties, standby retainer, misconduct
-  penalties, stronger randomness for V4, E7/E9/E10.
+- **Not implemented / owner decision:** standby retainer (P-1), on-chain keeper bounty (P-2), misconduct penalties (P-3),
+  stronger randomness for V4, arbitrary uploaded code (needs microVM isolation), chain-client installer unification,
+  E7/E9/E10.
 
-## What V4 now does (source)
-Consumer posts a request with explicit n seats, s standbys, fault bound b (n ≥ 3b+1), fixed or provider-proposed epochs;
-providers bid (free, withdrawable, expiring); consumer awards any bid any time (no minimum bids) and funds service + exact
-report budget; committee is drawn from a global append-only monitor roster with bounded unbiased rejection sampling at a future
-blockhash, reserving capacity only for the n+s drawn; standby state machine handles confirmation and fixed-order promotion;
-the confirmed committee is frozen in the ledger and the report budget transferred once; provider must accept the exact termsHash;
-only an admitted epoch authorizes execution; V3 SSE accounting semantics preserved; every pre-service failure refunds in full and
-releases reservations. Details: handoff/audits/SMART_CONTRACT_AUDIT.md.
+## What V4 does end to end (source)
+Consumer builds a request in the console (uploads → content-addressed commitment, planner shows exact cost and draw
+probability), providers bid, consumer awards and funds from their own wallet; anyone (or the parties' self-keeping agents)
+draws the committee from the global monitor roster; standbys replace non-confirming seats; provider agent decodes and
+verifies the exact Terms and accepts; consumer agent starts epochs within its exposure budget; provider runs only after a
+finalized admitted epoch, signs the response, serves the output only to the consumer; monitors probe and vote (abstain when
+inconclusive); keepers finalize and close evidence; the consumer downloads the output and the console verifies it against
+the finalized on-chain responseHash. Details: audits/SMART_CONTRACT_AUDIT.md, audits/AGENT_AND_RUNTIME_SOURCE_AUDIT.md.
 
 ## Owner next steps
-Run handoff/planning/DEFERRED_RUNTIME_VALIDATION.md Stages 0–3 (read-only/compile/tests), record outputs in
-handoff/logs/BUGS_AND_FIXES_LOG.md, then start a new source session to fix failures. Decide: standby retainer economics (D-05),
-whether to commit Report2/Report3 PDFs, and provide the Milestone 4 rubric if it exists.
+1. Run planning/DEFERRED_RUNTIME_VALIDATION.md Stages 0–3 (read-only, compile, tests) and record outputs in
+   logs/BUGS_AND_FIXES_LOG.md; then a new source session fixes failures.
+2. Decide P-1/P-2/P-3 (planning/DESIGN_DECISIONS.md), whether to commit Report2/Report3 PDFs, and provide the Milestone 4
+   rubric if it exists.
+3. Only after Stage 4 (isolated chain) passes: approve a chain31340 V4 deployment plan (Stage 5).
 
 ## Risks
-Unknown bytecode size/stack depth (SC-13/14); proposer-biasable entropy; Sybil via bonded addresses; valueless TEST ETH.
+Unknown bytecode size/stack depth (SC-13/14); proposer-biasable entropy; Sybil via bonded addresses; valueless TEST ETH;
+hand-written ABI tables must match compiled ABIs (DRV-V4-ABI); console/agents never run in a browser or against a node yet.

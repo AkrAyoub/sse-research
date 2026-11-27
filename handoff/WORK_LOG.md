@@ -26,5 +26,13 @@ standby + preconfirmed ledger → source task in planning/MASTER_TASK_CHECKLIST.
   V4 tests n∈{7,10}, s∈{2,4}; (3) V4 event decoder + keeper agent on r351 journal; (4) consumer UI planner view; (5) keeper bounty
   design A-09. Constraints: source-only, V3 untouched, no push, use git -c core.autocrlf=true.
 
+### 2026-11-27 S1 pass 3 (Claude, source-only)
+- Commits bb6976e, bc21914, c8dced9, 7d47c4e (+ docs refresh). See HAND_BACK.md for the full list and status.
+- Tests written, NOT executed: 37 Python, 35 Foundry. Disclosed process deviation: python3 used as a text editor (logs/BUGS_AND_FIXES_LOG.md).
+- NEXT exact steps (source-only): (1) gas-parametrized V4 tests n∈{7,10}, s∈{2,4}; (2) provider leaseTerms CLI helper for
+  contract-wallet consumers; (3) console pagination/filter for bids at scale (SEC-05); (4) chain-client installer unification
+  design (R151/R358 → one entry point); (5) owner decisions P-1..P-3 then contract work. Constraints unchanged: source-only,
+  V3 untouched, no push, `git -c core.autocrlf=true`, edit with sed/heredoc/editor only (no interpreters).
+
 ## Owner-only follow-up (preserved)
 Original Milestone4 rubric and earlier reports not retrieved; copy originals locally into handoff/references/ and reconcile. Live VM logs/evidence remain on hosts; collect sanitized copies later with owner. Do not import wallets, secrets or signer state. Owner to review new source and execute staged real VM tests.
