@@ -512,6 +512,50 @@ contract SSEAdaptiveMarketV4Test is Test {
         covered();
     }
 
+    // ------------------------------------------------- gas-parametrized formation
+    /// @dev Records formation gas for larger committees (owner reads `forge test -vv` logs and
+    /// `--gas-report`). Asserts only structural facts and a generous per-call ceiling so the
+    /// test fails loudly if a configuration would not fit a 30M block. Written, NOT executed.
+    function formationGas(uint16 n, uint16 s, uint16 b) private {
+        for (uint256 i = MONITORS; i < 40; ++i) { // 40 entries: draw failure odds negligible for n+s ≤ 14
+            address m = mon(i);
+            vm.deal(m, 10 ether);
+            vm.prank(m);
+            registry.register{value: BOND}(1);
+        }
+        uint256 rid = requestB(n, s, b);
+        vm.prank(consumer);
+        uint256 id = market.awardAndFund{value: SERVICE + uint256(n) * EPOCHS * REWARD}(rid, 0, terms(true, false));
+        uint256 eb = market.lease(id).entropyBlock;
+        vm.roll(eb + 1);
+        vm.setBlockhash(eb, keccak256(abi.encode("fixture entropy", id)));
+        uint256 g = gasleft();
+        market.drawCommittee(id);
+        uint256 drawGas = g - gasleft();
+        assertEq(uint8(market.lease(id).phase), uint8(M.Phase.Forming));
+        confirmAll(id);
+        g = gasleft();
+        market.activateCommittee(id);
+        uint256 activateGas = g - gasleft();
+        emit log_named_uint("seats", n);
+        emit log_named_uint("standbys", s);
+        emit log_named_uint("drawCommittee gas", drawGas);
+        emit log_named_uint("activateCommittee gas", activateGas);
+        assertLt(drawGas, 15_000_000);
+        assertLt(activateGas, 15_000_000);
+        assertEq(votes.committee(id).seats, n);
+        assertEq(votes.committee(id).quorum, uint256(n) - (uint256(n) - 1) / 3);
+        uint256 reservedSum;
+        for (uint256 i; i < 40; ++i) { (,, uint256 r,,) = registry.position(mon(i)); reservedSum += r; }
+        assertEq(reservedSum, n); // standbys released at activation
+        covered();
+    }
+
+    function testFormationGas7Seats2Standbys() public { formationGas(7, 2, 2); }
+    function testFormationGas7Seats4Standbys() public { formationGas(7, 4, 2); }
+    function testFormationGas10Seats2Standbys() public { formationGas(10, 2, 3); }
+    function testFormationGas10Seats4Standbys() public { formationGas(10, 4, 3); }
+
     /// @dev Fuzz: arbitrary per-epoch evidence combinations conserve funds.
     function testFuzzConservation(uint8 pattern) public {
         uint256 id = open(true, true);
