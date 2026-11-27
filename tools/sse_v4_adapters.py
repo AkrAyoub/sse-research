@@ -103,7 +103,7 @@ def resource_binding(cfg, lease):
     sla = p["sla"]
     for k in ("responseSeconds", "maxRuntimeSeconds"):
         st.require(type(sla.get(k)) is int and 1 <= sla[k] <= 86400, "invalid runtime SLA")
-    st.require(sla["maxRuntimeSeconds"] <= sla["responseSeconds"] <= lease["responseSeconds"],
+    st.require(sla["maxRuntimeSeconds"] <= lease["responseSeconds"] <= sla["responseSeconds"],
                "profile response SLA incompatible with lease")
     st.require(isinstance(w.get("imageId"), str) and re.fullmatch(r"sha256:[0-9a-f]{64}", w["imageId"]),
                "immutable worker image required")
@@ -164,6 +164,9 @@ def make_job_runner(policy, state_dir):
     def run(job):
         try:
             p, _, w = resource_binding(cfg, job)
+            st.require(job.get("workerBindingHash") == response_hash(w) and
+                       job.get("workerKey") == [w["dockerSocket"], w["container"], w["url"]],
+                       "queued worker configuration changed")
             worker = w["url"]
             before = inspect_bound_worker(p, w)
         except (ValueError, KeyError, TypeError, OSError):
