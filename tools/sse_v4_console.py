@@ -42,6 +42,8 @@ PROVIDER_URL = re.compile(r"^(https://[A-Za-z0-9.-]{1,253}(:[0-9]{2,5})?(/[A-Za-
 ZERO32 = "0x" + "00" * 32
 MAX_OUTPUT = 4 * 1024 * 1024
 OUTPUT_AUTH_SECONDS = 300
+SUPPORTED_SERVICES = ("SHA256_CHAIN_8192",)  # must match tools/sse_v4_adapters.py
+HISTORY_RANGE = 2000  # same bound as the agent cursor (sse_v4_state.MAX_LOG_RANGE)
 STALE_REWARDS_SECONDS = 300  # collector timer runs every ~24 s (scripts/sse_install_native_reward_timer.py)
 STATIC = Path(__file__).resolve().parent / "sse_v4_console_static"
 
@@ -128,8 +130,35 @@ class Console:
 
     def account(self, who, q):
         r, tag = self._reader(q.get("finality", ["finalized"])[0])
-        return dict(self._meta(tag), address=who, withdrawable=r.withdrawable(who), monitor=r.position(who))
+        code = self.ask("eth_getCode", [who, tag])
+        return dict(self._meta(tag), address=who, withdrawable=r.withdrawable(who), monitor=r.position(who),
+                    balanceWei=int(self.ask("eth_getBalance", [who, tag]), 16),
+                    nonce=int(self.ask("eth_getTransactionCount", [who, tag]), 16),
+                    codeBytes=(len(code) - 2) // 2 if isinstance(code, str) else None)
 
+
+    def history(self, who, q):
+        """Finalized SSE V4 events that name this address (provider/monitor/account
+        topics), over at most HISTORY_RANGE blocks ending at `toBlock` (default:
+        finalized). Read only; older history is paged by the caller."""
+        fin = st.finalized(self.ask)[0]
+        to = min(_int(q, "toBlock", fin), fin)
+        frm = max(0, to - HISTORY_RANGE + 1)
+        topic = "0x" + "00" * 12 + who[2:]
+        rows = []
+        # The address can sit in topic 1, 2 or 3 depending on the event; one query per position.
+        for pos in (1, 2, 3):
+            flt = {"fromBlock": hex(frm), "toBlock": hex(to), "address": list(self.mods.values()),
+                   "topics": [None] * pos + [topic]}
+            for log in self.ask("eth_getLogs", [flt]) or []:
+                ev = abi.decode_log(log, self.mods)
+                if ev is not None and who in (str(v).lower() for v in ev.values()):
+                    rows.append(ev)
+        uniq = {(e["blockNumber"], e["logIndex"]): e for e in rows}
+        events = [uniq[k] for k in sorted(uniq, reverse=True)]
+        return {"address": who, "fromBlock": frm, "toBlock": to, "finalized": True, "events": events,
+                "earlierPage": frm - 1 if frm > 0 else None,
+                "note": "Only events naming this address in an indexed field are listed; amounts are wei."}
     def plan(self, q):
         r, tag = self._reader("finalized")
         ex_a = q.get("consumer", ["0x" + "0" * 40])[0]
@@ -390,6 +419,53 @@ class Console:
                     policySnippet={"provider": {"leaseTerms": {str(lid): clean}}} if match else None,
                     note="Add the snippet to the provider policy only if it matches; acceptance additionally "
                          "requires the offer hash to be in approvedOfferHashes.")
+
+    # ------------------------------------------------------- structured manifests
+    def manifest(self, kind, body):
+        """Build a canonical manifest and its keccak commitment. Pure, read only.
+        profile  (consumer): service + resource needs + measurable SLA -> profileHash
+        policy   (consumer): monitoring/evidence policy -> policyHash
+        offer    (provider): actual resources advertised -> offerHash; endpoint URL -> endpointHash
+        Supported service in this release is SHA256_CHAIN_8192 only (fail closed otherwise)."""
+        def num(name, lo, hi):
+            v = body.get(name)
+            if type(v) is not int or not lo <= v <= hi:
+                raise ValueError(f"{name} must be an integer in [{lo}, {hi}]")
+            return v
+        if kind == "profile":
+            if body.get("service") not in SUPPORTED_SERVICES:
+                raise ValueError("unsupported service (supported: " + ", ".join(SUPPORTED_SERVICES) + ")")
+            m = {"schema": "SSE_V4_PROFILE_V1", "service": body["service"],
+                 "resources": {"cpuCores": num("cpuCores", 1, 256), "memoryMiB": num("memoryMiB", 64, 1 << 20),
+                               "storageMiB": num("storageMiB", 0, 1 << 24)},
+                 "sla": {"responseSeconds": num("responseSeconds", 1, 86400),
+                         "maxRuntimeSeconds": num("maxRuntimeSeconds", 1, 86400)}}
+        elif kind == "policy":
+            m = {"schema": "SSE_V4_POLICY_V1", "probe": body.get("probe"),
+                 "probeTimeoutSeconds": num("probeTimeoutSeconds", 1, 3600),
+                 "failureEvidence": body.get("failureEvidence")}
+            if m["probe"] not in SUPPORTED_SERVICES:
+                raise ValueError("probe must be a supported deterministic service")
+            if m["failureEvidence"] not in ("conditional-quorum", "none"):
+                raise ValueError("failureEvidence must be conditional-quorum or none")
+        elif kind == "offer":
+            url = body.get("endpointUrl")
+            if not isinstance(url, str) or not PROVIDER_URL.fullmatch(url) or url.startswith("http://"):
+                raise ValueError("endpointUrl must be a public https URL")
+            m = {"schema": "SSE_V4_OFFER_V1", "services": sorted(set(body.get("services") or [])),
+                 "resources": {"cpuCores": num("cpuCores", 1, 1024), "memoryMiB": num("memoryMiB", 64, 1 << 24),
+                               "storageMiB": num("storageMiB", 0, 1 << 30)},
+                 "maxConcurrentLeases": num("maxConcurrentLeases", 1, 1024), "endpointUrl": url}
+            if not m["services"] or any(s not in SUPPORTED_SERVICES for s in m["services"]):
+                raise ValueError("services must be a non-empty subset of the supported services")
+        else:
+            raise ValueError("unknown manifest kind")
+        raw = json.dumps(m, sort_keys=True, separators=(",", ":")).encode()
+        out = {"kind": kind, "manifest": m, "canonical": raw.decode(), "hash": "0x" + keccak256(raw).hex(),
+               "note": "Publish the canonical manifest with your request or bid; the chain stores only the hash."}
+        if kind == "offer":
+            out["endpointHash"] = endpoint_hash(m["endpointUrl"])
+        return out
     # ---------------------------------------------------------- consumer outputs
     def output_message(self, q):
         """Message the consumer signs (EIP-191 personal_sign) to download an
@@ -483,6 +559,8 @@ def make_handler(console):
                     return self._send(200, console.request(int(p[1]), q))
                 if len(p) == 2 and p[0] == "lease" and INT.fullmatch(p[1]):
                     return self._send(200, console.lease(int(p[1]), q))
+                if len(p) == 3 and p[0] == "account" and ADDR.fullmatch(p[1]) and p[2] == "history":
+                    return self._send(200, console.history(p[1].lower(), q))
                 if len(p) == 2 and p[0] == "account" and ADDR.fullmatch(p[1]):
                     return self._send(200, console.account(p[1].lower(), q))
                 if p == ["node"]:
@@ -524,6 +602,10 @@ def make_handler(console):
                         return self._send(413, {"error": "too large"})
                     body = json.loads(self.rfile.read(n) or b"{}")
                     return self._send(200, console.intent(parts[2], body))
+                if len(parts) == 3 and parts[:2] == ["api", "manifest"]:
+                    if n > MAX_JSON:
+                        return self._send(413, {"error": "too large"})
+                    return self._send(200, console.manifest(parts[2], json.loads(self.rfile.read(n) or b"{}")))
                 if parts == ["api", "terms-check"]:
                     if n > MAX_JSON:
                         return self._send(413, {"error": "too large"})

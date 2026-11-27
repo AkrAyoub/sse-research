@@ -178,7 +178,7 @@ $("moDone").onclick = async () => { try { await sendWithWallet(await api("intent
 $("aLoad").onclick = async () => {
   try {
     const j = await api("account/" + $("aAddr").value);
-    show("aOut", meta(j) + "<h4>Withdrawable (wei)</h4>" + table([j.withdrawable], ["market", "registry", "ledger"]) + "<h4>Monitor position</h4>" + table([j.monitor], ["bond", "capacity", "reserved", "available", "exiting"]));
+    show("aOut", meta(j) + table([j], ["balanceWei", "nonce", "codeBytes"]) + "<h4>Withdrawable (wei)</h4>" + table([j.withdrawable], ["market", "registry", "ledger"]) + "<h4>Monitor position</h4>" + table([j.monitor], ["bond", "capacity", "reserved", "available", "exiting"]));
   } catch (e) { fail("aOut", e); }
 };
 
@@ -285,3 +285,44 @@ $("tcGo").onclick = async () => {
     show("tcOut", html + '<p class="note">' + esc(j.note) + "</p>");
   } catch (e) { fail("tcOut", e); }
 };
+
+// ------------------------------------------------ structured manifests
+function manifestHtml(m) {
+  return "<p>Hash <code>" + esc(m.hash) + "</code></p><details><summary>Canonical manifest</summary><pre>" + esc(m.canonical) + "</pre></details>";
+}
+$("pfBuild").onclick = async () => {
+  try {
+    const n = (id) => parseInt($(id).value, 10);
+    const p = await api("manifest/profile", { service: $("pfService").value, cpuCores: n("pfCpu"), memoryMiB: n("pfMem"), storageMiB: n("pfSto"), responseSeconds: n("pfResp"), maxRuntimeSeconds: n("pfRun") });
+    const q = await api("manifest/policy", { probe: $("pfService").value, probeTimeoutSeconds: n("pfProbe"), failureEvidence: $("pfFail").value });
+    document.querySelector('#rForm [name="profileHash"]').value = p.hash;
+    document.querySelector('#rForm [name="policyHash"]').value = q.hash;
+    show("pfOut", "<h4>Profile</h4>" + manifestHtml(p) + "<h4>Policy</h4>" + manifestHtml(q) + '<p class="note">' + esc(p.note) + "</p>");
+  } catch (e) { fail("pfOut", e); }
+};
+$("ofBuild").onclick = async () => {
+  try {
+    const n = (id) => parseInt($(id).value, 10);
+    const o = await api("manifest/offer", { endpointUrl: $("ofUrl").value.trim(), services: ["SHA256_CHAIN_8192"], cpuCores: n("ofCpu"), memoryMiB: n("ofMem"), storageMiB: n("ofSto"), maxConcurrentLeases: n("ofConc") });
+    document.querySelector('#bForm [name="offerHash"]').value = o.hash;
+    document.querySelector('#bForm [name="endpointHash"]').value = o.endpointHash;
+    show("ofOut", manifestHtml(o) + "<p>Endpoint hash <code>" + esc(o.endpointHash) + "</code></p><p class='note'>Add the offer hash to your agent policy approvedOfferHashes so it may accept leases awarded on this bid.</p>");
+  } catch (e) { fail("ofOut", e); }
+};
+
+// ------------------------------------------------ account event history
+async function loadHistory(to) {
+  try {
+    const j = await api("account/" + $("aAddr").value + "/history" + (to === null ? "" : "?toBlock=" + to));
+    const rows = j.events.map((e) => { const { event, blockNumber, transactionHash, module, logIndex, blockHash, ...rest } = e; return { block: blockNumber, event, module, details: rest, tx: transactionHash }; });
+    let html = "<p class='note'>Finalized blocks " + esc(j.fromBlock) + "–" + esc(j.toBlock) + ". " + esc(j.note) + "</p>" + table(rows, ["block", "event", "module", "details", "tx"]);
+    show("aHistOut", html);
+    if (j.earlierPage !== null) {
+      const b = document.createElement("button");
+      b.textContent = "Earlier blocks";
+      b.onclick = () => loadHistory(j.earlierPage);
+      $("aHistOut").appendChild(b);
+    }
+  } catch (e) { fail("aHistOut", e); }
+}
+$("aHist").onclick = () => loadHistory(null);

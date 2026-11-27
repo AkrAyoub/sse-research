@@ -247,6 +247,29 @@ class ConsoleTest(unittest.TestCase):
         with self.assertRaises(ValueError):
             c.terms_check({"leaseId": 0, "terms": good})
 
+    def test_manifests_are_canonical_and_fail_closed(self):
+        c = console.Console(lambda m, p: None, {"modules": MODS}, "public")
+        prof = {"service": "SHA256_CHAIN_8192", "cpuCores": 1, "memoryMiB": 512, "storageMiB": 0,
+                "responseSeconds": 100, "maxRuntimeSeconds": 60}
+        a = c.manifest("profile", prof)
+        b = c.manifest("profile", dict(reversed(list(prof.items()))))
+        self.assertEqual(a["hash"], b["hash"])  # key order does not matter
+        with self.assertRaises(ValueError):
+            c.manifest("profile", dict(prof, service="ARBITRARY_CODE"))
+        with self.assertRaises(ValueError):
+            c.manifest("profile", dict(prof, cpuCores=0))
+        offer = {"endpointUrl": "https://provider.example/sse", "services": ["SHA256_CHAIN_8192"], "cpuCores": 2,
+                 "memoryMiB": 2048, "storageMiB": 0, "maxConcurrentLeases": 4}
+        o = c.manifest("offer", offer)
+        from sse_v4_adapters import endpoint_hash
+        self.assertEqual(o["endpointHash"], endpoint_hash("https://provider.example/sse"))
+        with self.assertRaises(ValueError):
+            c.manifest("offer", dict(offer, endpointUrl="http://127.0.0.1:8881"))  # offers must be public https
+        with self.assertRaises(ValueError):
+            c.manifest("policy", {"probe": "SHA256_CHAIN_8192", "probeTimeoutSeconds": 30, "failureEvidence": "vote"})
+        with self.assertRaises(ValueError):
+            c.manifest("other", {})
+
     def test_unknown_intent_rejected(self):
         class FakeReader:
             pass
