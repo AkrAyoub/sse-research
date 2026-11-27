@@ -237,6 +237,16 @@ class ConsoleTest(unittest.TestCase):
         self.assertEqual((r["epochsUnavailable"], r["blocksUnavailable"], r["stale"]), (["0"], 1, False))
         self.assertFalse(console.Console(lambda m, p: None, {"modules": MODS}, "public").rewards()["available"])
 
+    def test_terms_check_validates_types_before_reading_chain(self):
+        c = console.Console(lambda m, p: None, {"modules": MODS}, "public")
+        good = {f: (False if k == "bool" else 1) for f, k in abi.TERMS_FIELDS}
+        for bad in (dict(good, acceptSeconds=2 ** 64), dict(good, conditionalQuorumPolicy=1),
+                    dict(good, reservationFee=-1), dict(good, idleSeconds="1")):
+            with self.assertRaises(ValueError):
+                c.terms_check({"leaseId": 1, "terms": bad})
+        with self.assertRaises(ValueError):
+            c.terms_check({"leaseId": 0, "terms": good})
+
     def test_unknown_intent_rejected(self):
         class FakeReader:
             pass

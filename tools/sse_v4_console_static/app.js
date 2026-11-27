@@ -62,12 +62,21 @@ async function loadMarket() {
     $("mList").querySelectorAll("tbody tr").forEach((tr, i) => { tr.tabIndex = 0; tr.onclick = () => loadRequest(j.rows[i].id); });
   } catch (e) { fail("mList", e); }
 }
-async function loadRequest(id) {
+let rOffset = 0;
+async function loadRequest(id, offset) {
+  rOffset = offset || 0;
   try {
-    const j = await api("request/" + id);
+    const validOnly = $("mValidOnly") && $("mValidOnly").checked ? "&validOnly=1" : "";
+    const maxFee = $("mMaxFee") && $("mMaxFee").value ? "&maxFee=" + encodeURIComponent($("mMaxFee").value) : "";
+    const j = await api("request/" + id + "?offset=" + rOffset + "&limit=50" + validOnly + maxFee);
     let html = "<h3>Request " + esc(id) + "</h3>" + meta(j) + "<pre>" + esc(JSON.stringify(j.request, null, 2)) + "</pre><p class='note'>" + esc(j.note) + "</p>";
+    html += "<p>Bids " + esc(j.offset) + "–" + esc(Math.min(j.offset + j.limit, j.bidCount)) + " of " + esc(j.bidCount) + " (filters apply within this page).</p>";
     html += table(j.bids, ["index", "provider", "epochFee", "epochs", "expiry", "withdrawn", "valid", "fundingWei", "offerHash"]);
     show("mDetail", html);
+    const nav = document.createElement("p");
+    if (rOffset > 0) { const b = document.createElement("button"); b.textContent = "Previous bids"; b.onclick = () => loadRequest(id, Math.max(0, rOffset - 50)); nav.appendChild(b); }
+    if (rOffset + 50 < j.bidCount) { const b = document.createElement("button"); b.textContent = "Next bids"; b.onclick = () => loadRequest(id, rOffset + 50); nav.appendChild(b); }
+    $("mDetail").appendChild(nav);
   } catch (e) { fail("mDetail", e); }
 }
 $("mStatus").onchange = () => { mOffset = 0; loadMarket(); };
@@ -264,4 +273,15 @@ $("rLoad").onclick = async () => {
     if (j.blocksUnavailable) html += '<p class="note">' + esc(j.blocksUnavailable) + " recent slots had no reward data (empty slot or not served).</p>";
     show("rOut", html);
   } catch (e) { fail("rOut", e); }
+};
+
+// ------------------------------------------- provider: verify handed-over terms
+$("tcGo").onclick = async () => {
+  try {
+    const j = await api("terms-check", { leaseId: Number($("tcLease").value), terms: JSON.parse($("tcTerms").value) });
+    let html = meta(j) + table([j], ["onchainTermsHash", "recomputedTermsHash", "match"]);
+    html += j.match ? "<h4>Policy snippet</h4><pre>" + esc(JSON.stringify(j.policySnippet, null, 2)) + "</pre>"
+      : '<p class="err">Terms do not reproduce the on-chain hash. Do not accept this lease with these terms.</p>';
+    show("tcOut", html + '<p class="note">' + esc(j.note) + "</p>");
+  } catch (e) { fail("tcOut", e); }
 };

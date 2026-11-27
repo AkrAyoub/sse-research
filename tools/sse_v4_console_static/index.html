@@ -26,6 +26,8 @@
   <h2>Open requests</h2>
   <label>Status <select id="mStatus"><option value="">all</option><option>Open</option><option>Awarded</option><option>Cancelled</option></select></label>
   <button id="mPrev">Newer</button><button id="mNext">Older</button>
+  <label><input id="mValidOnly" type="checkbox"> Only valid bids</label>
+  <label>Max fee per epoch (wei) <input id="mMaxFee" type="number" min="0"></label>
   <div id="mList"></div>
   <div id="mDetail"></div>
 </section>
@@ -86,6 +88,14 @@
   </form>
   <p class="note">A bid never starts work. Your agent executes only after award, your acceptance of the exact terms hash, committee activation and a finalized epoch start.</p>
   <div id="bOut"></div>
+  <fieldset>
+    <legend>Verify consumer terms (contract-wallet consumers)</legend>
+    <p class="note">If the consumer funded through a contract wallet, your agent cannot read the terms from the funding transaction. Paste the terms JSON the consumer gave you; the console recomputes the terms hash from finalized chain state and, only on a match, shows the policy snippet for your agent.</p>
+    <label>Lease id <input id="tcLease" type="number" min="1"></label>
+    <label>Terms JSON <textarea id="tcTerms" rows="5" placeholder='{"acceptSeconds":86400,...}'></textarea></label>
+    <button id="tcGo">Check terms</button>
+    <div id="tcOut"></div>
+  </fieldset>
 </section>
 <section id="monitor" class="tab" hidden>
   <h2>Monitor registration</h2>

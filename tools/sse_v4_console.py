@@ -107,12 +107,19 @@ class Console:
         r, tag = self._reader(q.get("finality", ["finalized"])[0])
         x = r.request(rid)
         x["statusName"] = abi.REQUEST_STATUS[x["status"]]
-        bids = r.bids(rid, _int(q, "offset", 0), _int(q, "limit", 50, 1, 100))
+        off, lim = _int(q, "offset", 0), _int(q, "limit", 50, 1, 100)
+        bid_count = r._v("board", "bidCount(uint256)", ("uint256",), (rid,))[0]
+        bids = r.bids(rid, off, lim) if off < bid_count else []
         now = int(self.ask("eth_getBlockByNumber", [tag, False])["timestamp"], 16)
         for b in bids:
             b["valid"] = (not b["withdrawn"]) and b["expiry"] >= now and x["statusName"] == "Open"
             b["fundingWei"] = b["epochFee"] * b["epochs"] + x["seats"] * b["epochs"] * x["perReportReward"]
-        return dict(self._meta(tag), request=x, bids=bids,
+        # Filters apply within the fetched page (on-chain bids are unbounded and never iterated on-chain).
+        if q.get("validOnly", ["0"])[0] == "1":
+            bids = [b for b in bids if b["valid"]]
+        max_fee = _int(q, "maxFee", 2 ** 256, 0, 2 ** 256)
+        bids = [b for b in bids if b["epochFee"] <= max_fee]
+        return dict(self._meta(tag), request=x, bids=bids, bidCount=bid_count, offset=off, limit=lim,
                     note="Any valid bid may be awarded; no minimum number of bids; cheapest is not auto-selected.")
 
     def lease(self, lid, q):
@@ -355,6 +362,34 @@ class Console:
                 "privacy": "Provider will see plaintext inputs once authorized; confidentiality against the "
                            "executing provider is not provided."}
 
+
+    def terms_check(self, body):
+        """Provider helper (D-10 fallback for contract-wallet consumers): recompute
+        termsHash from finalized public views + the Terms the consumer handed over,
+        and emit the policy snippet the provider agent needs. Read only."""
+        lid, t = body["leaseId"], body["terms"]
+        if type(lid) is not int or lid < 1 or not isinstance(t, dict):
+            raise ValueError("leaseId and terms object required")
+        clean = {}
+        for name, kind in abi.TERMS_FIELDS:
+            v = t.get(name)
+            if kind == "bool":
+                if type(v) is not bool:
+                    raise ValueError(name + " must be true/false")
+            elif type(v) is not int or v < 0 or v >= 2 ** (64 if kind == "uint64" else 256):
+                raise ValueError(name + " must be a " + kind)
+            clean[name] = v
+        r, tag = self._reader("finalized")
+        lease = r.lease(lid)
+        q = r.request(lease["requestId"])
+        bid = r.bids(lease["requestId"], lease["bidIndex"], 1)[0]
+        bid.pop("index", None)
+        got = "0x" + terms.terms_hash(st.CHAIN_ID, self.mods["market"], lid, lease["bidIndex"], q, bid, clean).hex()
+        match = got.lower() == lease["termsHash"].lower()
+        return dict(self._meta(tag), onchainTermsHash=lease["termsHash"], recomputedTermsHash=got, match=match,
+                    policySnippet={"provider": {"leaseTerms": {str(lid): clean}}} if match else None,
+                    note="Add the snippet to the provider policy only if it matches; acceptance additionally "
+                         "requires the offer hash to be in approvedOfferHashes.")
     # ---------------------------------------------------------- consumer outputs
     def output_message(self, q):
         """Message the consumer signs (EIP-191 personal_sign) to download an
@@ -489,6 +524,10 @@ def make_handler(console):
                         return self._send(413, {"error": "too large"})
                     body = json.loads(self.rfile.read(n) or b"{}")
                     return self._send(200, console.intent(parts[2], body))
+                if parts == ["api", "terms-check"]:
+                    if n > MAX_JSON:
+                        return self._send(413, {"error": "too large"})
+                    return self._send(200, console.terms_check(json.loads(self.rfile.read(n) or b"{}")))
                 if parts in (["api", "output-verify"], ["api", "output-fetch"]):
                     if n > MAX_OUTPUT + MAX_JSON:
                         return self._send(413, {"error": "too large"})
