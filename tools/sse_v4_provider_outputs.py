@@ -82,6 +82,10 @@ class Outputs:
 
 def make_handler(outputs):
     class H(BaseHTTPRequestHandler):
+        def setup(self):
+            super().setup()
+            self.connection.settimeout(15)
+
         def log_message(self, *a):
             pass
 
@@ -127,6 +131,7 @@ def main():
     from sse_chain_read import LocalRPC
     ask = LocalRPC(a.rpc).request
     manifest = st.load_manifest(a.manifest)
+    st.verify_deployment(ask, manifest)
     ThreadingHTTPServer(("127.0.0.1", a.port), make_handler(Outputs(ask, manifest, a.state))).serve_forever()
 
 
