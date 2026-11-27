@@ -341,7 +341,7 @@ class Agent:
         cache[key] = t
         return t
 
-    def step(self):
+    def step(self, persist=True):
         events, new_cursor = self.cursor.poll()
         idx = self._index()
         for ev in events:
@@ -386,8 +386,9 @@ class Agent:
             actions += acts
             for j in new_jobs:
                 jobs[j["jobId"]] = dict(j, state="QUEUED", queuedAt=now)
-            st.atomic_write_json(self.jobs_path, jobs)  # persist BEFORE any execution
-            if self.job_runner:
+            if persist:
+                st.atomic_write_json(self.jobs_path, jobs)  # persist BEFORE any execution
+            if self.job_runner and persist:
                 for jid, j in jobs.items():
                     if j["state"] == "QUEUED":
                         jobs[jid] = dict(j, state="RUNNING")
@@ -414,8 +415,9 @@ class Agent:
                     results.append({"refused": str(exc), "action": a["reason"]})
                     if "unresolved journal" in str(exc):
                         break
-        st.atomic_write_json(self.index_path, idx)
-        self.cursor.commit(new_cursor)
+        if persist:
+            st.atomic_write_json(self.index_path, idx)
+            self.cursor.commit(new_cursor)
         return {"events": len(events), "actions": actions, "results": results, "cursor": new_cursor}
 
 
@@ -436,6 +438,21 @@ def main():
     st.verify_deployment(ask, manifest)
     sender = None
     if not a.dry_run:
+        # One active agent per owner state directory. A shared wallet must
+        # never be concurrently managed by another signer/state directory.
+        import fcntl
+        lock = open(st.private_dir(a.state) / "agent.lock", "a")
+        try:
+            fcntl.flock(lock, fcntl.LOCK_EX | fcntl.LOCK_NB)
+        except BlockingIOError:
+            raise SystemExit("another agent already owns this state directory")
+        identity_path = a.state / "deployment-identity.json"
+        identity = {"chainId": st.CHAIN_ID, "genesisHash": st.GENESIS,
+                    "modules": manifest["modules"], "wallet": policy["wallet"]}
+        old = st.read_json(identity_path)
+        st.require(old is None or old == identity, "state belongs to a different deployment or wallet")
+        if old is None:
+            st.atomic_write_json(identity_path, identity)
         from sse_v4_signer import unlock_account
         sender = Sender(ask, manifest, policy, unlock_account(policy), st.Journal(a.state))
     import sse_v4_adapters as adapters
@@ -444,7 +461,9 @@ def main():
     agent = Agent(ask, manifest, policy, a.state, sender=sender, job_runner=runner, prober=prober)
     while True:
         try:
-            print(json.dumps(agent.step(), default=str))
+            print(json.dumps(agent.step(persist=not a.dry_run), default=str))
+            if a.dry_run:
+                return
         except st.StateError as exc:
             print(json.dumps({"halted": str(exc)}))
             if "canonical" in str(exc):
