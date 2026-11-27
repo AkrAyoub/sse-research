@@ -542,6 +542,14 @@ contract SSEAdaptiveMarketV4Test is Test {
             board.request(l.requestId), board.bidAt(l.requestId, l.bidIndex), terms(true, false)));
         assertEq(h, l.termsHash);
         emit log_named_bytes32("termsHash", h);
+        // Export exact ABI bytes from actual public views for an independent
+        // owner-run Python decoder/encoder comparison. No FFI or filesystem writes.
+        emit log_named_bytes("V4_PARITY_TERMS", abi.encode(block.chainid, address(market), id, l.bidIndex,
+            board.request(l.requestId), board.bidAt(l.requestId, l.bidIndex), terms(true, false)));
+        emit log_named_bytes32("V4_PARITY_TERMS_HASH", l.termsHash);
+        emit log_named_address("V4_PARITY_LEDGER", address(votes));
+        emit log_named_bytes32("V4_PARITY_MARKET_DOMAIN", market.domainSeparator());
+        emit log_named_bytes32("V4_PARITY_LEDGER_DOMAIN", votes.domainSeparator());
     }
 
     /// @dev Larger committee n=7, b=2, s=4 (gas report anchor for DRV-V4-GAS).
