@@ -156,9 +156,13 @@ def install(roles, publish, rpc, python, input_fn=input):
         fd = os.open(pol_path, os.O_WRONLY | os.O_CREAT | os.O_EXCL, 0o600)
         with os.fdopen(fd, "w") as fh:
             json.dump(pol, fh, indent=2)
-    common = dict(PYTHON=python, REPO=REPO, MANIFEST=MANIFEST, RPC=rpc, STATE=STATE, POLICY=pol_path)
+    common = dict(PYTHON=python, REPO=REPO, MANIFEST=MANIFEST, RPC=rpc, STATE=STATE, POLICY=pol_path,
+                  BEACON="http://127.0.0.1:25052")  # local BN default (R358 layout); unreachable => "unavailable"
     units = {"sse-v4-agent.service": render_unit("sse-v4-agent.service.in", **common),
              "sse-v4-console.service": render_unit("sse-v4-console.service.in", MODE="local", PORT=8790, **common)}
+    if "provider" in roles:
+        units["sse-v4-provider-outputs.service"] = render_unit("sse-v4-provider-outputs.service.in", **common)
+        print("Provider: point the existing TLS front (R304) at 127.0.0.1:8881 and publish its URL; endpointHash = keccak(URL).")
     if publish:
         units["sse-v4-console-public.service"] = render_unit("sse-v4-console.service.in", MODE="public", PORT=8791, **common)
     for name, text in units.items():

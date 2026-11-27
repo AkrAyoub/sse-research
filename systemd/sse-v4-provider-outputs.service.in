@@ -1,0 +1,18 @@
+# SSE V4 provider output endpoint (serves stored results, never executes). SOURCE-ONLY template.
+[Unit]
+Description=SSE V4 provider output endpoint
+After=network-online.target
+
+[Service]
+Type=simple
+ExecStart=@PYTHON@ @REPO@/tools/sse_v4_provider_outputs.py --manifest @MANIFEST@ --rpc @RPC@ --state @STATE@ --port 8881
+Restart=on-failure
+RestartSec=10
+NoNewPrivileges=yes
+PrivateTmp=yes
+ProtectSystem=strict
+ReadOnlyPaths=@STATE@
+UMask=0077
+
+[Install]
+WantedBy=default.target

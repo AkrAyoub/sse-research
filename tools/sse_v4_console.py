@@ -55,8 +55,11 @@ def _int(q, name, default=None, lo=0, hi=2 ** 63):
 
 
 class Console:
-    def __init__(self, ask, manifest, mode, state_dir=None):
+    def __init__(self, ask, manifest, mode, state_dir=None, beacon=None):
         self.ask, self.manifest, self.mode = ask, manifest, mode
+        if beacon is not None and not re.fullmatch(r"http://127\.0\.0\.1:[0-9]{2,5}", beacon):
+            raise ValueError("beacon API must be a loopback URL")
+        self.beacon = beacon
         self.mods = manifest["modules"]
         self.uploads = st.private_dir(Path(state_dir) / "artifacts") if mode == "local" and state_dir else None
 
@@ -193,6 +196,61 @@ class Console:
                    note="Only nodes returned by eth_getProof are shown; the full trie is not enumerated.")
         return rep
 
+    # ------------------------------------------------------ node / validator
+    def node(self):
+        """Execution-layer node facts from the configured RPC (no secrets, no paths)."""
+        out = {"source": "configured RPC endpoint", "observedAt": int(time.time())}
+        for k, m in (("peerCount", "net_peerCount"), ("syncing", "eth_syncing"), ("client", "web3_clientVersion")):
+            try:
+                out[k] = self.ask(m, [])
+            except ValueError as exc:
+                out[k] = {"unavailable": str(exc)[:120]}
+        for tag in ("latest", "safe", "finalized"):
+            b = self.ask("eth_getBlockByNumber", [tag, False])
+            out[tag] = {"number": b["number"], "hash": b["hash"], "timestamp": b["timestamp"]} if b else None
+        # Historical-state capability probe: genesis-era balance query succeeds only on archive nodes.
+        try:
+            self.ask("eth_getBalance", [self.mods["market"], "0x1"])
+            out["historicalStateAtBlock1"] = "served"
+        except ValueError:
+            out["historicalStateAtBlock1"] = "unavailable (pruned full node or method restricted) - not zero"
+        out["beacon"] = self._beacon_summary() if self.beacon else {"configured": False}
+        return out
+
+    def _bn(self, path):
+        from urllib.request import urlopen
+        with urlopen(self.beacon + path, timeout=4) as r:
+            st.require(r.status == 200, "beacon HTTP " + str(r.status))
+            return json.loads(r.read(1024 * 1024))
+
+    def _beacon_summary(self):
+        out = {"configured": True, "source": "local beacon node API"}
+        for k, p in (("syncing", "/eth/v1/node/syncing"), ("peers", "/eth/v1/node/peer_count"),
+                     ("finality", "/eth/v1/beacon/states/head/finality_checkpoints"),
+                     ("headHeader", "/eth/v1/beacon/headers/head")):
+            try:
+                out[k] = self._bn(p).get("data")
+            except Exception as exc:  # noqa: BLE001
+                out[k] = {"unavailable": type(exc).__name__}
+        return out
+
+    def validators(self, q):
+        if not self.beacon:
+            return {"available": False, "reason": "no local beacon node configured"}
+        ids = q.get("id", [])[:64]
+        if not ids:
+            raise ValueError("1..64 validator ids required")
+        for i in ids:
+            if not (INT.fullmatch(i) or re.fullmatch(r"^0x[0-9a-fA-F]{96}$", i)):
+                raise ValueError("validator ids must be indices or 48-byte pubkeys")
+        state = q.get("state", ["finalized"])[0]
+        if state not in ("head", "finalized", "justified") and not INT.fullmatch(state):
+            raise ValueError("bad state id")
+        data = self._bn(f"/eth/v1/beacon/states/{state}/validators?id=" + ",".join(ids))
+        return {"state": state, "validators": data.get("data"), "executionOptimistic": data.get("execution_optimistic"),
+                "finalized": data.get("finalized"), "note": "Balances in Gwei as reported by the local beacon node. "
+                "Rewards history comes from the R424 collector archive, not recomputed here."}
+
     # -------------------------------------------------------------- intents
     def intent(self, action, body):
         r, tag = self._reader("latest")
@@ -309,6 +367,10 @@ def make_handler(console):
                     return self._send(200, console.lease(int(p[1]), q))
                 if len(p) == 2 and p[0] == "account" and ADDR.fullmatch(p[1]):
                     return self._send(200, console.account(p[1].lower(), q))
+                if p == ["node"]:
+                    return self._send(200, console.node())
+                if p == ["validators"]:
+                    return self._send(200, console.validators(q))
                 if p == ["plan"]:
                     return self._send(200, console.plan(q))
                 if len(p) == 2 and p[0] == "block":
@@ -361,12 +423,13 @@ def main():
     p.add_argument("--mode", choices=("local", "public"), default="local")
     p.add_argument("--port", type=int, default=8790)
     p.add_argument("--state", type=Path)
+    p.add_argument("--beacon", help="local beacon API, e.g. http://127.0.0.1:25052")
     a = p.parse_args()
     from sse_chain_read import LocalRPC
     ask = LocalRPC(a.rpc).request
     manifest = st.load_manifest(a.manifest)
     st.verify_deployment(ask, manifest)
-    console = Console(ask, manifest, a.mode, a.state)
+    console = Console(ask, manifest, a.mode, a.state, a.beacon)
     # Public exposure happens only through the separate tunnel/reverse proxy,
     # which must point at a --mode public instance. Always bind loopback.
     ThreadingHTTPServer(("127.0.0.1", a.port), make_handler(console)).serve_forever()

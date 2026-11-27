@@ -199,3 +199,24 @@ $("pGo").onclick = async () => {
     loadMarket();
   } catch (e) { $("status").textContent = "Console unavailable: " + (e.message || e); }
 })();
+
+// ---------------------------------------------------------- node page
+$("nLoad").onclick = async () => {
+  try {
+    const j = await api("node");
+    const rows = ["latest", "safe", "finalized"].map((t) => ({ tag: t, number: j[t] && parseInt(j[t].number, 16), hash: j[t] && j[t].hash }));
+    let html = "<p>Client " + esc(JSON.stringify(j.client)) + " · EL peers " + esc(JSON.stringify(j.peerCount)) + " · syncing " + esc(JSON.stringify(j.syncing)) + "</p>" + table(rows, ["tag", "number", "hash"]);
+    html += "<p>Historical state at block 1: " + esc(j.historicalStateAtBlock1) + "</p>";
+    html += "<h4>Consensus layer</h4><pre>" + esc(JSON.stringify(j.beacon, null, 2)) + "</pre>";
+    show("nOut", html);
+  } catch (e) { fail("nOut", e); }
+};
+$("vLoad").onclick = async () => {
+  const ids = $("vIds").value.split(",").map((s) => s.trim()).filter(Boolean).map((s) => "id=" + encodeURIComponent(s)).join("&");
+  try {
+    const j = await api("validators?" + ids + "&state=" + $("vState").value);
+    if (j.available === false) { show("vOut", '<p class="warn">' + esc(j.reason) + "</p>"); return; }
+    const rows = (j.validators || []).map((v) => ({ index: v.index, status: v.status, balanceGwei: v.balance, effectiveGwei: v.validator.effective_balance, slashed: v.validator.slashed, activationEpoch: v.validator.activation_epoch, exitEpoch: v.validator.exit_epoch, pubkey: v.validator.pubkey }));
+    show("vOut", "<p class='note'>State " + esc(j.state) + ", finalized flag " + esc(j.finalized) + ". " + esc(j.note) + "</p>" + table(rows, ["index", "status", "balanceGwei", "effectiveGwei", "slashed", "activationEpoch", "exitEpoch", "pubkey"]));
+  } catch (e) { fail("vOut", e); }
+};

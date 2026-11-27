@@ -18,6 +18,7 @@
     <button data-tab="monitor">Monitor</button>
     <button data-tab="account">Account</button>
     <button data-tab="explorer">Explorer</button>
+    <button data-tab="node">Node / validator</button>
   </nav>
 </header>
 <main>
@@ -100,6 +101,15 @@
     <button id="pGo">Verify</button>
   </fieldset>
   <div id="eOut"></div>
+</section>
+<section id="node" class="tab" hidden>
+  <h2>Node and validator</h2>
+  <button id="nLoad">Refresh node status</button>
+  <div id="nOut"></div>
+  <label>Validator indices or public keys (comma separated) <input id="vIds"></label>
+  <label>State <select id="vState"><option>finalized</option><option>head</option></select></label>
+  <button id="vLoad">Load validators</button>
+  <div id="vOut"></div>
 </section>
 </main>
 <footer><p>Observations show source, block and finality. Signed reports authenticate origin, not physical SLA truth. No login: transactions are authorized by your own wallet.</p></footer>
