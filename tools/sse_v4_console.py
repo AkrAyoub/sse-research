@@ -327,6 +327,39 @@ class Console:
                 "blockRewards": blocks, "blocksUnavailable": len(latest.get("blockRewards", [])) - len(blocks),
                 "note": "Unavailable rewards are unknown, not zero. Values are beacon-API reports in Gwei."}
     # -------------------------------------------------------------- intents
+    def residual_preview(self, body):
+        """Unsigned typed data for two independently consenting EOA parties."""
+        lid, eid = body["leaseId"], body["epochId"]
+        st.require(type(lid) is int and lid > 0 and type(eid) is int and eid >= 0, "invalid epoch identity")
+        supplied = body["allocation"]
+        allocation = {}
+        for name, _ in abi.ALLOCATION_FIELDS:
+            v = supplied[name]
+            if isinstance(v, str):
+                st.require(re.fullmatch(r"[0-9]{1,78}", v), "invalid allocation integer")
+                v = int(v)
+            st.require(type(v) is int and 0 <= v < 2**256, "invalid allocation integer")
+            allocation[name] = v
+        r, tag = self._reader("finalized")
+        lease, epoch, science = r.lease(lid), r.market_epoch(lid, eid), r.scientific_epoch(lid, eid)
+        st.require(epoch["exists"] and not epoch["resolved"] and science["evidenceClosed"] and not science["residualAllocated"], "residual not eligible")
+        st.require(allocation["unresolvedAmount"] == science["unresolved"] and allocation["nonce"] == epoch["nonce"], "stale residual or nonce")
+        st.require(allocation["expiry"] > int(time.time()), "allocation expired")
+        domain = terms.domain_separator(terms.MARKET_NAME, st.CHAIN_ID, self.mods["market"])
+        digest = terms.allocation_digest(domain, lid, eid, epoch["requestHash"], allocation)
+        message = {"leaseId": str(lid), "epochId": str(eid), "requestHash": epoch["requestHash"],
+                   **{k: str(v) for k, v in allocation.items()}}
+        typed = {"primaryType": "ResidualAgreement",
+                 "types": {"EIP712Domain": [{"name": k, "type": t} for k,t in
+                           (("name","string"),("version","string"),("chainId","uint256"),("verifyingContract","address"))],
+                           "ResidualAgreement": [{"name": k,"type": t} for k,t in
+                           (("leaseId","uint256"),("epochId","uint256"),("requestHash","bytes32")) + abi.ALLOCATION_FIELDS]},
+                 "domain": {"name": terms.MARKET_NAME, "version": "1", "chainId": st.CHAIN_ID,
+                            "verifyingContract": self.mods["market"]}, "message": message}
+        return {"typedData": typed, "digest": "0x" + digest.hex(), "consumer": lease["consumer"],
+                "provider": lease["provider"], "allocation": allocation,
+                "note": "Bilateral consent allocates uncertainty; it does not prove SLA truth."}
+
     def intent(self, action, body):
         # Browser inputs carry monetary uint256 values as exact decimal strings.
         body = dict(body)
@@ -372,6 +405,19 @@ class Console:
             call = abi.registry_call(action)
         elif action in ("confirm", "advance"):
             call = abi.standby_call(action, body["leaseId"])
+        elif action == "resolveResidual":
+            preview = self.residual_preview(body)
+            from eth_account import Account
+            from eth_account.messages import encode_typed_data
+            msg = encode_typed_data(full_message=preview["typedData"])
+            signatures = []
+            for role in ("consumer", "provider"):
+                raw = body[role + "Signature"]
+                st.require(isinstance(raw, str) and re.fullmatch(r"0x[0-9a-fA-F]{130}", raw), "invalid signature")
+                sig = bytes.fromhex(raw[2:])
+                st.require(Account.recover_message(msg, signature=sig).lower() == preview[role].lower(), role + " signature mismatch")
+                signatures.append(sig)
+            call = abi.resolve_residual(body["leaseId"], body["epochId"], preview["allocation"], *signatures)
         elif action == "withdraw":
             call = abi.withdraw(body["module"])
         else:
@@ -645,6 +691,10 @@ def make_handler(console):
                     if n > MAX_JSON:
                         return self._send(413, {"error": "too large"})
                     return self._send(200, console.manifest(parts[2], json.loads(self.rfile.read(n) or b"{}")))
+                if parts == ["api", "residual-preview"]:
+                    if n > MAX_JSON:
+                        return self._send(413, {"error": "too large"})
+                    return self._send(200, console.residual_preview(json.loads(self.rfile.read(n) or b"{}")))
                 if parts == ["api", "terms-check"]:
                     if n > MAX_JSON:
                         return self._send(413, {"error": "too large"})
