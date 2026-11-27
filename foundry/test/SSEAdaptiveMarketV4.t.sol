@@ -71,11 +71,15 @@ contract SSEAdaptiveMarketV4Test is Test {
     }
 
     function request(uint16 seats, uint16 standbys) private returns (uint256 id) {
+        id = requestB(seats, standbys, 1);
+    }
+
+    function requestB(uint16 seats, uint16 standbys, uint16 b) private returns (uint256 id) {
         Board.RequestInput memory r = Board.RequestInput({
             profileHash: keccak256("profile"), policyHash: keccak256("policy"),
             artifactCommitment: keccak256("artifacts"), maxEpochFee: FEE,
             biddingClose: uint64(block.timestamp + 1 hours), fixedEpochs: EPOCHS, maxEpochs: EPOCHS,
-            seats: seats, standbys: standbys, faultTolerance: 1, perReportReward: REWARD});
+            seats: seats, standbys: standbys, faultTolerance: b, perReportReward: REWARD});
         vm.prank(consumer);
         id = board.createRequest(r);
         vm.prank(provider);
@@ -473,6 +477,38 @@ contract SSEAdaptiveMarketV4Test is Test {
         market.forceCloseIdle(id);
         assertEq(market.withdrawable(consumer), SERVICE);
         assertEq(totalReserved(), 0);
+        covered();
+    }
+
+    /// @dev Agents recompute termsHash from public board views (DRV-V4-PARITY anchor);
+    /// the logged value is compared with tools/sse_v4_terms.py by the owner.
+    function testTermsHashRecomputableFromPublicViews() public {
+        uint256 id = fund(true, false);
+        M.Lease memory l = market.lease(id);
+        bytes32 h = keccak256(abi.encode(block.chainid, address(market), id, l.bidIndex,
+            board.request(l.requestId), board.bidAt(l.requestId, l.bidIndex), terms(true, false)));
+        assertEq(h, l.termsHash);
+        emit log_named_bytes32("termsHash", h);
+    }
+
+    /// @dev Larger committee n=7, b=2, s=4 (gas report anchor for DRV-V4-GAS).
+    function testSevenSeatCommitteeQuorumFive() public {
+        for (uint256 i = MONITORS; i < 20; ++i) {
+            address m = mon(i);
+            vm.deal(m, 10 ether);
+            vm.prank(m);
+            registry.register{value: BOND}(1);
+        }
+        uint256 rid = requestB(7, 4, 2);
+        vm.prank(consumer);
+        uint256 id = market.awardAndFund{value: SERVICE + 7 * uint256(EPOCHS) * REWARD}(rid, 0, terms(true, false));
+        draw(id);
+        assertEq(uint8(market.lease(id).phase), uint8(M.Phase.Forming));
+        confirmAll(id);
+        market.activateCommittee(id);
+        assertEq(votes.committee(id).seats, 7);
+        assertEq(votes.committee(id).quorum, 5);
+        assertEq(votes.selected(id).length, 7);
         covered();
     }
 
