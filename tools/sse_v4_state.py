@@ -52,8 +52,10 @@ def atomic_write_json(path, obj):
     raw = (json.dumps(obj, sort_keys=True, indent=2) + "\n").encode()
     fd, tmp = tempfile.mkstemp(dir=str(path.parent), prefix=".tmp-")
     try:
-        os.write(fd, raw)
-        os.fsync(fd)
+        with os.fdopen(fd, "wb", closefd=False) as stream:
+            stream.write(raw)
+            stream.flush()
+            os.fsync(fd)
     finally:
         os.close(fd)
     os.replace(tmp, path)
@@ -216,10 +218,12 @@ class Reader:
         if l["monitorBudgetTransferred"] and l["phase"] in (3, 4):
             out["committee"] = self.committee(lid)
             out["members"] = self.members(lid)
-        for e in range(max(0, l["nextEpoch"] - 16), l["nextEpoch"]):
+        # The contract caps leases at 64 epochs. Include older open evidence.
+        require(0 <= l["nextEpoch"] <= 64, "invalid epoch count")
+        for e in range(l["nextEpoch"]):
             out["epochs"].append({"id": e, "market": self.market_epoch(lid, e), "science": self.scientific_epoch(lid, e),
                                   "votes": self.ledger_epoch(lid, e)})
-        out["epochsTruncated"] = l["nextEpoch"] > 16
+        out["epochsTruncated"] = False
         return out
 
 
