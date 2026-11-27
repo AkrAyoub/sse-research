@@ -20,7 +20,7 @@ from pathlib import Path
 READ=frozenset(("eth_chainId","eth_getBlockByNumber","eth_getTransactionByHash",
     "eth_getTransactionReceipt","eth_getCode","eth_call","eth_estimateGas",
     "eth_gasPrice","eth_getBalance","eth_getTransactionCount","eth_getLogs",
-    "eth_syncing","net_peerCount"))
+    "eth_syncing","net_peerCount","eth_blockNumber","eth_getBlockByHash","web3_clientVersion"))
 MAX_REQUEST=65536
 MAX_RESPONSE=131072
 
