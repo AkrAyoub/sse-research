@@ -40,5 +40,12 @@ standby + preconfirmed ledger → source task in planning/MASTER_TASK_CHECKLIST.
   pass 3–4 rows; (3) console accessibility pass (labels/focus order) review; (4) E7 deterministic-reference adapter design
   (D-07). Constraints unchanged.
 
+### 2026-11-27 S1 FINAL CHECKPOINT (owner closed implementation)
+- HEAD after this commit is the final S1 state; see HAND_BACK.md "Final state". Tests written, NOT executed: 43 Python, 39 Foundry.
+- Owner decisions: P-1 standby retainer REJECTED (D-12); Report2/Report3 PDFs stay untracked. OPEN: P-2 keeper bounty, P-3 slashing.
+- NEXT (new session only, after owner input): (1) read owner outputs of DEFERRED_RUNTIME_VALIDATION Stages 0–3 and fix failures in
+  source; (2) implement P-2/P-3 only if the owner approves; (3) earlier pass-4 suggestions (accessibility review, E7 design)
+  are optional. Constraints unchanged: source-only, V3 untouched, no push, `git -c core.autocrlf=true`, no interpreters for edits.
+
 ## Owner-only follow-up (preserved)
 Original Milestone4 rubric and earlier reports not retrieved; copy originals locally into handoff/references/ and reconcile. Live VM logs/evidence remain on hosts; collect sanitized copies later with owner. Do not import wallets, secrets or signer state. Owner to review new source and execute staged real VM tests.

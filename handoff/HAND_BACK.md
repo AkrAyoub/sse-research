@@ -1,4 +1,4 @@
-# HAND_BACK — session S1, 2026-11-27 (source-code-only), refreshed after pass 3
+# HAND_BACK — session S1, 2026-11-27 (source-code-only) — FINAL (implementation closed by owner request)
 
 **Honest summary:** nothing in this session was compiled, executed, tested, installed or deployed. All new work is
 source + unexecuted tests + static review. No VM, chain, wallet or key was touched. Branch `handoff/claude-code-2026-11-27`,
@@ -27,7 +27,9 @@ used sed/heredocs only. See logs/BUGS_AND_FIXES_LOG.md.
 | 189ad8d | One-entry-point setup orchestrator (plan first, per-step yes) over existing installers |
 | 184af44 | Pass-4 docs refresh |
 | 7770905 | Structured profile/policy/offer manifests; account balance/nonce/code and finalized history |
-| (this)  | Requirements traceability refresh |
+| 59f2ba7 | Requirements traceability refresh |
+| 5fbc802 | Owner decisions recorded: no standby retainer (D-12); report PDFs stay untracked |
+| (this)  | Final checkpoint: HAND_BACK and WORK_LOG closed |
 
 ## By status
 - **Existing live-verified (unchanged):** native chain31340 PoS; V2/V3 deployments; V3 experiments E1–E6, E8; V3 read-only
@@ -67,3 +69,11 @@ the finalized on-chain responseHash. Details: audits/SMART_CONTRACT_AUDIT.md, au
 ## Risks
 Unknown bytecode size/stack depth (SC-13/14); proposer-biasable entropy; Sybil via bonded addresses; valueless TEST ETH;
 hand-written ABI tables must match compiled ABIs (DRV-V4-ABI); console/agents never run in a browser or against a node yet.
+
+## Final state (2026-11-27, session closed by owner: "no more implementation needed now")
+- Branch `handoff/claude-code-2026-11-27`, local commits only, never pushed; V3 contracts, evidence and original reports untouched.
+- Untracked by owner decision: handoff/references/Report2.pdf, Report3.pdf (never commit).
+- Tests written, NOT executed: 43 Python, 39 Foundry. Nothing compiled, run, installed or deployed.
+- Open owner decisions: P-2 on-chain keeper bounty (current design: self-keeping, D-09), P-3 equivocation-only slashing.
+  P-1 standby retainer: rejected (D-12).
+- First owner action: planning/DEFERRED_RUNTIME_VALIDATION.md Stages 0–3; return outputs for a new source session.
