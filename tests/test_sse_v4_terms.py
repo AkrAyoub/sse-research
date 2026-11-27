@@ -41,6 +41,25 @@ class TermsTest(unittest.TestCase):
         with self.assertRaises(ValueError):
             t.vote_digest(d, 1, 0, Z, 0, Z, Z)
 
+    def test_residual_digest_matches_independent_typed_data_encoder(self):
+        from eth_account.messages import encode_typed_data
+        a = dict(unresolvedAmount=20, providerShare=7, consumerShare=13, nonce=0, expiry=1000)
+        fields = [("leaseId", "uint256"), ("epochId", "uint256"), ("requestHash", "bytes32")]
+        fields += [(k, "uint256") for k in a]
+        msg = encode_typed_data(
+            domain_data={"name": t.MARKET_NAME, "version": "1", "chainId": 31340, "verifyingContract": MARKET},
+            message_types={"ResidualAgreement": [{"name": k, "type": v} for k, v in fields]},
+            message_data=dict(leaseId=1, epochId=0, requestHash=Z, **a))
+        from sse_challenge import keccak256
+        expected = keccak256(b"\x19" + msg.version + msg.header + msg.body)
+        domain = t.domain_separator(t.MARKET_NAME, 31340, MARKET)
+        self.assertEqual(t.allocation_digest(domain, 1, 0, Z, a), expected)
+        for bad in (dict(a, consumerShare=12), dict(a, nonce=-1), dict(a, providerShare=True)):
+            with self.assertRaises(ValueError):
+                t.allocation_digest(domain, 1, 0, Z, bad)
+        with self.assertRaises(ValueError):
+            t.allocation_digest(domain, 0, 0, Z, a)
+
     def test_domains_differ(self):
         self.assertNotEqual(t.domain_separator(t.MARKET_NAME, 31340, MARKET),
                             t.domain_separator(t.LEDGER_NAME, 31340, MARKET))
