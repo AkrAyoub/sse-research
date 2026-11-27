@@ -12,12 +12,12 @@ Only owner-observed results count as runtime evidence.
 | F02 GitHub handoff | Complete | S1 remote matched exact SHA |
 | F03 Isolated checkout | Passed | Owner verified exact SHA and clean worktree |
 | F04 Dependency/toolchain | Passed | R429 and S1 identical pins; forge-std f3dae6e6ee381f25eb6a246f7da9b85c91a68219; OpenZeppelin cab19933c33c2ad1d4c7a84864a3601dddfd16f3; Forge 1.9.0, Python 3.12.3, Solc 0.8.24 |
-| F05 Solidity compile | Failed on 68c6f4d | New stack-depth location at market line 239; DEV-004 source repair committed |
-| F06 Compile/size repairs | Active | DEV-002/003 below; EIP-170/3860 measurements not available |
-| F07 Full Foundry regression | Pending | After successful compilation |
-| F08 Focused V4 tests/fuzz | Pending | Includes two new DEV-002 tests |
+| F05 Solidity compile | Passed at cabaa2b | Owner build --sizes exit 0, unchanged compiler settings; revalidate new checkpoint |
+| F06 Compile/size repairs | Partial | Build passed; explicit bytecode-size test blocked by ledger constructor |
+| F07 Full Foundry regression | Failed at cabaa2b | 275 passed, 2 failed; market suite setup prevented execution |
+| F08 Focused V4 tests/fuzz | Partial | 22 passed, 2 failed; registry reservation fuzz and ordered sample fuzz 1024 runs each |
 | F09 Python regression | V4 subset passed; full historical suite pending | Owner VM4707 at 68c6f4d: 46 V4 + 4 setup tests passed, zero failures |
-| F10 ABI/EIP-712 parity | Partial | Independent Python residual digest test passed; compiled ABI checker and Solidity parity blocked by build |
+| F10 ABI/EIP-712 parity | Partial | Compiled ABI checker reported ledger Withdrawal name mismatch only; correction unverified; digest parity pending |
 | F11 Security/science review | Active; mandatory pre-use gate | Static remediation pass 1 committed; open findings in audit report; no certification |
 | F12 Isolated deployment/lifecycle | Pending | Disposable keys, isolated RPC |
 | F13 Consumer marketplace/UI | Source, unvalidated | Owner-run |
@@ -57,3 +57,11 @@ Owner decisions unchanged: P-1 standby retainer rejected; P-2 keeper bounty and 
 - Compiled ABI and focused Foundry tests skipped because build failed. JavaScript syntax check not run because Node unavailable.
 - Logs: ~/sse-v4-validation-logs/68c6f4d0029723c6fa055d6378e7e1d62136f689.
 - Audit passes 2–4 added execution recovery, residual settlement backend/browser, and offline ABI checker. No live deployment. All unresolved audit blockers remain in force.
+
+## Owner validation at cabaa2b0a842e1403b20c3ab5a0e51c64b2067d3
+- Full Solidity build --sizes exit 0. DEV-004 compile blocker closed at tested SHA. DEV-002 registry regression tests and 1024-run reservation fuzz passed. DEV-003 residual lifecycle tests still blocked by market setup.
+- Focused Foundry: 22 passed, 2 failed; full Foundry: 275 passed, 2 failed, 0 skipped. Both failures are StringTooLong in ledger constructor; market lifecycle suite did not execute. Do not interpret denominator as full intended coverage.
+- Compiled ABI exit 1: ledger Withdrawal parameter name mismatch. Other checker assertions passed within its stated scope. Logs ~/sse-v4-validation-logs/cabaa2b0a842e1403b20c3ab5a0e51c64b2067d3.
+- DEV-005: corrected undeployed ledger domain to SSEAdaptiveCommitteeVotesV4 in Solidity (4f19aeb) and Python (025a4db); added regression fixture (90d54f8). Old candidate domain signatures invalid under new domain. No V3 change.
+- DEV-006: same Solidity commit normalizes Withdrawal indexed parameter name to account. Event topic/types/values unchanged. ABI checker not weakened.
+- Next: rerun build, ABI, Python V4 tests, focused Foundry with 1024 fuzz runs and full Foundry. Inspect full size report and retain lint warnings for triage. No deployment authorization.
