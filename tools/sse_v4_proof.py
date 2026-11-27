@@ -30,7 +30,7 @@ def rlp_decode(data):
 def _len(data, start, n):
     if start + n > len(data):
         raise ProofError("truncated RLP length")
-    if n > 1 and data[start] == 0:
+    if n == 0 or data[start] == 0:
         raise ProofError("non-canonical RLP length")
     return int.from_bytes(data[start:start + n], "big")
 
@@ -110,6 +110,8 @@ def _hp_decode(path):
     if flag > 3:
         raise ProofError("bad hex-prefix flag")
     leaf = flag >= 2
+    if not flag & 1 and (len(n) < 2 or n[1] != 0):
+        raise ProofError("invalid even hex-prefix padding")
     rest = n[1:] if flag & 1 else n[2:]
     return rest, leaf
 
@@ -123,7 +125,7 @@ def verify_mpt(root, key, proof):
     path, pos, inline = [], 0, None
     if expected == EMPTY_TRIE_ROOT and not proof:
         return None, path
-    while True:
+    for _ in range(65):
         if inline is not None:
             node, raw = inline, rlp_encode(inline)
             inline = None
@@ -149,6 +151,8 @@ def verify_mpt(root, key, proof):
             if target[pos:pos + len(rest)] != rest:
                 return None, path  # divergent path: proven absent
             pos += len(rest)
+            if not leaf and not rest:
+                raise ProofError("empty extension")
             if leaf:
                 if pos != len(target):
                     raise ProofError("leaf before end of key")
@@ -157,11 +161,14 @@ def verify_mpt(root, key, proof):
         else:
             raise ProofError("invalid node arity")
         if isinstance(child, list):
-            inline = child  # embedded node (< 32 bytes)
+            if len(rlp_encode(child)) >= 32:
+                raise ProofError("oversized embedded node")
+            inline = child
         elif len(child) == 32:
             expected = child
         else:
             raise ProofError("invalid child reference")
+    raise ProofError("proof exceeds secure trie depth")
 
 
 def _hx(s):
@@ -180,6 +187,8 @@ def verify_get_proof(state_root_hex, response):
     """Verify an eth_getProof response. Returns a report with per-item status."""
     state_root = _hx(state_root_hex)
     address = _hx(response["address"])
+    if len(state_root) != 32 or len(address) != 20:
+        raise ProofError("invalid state root or account address length")
     value, apath = verify_mpt(state_root, address, [_hx(p) for p in response["accountProof"]])
     report = {"address": response["address"].lower(), "stateRoot": state_root_hex, "accountPath": apath,
               "storage": []}
