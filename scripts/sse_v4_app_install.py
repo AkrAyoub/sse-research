@@ -185,8 +185,8 @@ def install(roles, publish, rpc, python, input_fn=input, prepare_only=False):
         (UNITS / name).write_text(text)
     subprocess.run(["systemctl", "--user", "daemon-reload"], check=True)
     for name in units:
-        if name == "sse-v4-agent.service" and prepare_only:
-            print("Agent unit prepared, not enabled or started; use interactive signer or verified encrypted credential.")
+        if name in ("sse-v4-agent.service", "sse-v4-provider-outputs.service") and prepare_only:
+            print(name + " prepared, not started; provider output requires agent deployment identity.")
             continue
         subprocess.run(["systemctl", "--user", "enable", "--now", name], check=True)
     print("Persistence across logout requires: loginctl enable-linger $USER (owner decision, needs sudo).")
