@@ -210,6 +210,22 @@ class ConsoleTest(unittest.TestCase):
         with self.assertRaises(ValueError):  # StateError is a ValueError; no network request is made
             loc.output_fetch(body)
 
+    def test_rewards_summary_keeps_unavailable_unknown(self):
+        import json as _json
+        import time as _time
+        d = tempfile.mkdtemp()
+        latest = {"headSlot": 99, "finalizedEpoch": "2", "gapBeforeStart": False, "observedUnixNs": _time.time_ns(),
+                  "attestationRewards": [{"epoch": "1", "validator": "3", "netGwei": 5},
+                                         {"epoch": "2", "validator": "3", "netGwei": -2},
+                                         {"epoch": "0", "available": False, "httpStatus": 404}],
+                  "blockRewards": [{"slot": "98", "proposer": "3", "totalGwei": "7", "apiFinalized": False},
+                                   {"slot": "99", "available": False, "httpStatus": 404}]}
+        Path(d, "latest.json").write_text(_json.dumps(latest))
+        r = console.Console(lambda m, p: None, {"modules": MODS}, "public", rewards_dir=d).rewards()
+        self.assertEqual(r["attestationByValidator"], [{"validator": "3", "epochs": 2, "netGwei": 3}])
+        self.assertEqual((r["epochsUnavailable"], r["blocksUnavailable"], r["stale"]), (["0"], 1, False))
+        self.assertFalse(console.Console(lambda m, p: None, {"modules": MODS}, "public").rewards()["available"])
+
     def test_unknown_intent_rejected(self):
         class FakeReader:
             pass

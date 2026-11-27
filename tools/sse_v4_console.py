@@ -42,6 +42,7 @@ PROVIDER_URL = re.compile(r"^(https://[A-Za-z0-9.-]{1,253}(:[0-9]{2,5})?(/[A-Za-
 ZERO32 = "0x" + "00" * 32
 MAX_OUTPUT = 4 * 1024 * 1024
 OUTPUT_AUTH_SECONDS = 300
+STALE_REWARDS_SECONDS = 300  # collector timer runs every ~24 s (scripts/sse_install_native_reward_timer.py)
 STATIC = Path(__file__).resolve().parent / "sse_v4_console_static"
 
 
@@ -60,11 +61,12 @@ def _int(q, name, default=None, lo=0, hi=2 ** 63):
 
 
 class Console:
-    def __init__(self, ask, manifest, mode, state_dir=None, beacon=None):
+    def __init__(self, ask, manifest, mode, state_dir=None, beacon=None, rewards_dir=None):
         self.ask, self.manifest, self.mode = ask, manifest, mode
         if beacon is not None and not re.fullmatch(r"http://127\.0\.0\.1:[0-9]{2,5}", beacon):
             raise ValueError("beacon API must be a loopback URL")
         self.beacon = beacon
+        self.rewards_dir = rewards_dir
         self.mods = manifest["modules"]
         self.uploads = st.private_dir(Path(state_dir) / "artifacts") if mode == "local" and state_dir else None
 
@@ -256,6 +258,33 @@ class Console:
                 "finalized": data.get("finalized"), "note": "Balances in Gwei as reported by the local beacon node. "
                 "Rewards history comes from the R424 collector archive, not recomputed here."}
 
+    def rewards(self):
+        """Summary written by the historically execution-tested R424/R425 native
+        reward collector timer (tools/sse_native_reward_collector.py --tick).
+        Read only; this console never queries reward endpoints itself."""
+        if not self.rewards_dir:
+            return {"available": False, "reason": "no reward collector directory configured"}
+        latest = st.read_json(Path(self.rewards_dir) / "latest.json")
+        if latest is None:
+            return {"available": False, "reason": "collector has not written latest.json yet"}
+        per = {}
+        unavailable = []
+        for r in latest.get("attestationRewards", []):
+            if "validator" not in r:
+                unavailable.append(r.get("epoch"))
+                continue
+            v = per.setdefault(str(r["validator"]), {"validator": str(r["validator"]), "epochs": 0, "netGwei": 0})
+            v["epochs"] += 1
+            v["netGwei"] += int(r["netGwei"])
+        blocks = [b for b in latest.get("blockRewards", []) if "totalGwei" in b]
+        age = int(time.time()) - int(latest.get("observedUnixNs", 0)) // 10 ** 9
+        return {"available": True, "source": "local native reward collector (beacon API, read only)",
+                "observedAgeSeconds": age, "stale": age > STALE_REWARDS_SECONDS, "headSlot": latest.get("headSlot"),
+                "finalizedEpoch": latest.get("finalizedEpoch"), "gapBeforeStart": latest.get("gapBeforeStart"),
+                "attestationByValidator": sorted(per.values(), key=lambda v: int(v["validator"])),
+                "epochsUnavailable": unavailable,
+                "blockRewards": blocks, "blocksUnavailable": len(latest.get("blockRewards", [])) - len(blocks),
+                "note": "Unavailable rewards are unknown, not zero. Values are beacon-API reports in Gwei."}
     # -------------------------------------------------------------- intents
     def intent(self, action, body):
         r, tag = self._reader("latest")
@@ -423,6 +452,8 @@ def make_handler(console):
                     return self._send(200, console.account(p[1].lower(), q))
                 if p == ["node"]:
                     return self._send(200, console.node())
+                if p == ["rewards"]:
+                    return self._send(200, console.rewards())
                 if p == ["validators"]:
                     return self._send(200, console.validators(q))
                 if p == ["output-message"]:
@@ -497,12 +528,13 @@ def main():
     p.add_argument("--port", type=int, default=8790)
     p.add_argument("--state", type=Path)
     p.add_argument("--beacon", help="local beacon API, e.g. http://127.0.0.1:25052")
+    p.add_argument("--rewards-dir", help="native reward collector output, e.g. ~/.local/share/sse-native-rewards")
     a = p.parse_args()
     from sse_chain_read import LocalRPC
     ask = LocalRPC(a.rpc).request
     manifest = st.load_manifest(a.manifest)
     st.verify_deployment(ask, manifest)
-    console = Console(ask, manifest, a.mode, a.state, a.beacon)
+    console = Console(ask, manifest, a.mode, a.state, a.beacon, a.rewards_dir)
     # Public exposure happens only through the separate tunnel/reverse proxy,
     # which must point at a --mode public instance. Always bind loopback.
     ThreadingHTTPServer(("127.0.0.1", a.port), make_handler(console)).serve_forever()

@@ -91,3 +91,7 @@ Public console: download button refuses, verify works. Cross-origin POST (e.g. `
 DRV-AGENT-V4-TERMS Provider agent with an EMPTY leaseTerms policy: after a consumer EOA funds a lease whose offerHash is
 approved, the agent accepts (decoded calldata reproduced termsHash). With a funding call routed through a contract wallet,
 the agent must NOT accept until the owner adds leaseTerms.
+DRV-REWARDS-V4 With the R424 reward timer running (scripts/sse_install_native_reward_timer.py, historically
+execution-tested), start the console with `--rewards-dir ~/.local/share/sse-native-rewards`: Node tab → "Load reward
+summary" shows per-validator netGwei equal to the sum over `latest.json` attestationRewards, unavailable epochs listed as
+unavailable (never as 0), and "STALE" after stopping the timer for >5 minutes.

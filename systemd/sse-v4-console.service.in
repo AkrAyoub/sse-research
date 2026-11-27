@@ -5,13 +5,14 @@ After=network-online.target
 
 [Service]
 Type=simple
-ExecStart=@PYTHON@ @REPO@/tools/sse_v4_console.py --manifest @MANIFEST@ --rpc @RPC@ --mode @MODE@ --port @PORT@ --state @STATE@ --beacon @BEACON@
+ExecStart=@PYTHON@ @REPO@/tools/sse_v4_console.py --manifest @MANIFEST@ --rpc @RPC@ --mode @MODE@ --port @PORT@ --state @STATE@ --beacon @BEACON@ --rewards-dir @REWARDS@
 Restart=on-failure
 RestartSec=10
 NoNewPrivileges=yes
 PrivateTmp=yes
 ProtectSystem=strict
 ReadWritePaths=@STATE@
+ReadOnlyPaths=-@REWARDS@
 UMask=0077
 
 [Install]

@@ -250,3 +250,18 @@ $("oVerify").onclick = async () => {
     showOutput(await api("output-verify", { leaseId: Number($("lId").value), epochId: Number($("oEpoch").value), output }));
   } catch (e) { fail("oOut", e); }
 };
+
+// ------------------------------------------------ native reward summary
+$("rLoad").onclick = async () => {
+  try {
+    const j = await api("rewards");
+    if (j.available === false) { show("rOut", '<p class="warn">' + esc(j.reason) + "</p>"); return; }
+    let html = '<p class="note">' + esc(j.source) + "; observed " + esc(j.observedAgeSeconds) + " s ago" + (j.stale ? ' <span class="err">(STALE: collector may be stopped)</span>' : "") +
+      "; head slot " + esc(j.headSlot) + ", finalized epoch " + esc(j.finalizedEpoch) + (j.gapBeforeStart ? "; gap before this sample (some slots not observed)" : "") + ". " + esc(j.note) + "</p>";
+    html += "<h4>Attestation rewards over the sampled epochs</h4>" + table(j.attestationByValidator, ["validator", "epochs", "netGwei"]);
+    if (j.epochsUnavailable.length) html += '<p class="warn">Epochs with unavailable attestation rewards: ' + esc(j.epochsUnavailable.join(", ")) + "</p>";
+    html += "<h4>Recent block rewards</h4>" + table(j.blockRewards, ["slot", "proposer", "totalGwei", "apiFinalized"]);
+    if (j.blocksUnavailable) html += '<p class="note">' + esc(j.blocksUnavailable) + " recent slots had no reward data (empty slot or not served).</p>";
+    show("rOut", html);
+  } catch (e) { fail("rOut", e); }
+};

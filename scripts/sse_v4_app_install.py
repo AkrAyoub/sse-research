@@ -157,6 +157,7 @@ def install(roles, publish, rpc, python, input_fn=input):
         with os.fdopen(fd, "w") as fh:
             json.dump(pol, fh, indent=2)
     common = dict(PYTHON=python, REPO=REPO, MANIFEST=MANIFEST, RPC=rpc, STATE=STATE, POLICY=pol_path,
+                  REWARDS=str(Path.home() / ".local/share/sse-native-rewards"),  # R424 collector output
                   BEACON="http://127.0.0.1:25052")  # local BN default (R358 layout); unreachable => "unavailable"
     units = {"sse-v4-agent.service": render_unit("sse-v4-agent.service.in", **common),
              "sse-v4-console.service": render_unit("sse-v4-console.service.in", MODE="local", PORT=8790, **common)}
