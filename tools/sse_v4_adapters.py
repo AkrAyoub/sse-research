@@ -105,6 +105,7 @@ def make_prober(policy, reader_factory, state_dir):
     cfg = policy.get("monitor", {})
     endpoints = {k.lower(): v for k, v in cfg.get("providerEndpoints", {}).items()}
     services = {k.lower(): v for k, v in cfg.get("services", {}).items()}
+    policies = {k.lower(): v for k, v in cfg.get("approvedPolicies", {}).items()}
     evdir = st.private_dir(Path(state_dir) / "evidence")
     me = policy["wallet"]
 
@@ -119,12 +120,15 @@ def make_prober(policy, reader_factory, state_dir):
                 done = evdir / f"{lid}-{e['id']}.json"
                 if not v["exists"] or v["monitoringSealed"] or now > v["monitoringClose"]:
                     continue
+                approved = policies.get(l["policyHash"])
+                policy_ok = isinstance(approved, dict) and response_hash(approved) == l["policyHash"] and approved.get("probe") == "SHA256_CHAIN_8192"
                 if done.exists():
                     # Durable evidence survives crash or gas-cap refusal.
                     record = st.read_json(done)
                     st.require(record["leaseId"] == lid and record["epochId"] == e["id"] and
                                record["monitor"] == me, "stored evidence context mismatch")
-                    if record["verdict"] != "inconclusive":
+                    if policy_ok and record["verdict"] != "inconclusive" and (record["verdict"] != "qualified_failure" or
+                            (approved.get("failureEvidence") == "conditional-quorum" and l["conditionalQuorumPolicy"] is True)):
                         results.append({"leaseId": lid, "epochId": e["id"], "verdict": record["verdict"],
                                         "reason": record.get("reason"),
                                         "evidenceHash": "0x" + keccak256(canonical(record)).hex()})
@@ -134,9 +138,12 @@ def make_prober(policy, reader_factory, state_dir):
                 ep = endpoints.get(l["endpointHash"])
                 service = services.get(l["profileHash"])
                 record = {"leaseId": lid, "epochId": e["id"], "observedAt": now, "monitor": me,
-                          "responseAuthenticated": v["responseAuthenticated"], "service": service}
+                          "responseAuthenticated": v["responseAuthenticated"], "service": service,
+                          "policyHash": l["policyHash"], "requestHash": v["requestHash"]}
                 verdict, reason = "inconclusive", None
-                if service != "SHA256_CHAIN_8192" or ep is None or endpoint_hash(ep["url"]) != l["endpointHash"]:
+                if not policy_ok:
+                    reason = "committed monitoring policy not owner-approved"
+                elif service != "SHA256_CHAIN_8192" or ep is None or endpoint_hash(ep["url"]) != l["endpointHash"]:
                     reason = "unsupported service or unverified endpoint"
                 elif not v["responseAuthenticated"]:
                     reason = "no authenticated response (not proof of violation)"
@@ -149,14 +156,17 @@ def make_prober(policy, reader_factory, state_dir):
                         record["latencyMs"] = round((time.perf_counter() - t0) * 1000, 3)
                         fetched = response_hash(out)
                         expected = compute_result(lid, e["id"], v["requestHash"])
-                        record.update(fetchedResponseHash=fetched, onchainResponseHash=v["responseHash"])
+                        record.update(fetchedResponseHash=fetched, onchainResponseHash=v["responseHash"],
+                                      observedOutput=out, expectedOutput=expected)
                         if fetched != v["responseHash"]:
                             reason = "fetched output does not match signed response hash"
                         elif out == expected:
                             verdict = "success"
-                        else:
+                        elif approved.get("failureEvidence") == "conditional-quorum" and l["conditionalQuorumPolicy"] is True:
                             verdict = "qualified_failure"
                             reason = "signed output differs from deterministic recomputation"
+                        else:
+                            reason = "signed wrong result, but negative evidence policy not enabled"
                     except Exception as exc:  # noqa: BLE001 - network outcome is uncertainty
                         reason = "probe error: " + type(exc).__name__
                 record.update(verdict=verdict, reason=reason)
