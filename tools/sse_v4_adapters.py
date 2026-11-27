@@ -27,7 +27,7 @@ import time
 import ssl
 from pathlib import Path
 from urllib.parse import urlsplit
-from urllib.request import Request, urlopen
+from urllib.request import Request, build_opener, HTTPRedirectHandler, HTTPSHandler
 
 import sse_v4_state as st
 from compute_workload import compute_result
@@ -58,11 +58,17 @@ def _check_url(url, allow_http_local=False):
         st.require(u.scheme == "https", "https required")
 
 
+class NoRedirect(HTTPRedirectHandler):
+    def redirect_request(self, req, fp, code, msg, headers, newurl):
+        raise st.StateError("endpoint redirect refused")
+
+
 def _post(url, body, ca_file=None, timeout=8, allow_http_local=False):
     _check_url(url, allow_http_local)
     ctx = ssl.create_default_context(cafile=ca_file) if url.startswith("https") else None
     req = Request(url, data=canonical(body), headers={"Content-Type": "application/json"}, method="POST")
-    with urlopen(req, timeout=timeout, context=ctx) as r:
+    opener = build_opener(NoRedirect(), HTTPSHandler(context=ctx))
+    with opener.open(req, timeout=timeout) as r:
         st.require(r.status == 200, "HTTP status " + str(r.status))
         data = r.read(MAX_BODY + 1)
     st.require(len(data) <= MAX_BODY, "response too large")
@@ -111,7 +117,17 @@ def make_prober(policy, reader_factory, state_dir):
             for e in b["epochs"]:
                 v = e["votes"]
                 done = evdir / f"{lid}-{e['id']}.json"
-                if done.exists() or not v["exists"] or v["monitoringSealed"] or now > v["monitoringClose"]:
+                if not v["exists"] or v["monitoringSealed"] or now > v["monitoringClose"]:
+                    continue
+                if done.exists():
+                    # Durable evidence survives crash or gas-cap refusal.
+                    record = st.read_json(done)
+                    st.require(record["leaseId"] == lid and record["epochId"] == e["id"] and
+                               record["monitor"] == me, "stored evidence context mismatch")
+                    if record["verdict"] != "inconclusive":
+                        results.append({"leaseId": lid, "epochId": e["id"], "verdict": record["verdict"],
+                                        "reason": record.get("reason"),
+                                        "evidenceHash": "0x" + keccak256(canonical(record)).hex()})
                     continue
                 if not v["responseAuthenticated"] and now <= v["responseDeadline"]:
                     continue  # wait for the response window
