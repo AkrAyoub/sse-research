@@ -39,6 +39,8 @@ async function sendWithWallet(intent, el) {
     try {
       const chain = await window.ethereum.request({ method: "eth_chainId" });
       if (parseInt(chain, 16) !== intent.chainId) throw new Error("wallet is on the wrong chain");
+      const genesis = await window.ethereum.request({ method: "eth_getBlockByNumber", params: ["0x0", false] });
+      if (!genesis || genesis.hash.toLowerCase() !== "0x5f7cbcd4f1ddfbbedbdd2b180b83d9eff49d4b7263643858d7be2e9c243936bf") throw new Error("wallet genesis does not match the original research chain");
       const [from] = await window.ethereum.request({ method: "eth_requestAccounts" });
       const h = await window.ethereum.request({ method: "eth_sendTransaction", params: [{ from, to: intent.to, data: intent.data, value: intent.value }] });
       box.innerHTML += "<p>Submitted " + esc(h) + ". Pending until included and finalized; check the Explorer tab.</p>";
