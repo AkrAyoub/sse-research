@@ -33,13 +33,17 @@ class TermsTest(unittest.TestCase):
         with self.assertRaises(ValueError):
             t.terms_hash(31340, MARKET, 1, 1, REQ, BID, TERMS)
 
-    def test_vote_digest_zeroes_response_for_failure(self):
+    def test_vote_digest_binds_response_for_both_verdicts(self):
         d = t.domain_separator(t.LEDGER_NAME, 31340, MARKET)
-        a = t.vote_digest(d, 1, 0, Z, 2, Z, Z)
-        b = t.vote_digest(d, 1, 0, Z, 2, "0x" + "22" * 32, Z)
-        self.assertEqual(a, b)
+        r1, r2 = "0x" + "22"*32, "0x" + "33"*32
+        for outcome in (1, 2):
+            a = t.vote_digest(d, 1, 0, Z, outcome, r1, Z)
+            b = t.vote_digest(d, 1, 0, Z, outcome, r2, Z)
+            self.assertNotEqual(a, b)
+            with self.assertRaises(ValueError):
+                t.vote_digest(d, 1, 0, Z, outcome, Z, Z)
         with self.assertRaises(ValueError):
-            t.vote_digest(d, 1, 0, Z, 0, Z, Z)
+            t.vote_digest(d, 1, 0, Z, 0, r1, Z)
 
     def test_residual_digest_matches_independent_typed_data_encoder(self):
         from eth_account.messages import encode_typed_data
