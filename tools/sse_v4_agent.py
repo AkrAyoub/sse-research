@@ -241,7 +241,7 @@ def provider_response_actions(jobs, manifest, sender, snapshot, now):
         e = next((e for e in b["epochs"] if e["id"] == j["epochId"]), None)
         if not e or e["market"]["requestHash"] != j["requestHash"] or e["votes"]["responseAuthenticated"] or now > e["votes"]["responseDeadline"]:
             continue
-        if j.get("state") == "DONE" and j.get("responseHash"):
+        if j.get("state") == "DONE" and j.get("responseHash") and j.get("resourceObservation"):
             d = terms.response_digest(domain, j["leaseId"], j["epochId"], j["requestHash"], j["responseHash"])
             out.append(_act("market", abi.authenticate_response(j["leaseId"], j["epochId"], j["responseHash"],
                                                                  sender.sign_digest(d)),
@@ -409,12 +409,26 @@ class Agent:
                 b["leaseId"] = lid
                 b["termsHashRecomputed"] = verify_terms(b, self.manifest["modules"]["market"], st.CHAIN_ID, lt)
             acts, new_jobs = plan_provider(snap, self.policy, now, jobs)
+            pending_accept = False
+            if self.sender:
+                # A pending acceptance may not yet appear in finalized views.
+                # Even finalized success newer than this snapshot is reserved.
+                selector = abi.accept_lease(1, "0x" + "11"*32)[1][:10]
+                pending_accept = any(
+                    e["target"] == self.manifest["modules"]["market"]
+                    and e["calldata"].startswith(selector)
+                    and (not e.get("terminal") or
+                         (e.get("status") == "FINALIZED_SUCCESS" and
+                          e.get("includedHeight", 0) > height))
+                    for e in self.sender.j.entries() if e["sender"] == self.policy["wallet"])
+                if pending_accept:
+                    acts, new_jobs = [], []
             actions += acts
             for j in new_jobs:
                 jobs[j["jobId"]] = dict(j, state="QUEUED", queuedAt=now)
             if persist:
                 st.atomic_write_json(self.jobs_path, jobs)  # persist BEFORE any execution
-            if self.job_runner and persist:
+            if self.job_runner and persist and not pending_accept:
                 for jid, j in jobs.items():
                     if j["state"] == "QUEUED":
                         b = snap["leases"].get(j["leaseId"])
