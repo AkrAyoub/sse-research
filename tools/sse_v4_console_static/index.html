@@ -112,6 +112,17 @@
     <button id="oVerify">Verify pasted output</button>
     <div id="oOut"></div>
   </fieldset>
+  <fieldset>
+    <legend>Bilateral residual consent (EOA wallets)</legend>
+    <p class="note">Only after finalized evidence closure. Both parties must review the exact same agreement and independently sign. This distributes unresolved funds by consent, not by a finding of SLA truth.</p>
+    <label>Agreement JSON <textarea id="resAgreement" rows="9" placeholder='{"leaseId":1,"epochId":0,"allocation":{"unresolvedAmount":"100","providerShare":"50","consumerShare":"50","nonce":"0","expiry":"UNIX_SECONDS"}}'></textarea></label>
+    <button id="resPreview">Validate agreement</button>
+    <button id="resSign">Review and sign as my party</button>
+    <label>Consumer signature <textarea id="resConsumer" rows="3"></textarea></label>
+    <label>Provider signature <textarea id="resProvider" rows="3"></textarea></label>
+    <button id="resRelay">Verify both signatures and prepare relay</button>
+    <div id="resOut" aria-live="polite"></div>
+  </fieldset>
 </section>
 <section id="provider" class="tab" hidden>
   <h2>Bid on a request</h2>
