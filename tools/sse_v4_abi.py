@@ -204,6 +204,23 @@ def submit_ack(lease_id, epoch_id, signature):
         (lease_id, epoch_id, bytes(signature))), 0
 
 
+ALLOCATION_FIELDS = (("unresolvedAmount", "uint256"), ("providerShare", "uint256"),
+                     ("consumerShare", "uint256"), ("nonce", "uint256"), ("expiry", "uint256"))
+
+
+def resolve_residual(lease_id, epoch_id, allocation, consumer_signature, provider_signature):
+    t = tuple_type(ALLOCATION_FIELDS)
+    values = as_tuple(ALLOCATION_FIELDS, allocation)
+    if lease_id <= 0 or values[0] == 0 or values[1] + values[2] != values[0]:
+        raise ValueError("invalid residual allocation")
+    if any(not isinstance(sig, (bytes, bytearray)) or len(sig) != 65
+           for sig in (consumer_signature, provider_signature)):
+        raise ValueError("two 65-byte EOA signatures required")
+    return "market", calldata("resolveResidual(uint256,uint256," + t + ",bytes,bytes)",
+        ("uint256", "uint256", t, "bytes", "bytes"),
+        (lease_id, epoch_id, values, bytes(consumer_signature), bytes(provider_signature))), 0
+
+
 def withdraw(module):
     if module not in ("market", "registry", "ledger"):
         raise ValueError("module has no withdraw")
