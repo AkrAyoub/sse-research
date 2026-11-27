@@ -35,6 +35,7 @@ async function sendWithWallet(intent, el) {
   const btn = document.createElement("button");
   btn.textContent = "Review and send with my wallet";
   btn.onclick = async () => {
+    btn.disabled = true;
     try {
       const chain = await window.ethereum.request({ method: "eth_chainId" });
       if (parseInt(chain, 16) !== intent.chainId) throw new Error("wallet is on the wrong chain");
@@ -59,7 +60,7 @@ async function loadMarket() {
     const s = $("mStatus").value;
     const j = await api("requests?offset=" + mOffset + "&limit=20" + (s ? "&status=" + s : ""));
     show("mList", meta(j) + "<p>" + j.total + " requests total.</p>" + table(j.rows, ["id", "statusName", "consumer", "maxEpochFee", "fixedEpochs", "maxEpochs", "seats", "standbys", "faultTolerance", "perReportReward", "bidCount", "profileHash"]));
-    $("mList").querySelectorAll("tbody tr").forEach((tr, i) => { tr.tabIndex = 0; tr.onclick = () => loadRequest(j.rows[i].id); });
+    $("mList").querySelectorAll("tbody tr").forEach((tr, i) => { tr.tabIndex = 0; tr.onclick = () => loadRequest(j.rows[i].id); tr.onkeydown = (ev) => { if (ev.key === "Enter" || ev.key === " ") { ev.preventDefault(); loadRequest(j.rows[i].id); } }; });
   } catch (e) { fail("mList", e); }
 }
 let rOffset = 0;
@@ -122,9 +123,9 @@ $("rForm").onsubmit = async (ev) => {
   const n = (k) => parseInt(f[k], 10);
   const body = {
     profileHash: f.profileHash, policyHash: f.policyHash, artifactCommitment: f.artifactCommitment,
-    maxEpochFee: n("maxEpochFee"), biddingClose: Math.floor(Date.now() / 1000) + 60 * n("biddingMinutes"),
+    maxEpochFee: f.maxEpochFee, biddingClose: Math.floor(Date.now() / 1000) + 60 * n("biddingMinutes"),
     fixedEpochs: f.epochMode === "fixed" ? n("maxEpochs") : 0, maxEpochs: n("maxEpochs"),
-    seats: n("seats"), standbys: n("standbys"), faultTolerance: n("faultTolerance"), perReportReward: n("perReportReward"),
+    seats: n("seats"), standbys: n("standbys"), faultTolerance: n("faultTolerance"), perReportReward: f.perReportReward,
   };
   try { await sendWithWallet(await api("intent/createRequest", body), "rOut"); } catch (e) { fail("rOut", e); }
 };
@@ -165,7 +166,7 @@ $("lLoad").onclick = loadLease;
 $("bForm").onsubmit = async (ev) => {
   ev.preventDefault();
   const f = formObj(ev.target);
-  const body = { requestId: parseInt(f.requestId, 10), epochFee: parseInt(f.epochFee, 10), epochs: parseInt(f.epochs, 10), expiry: Math.floor(Date.now() / 1000) + 3600 * parseInt(f.hours, 10), endpointHash: f.endpointHash, offerHash: f.offerHash };
+  const body = { requestId: parseInt(f.requestId, 10), epochFee: f.epochFee, epochs: parseInt(f.epochs, 10), expiry: Math.floor(Date.now() / 1000) + 3600 * parseInt(f.hours, 10), endpointHash: f.endpointHash, offerHash: f.offerHash };
   try { await sendWithWallet(await api("intent/placeBid", body), "bOut"); } catch (e) { fail("bOut", e); }
 };
 
@@ -264,15 +265,15 @@ $("oVerify").onclick = async () => {
 $("rLoad").onclick = async () => {
   try {
     const j = await api("rewards");
-    if (j.available === false) { show("rOut", '<p class="warn">' + esc(j.reason) + "</p>"); return; }
+    if (j.available === false) { show("rewardOut", '<p class="warn">' + esc(j.reason) + "</p>"); return; }
     let html = '<p class="note">' + esc(j.source) + "; observed " + esc(j.observedAgeSeconds) + " s ago" + (j.stale ? ' <span class="err">(STALE: collector may be stopped)</span>' : "") +
       "; head slot " + esc(j.headSlot) + ", finalized epoch " + esc(j.finalizedEpoch) + (j.gapBeforeStart ? "; gap before this sample (some slots not observed)" : "") + ". " + esc(j.note) + "</p>";
     html += "<h4>Attestation rewards over the sampled epochs</h4>" + table(j.attestationByValidator, ["validator", "epochs", "netGwei"]);
     if (j.epochsUnavailable.length) html += '<p class="warn">Epochs with unavailable attestation rewards: ' + esc(j.epochsUnavailable.join(", ")) + "</p>";
     html += "<h4>Recent block rewards</h4>" + table(j.blockRewards, ["slot", "proposer", "totalGwei", "apiFinalized"]);
     if (j.blocksUnavailable) html += '<p class="note">' + esc(j.blocksUnavailable) + " recent slots had no reward data (empty slot or not served).</p>";
-    show("rOut", html);
-  } catch (e) { fail("rOut", e); }
+    show("rewardOut", html);
+  } catch (e) { fail("rewardOut", e); }
 };
 
 // ------------------------------------------- provider: verify handed-over terms
