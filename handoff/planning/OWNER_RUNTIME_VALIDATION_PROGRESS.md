@@ -12,12 +12,12 @@ Only owner-observed results count as runtime evidence.
 | F02 GitHub handoff | Complete | S1 remote matched exact SHA |
 | F03 Isolated checkout | Passed | Owner verified exact SHA and clean worktree |
 | F04 Dependency/toolchain | Passed | R429 and S1 identical pins; forge-std f3dae6e6ee381f25eb6a246f7da9b85c91a68219; OpenZeppelin cab19933c33c2ad1d4c7a84864a3601dddfd16f3; Forge 1.9.0, Python 3.12.3, Solc 0.8.24 |
-| F05 Solidity compile | Failed on S1 and 111265b | Registry error progressed to market line 475; both source repairs pending full build |
+| F05 Solidity compile | Failed on 68c6f4d | New stack-depth location at market line 239; DEV-004 source repair committed |
 | F06 Compile/size repairs | Active | DEV-002/003 below; EIP-170/3860 measurements not available |
 | F07 Full Foundry regression | Pending | After successful compilation |
 | F08 Focused V4 tests/fuzz | Pending | Includes two new DEV-002 tests |
-| F09 Python regression | Pending | Pinned venv |
-| F10 ABI/EIP-712 parity | Pending | Compiled ABI and cross-language fixtures |
+| F09 Python regression | V4 subset passed; full historical suite pending | Owner VM4707 at 68c6f4d: 46 V4 + 4 setup tests passed, zero failures |
+| F10 ABI/EIP-712 parity | Partial | Independent Python residual digest test passed; compiled ABI checker and Solidity parity blocked by build |
 | F11 Security/science review | Active; mandatory pre-use gate | Static remediation pass 1 committed; open findings in audit report; no certification |
 | F12 Isolated deployment/lifecycle | Pending | Disposable keys, isolated RPC |
 | F13 Consumer marketplace/UI | Source, unvalidated | Owner-run |
@@ -49,3 +49,11 @@ DEV-002 (open, source repair committed):
 DEV-003 (open, source repair committed): owner retry at 111265bd25fabbc0c0d751a8e1681bbba700a2cb failed stack too deep at SSEAdaptiveMarketV4.sol:475:46, exit 1. Residual verification and allocation split; no compiler setting changes. Further static fixes and regression source recorded in [audit pass 1](../audits/OWNER_VALIDATION_AUDIT_PASS_1.md). Mandatory audit and isolated validation before use; no live deployment authorization. Audit report commit 20ff4a150655e1b5a8978dde6eea680cc168cb2b.
 
 Owner decisions unchanged: P-1 standby retainer rejected; P-2 keeper bounty and P-3 provable misconduct slashing remain undecided. Report2.pdf and Report3.pdf stay untracked. Preserve original chain31340/V3 and private wallet state.
+
+## Consolidated owner validation at 68c6f4d0029723c6fa055d6378e7e1d62136f689
+- Forge 1.9.0, Solc 0.8.24, Python 3.12.3, unchanged dependency pins and compiler settings. Clean source tree.
+- 01-solidity-build exit 1, 91 files, stack too deep in SSEAdaptiveMarketV4.sol:239:18, accounting initialize call. DEV-004 source repair 4618b0f637e2318c542a48dc954c1fa864d6fa3f splits accounting initialization and event emission from lease recording; same atomic transaction, unchanged hash and funds. Unverified compilation.
+- 02-v4-python-regression exit 0: 46 tests passed. 03-setup-regression exit 0: 4 tests passed. No skipped tests in these two runs. Historical full Python suite not executed.
+- Compiled ABI and focused Foundry tests skipped because build failed. JavaScript syntax check not run because Node unavailable.
+- Logs: ~/sse-v4-validation-logs/68c6f4d0029723c6fa055d6378e7e1d62136f689.
+- Audit passes 2–4 added execution recovery, residual settlement backend/browser, and offline ABI checker. No live deployment. All unresolved audit blockers remain in force.
