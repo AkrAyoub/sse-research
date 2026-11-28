@@ -60,5 +60,19 @@ def main():
         with urllib.request.urlopen("http://127.0.0.1:8790/",timeout=5) as r:
             out["localConsoleHTTP"]=r.status==200
     except Exception: pass
+    out["preparationVerified"]=bool(out["wallet"] and out["roles"] and out["deploymentVerified"]
+                                   and out.get("recentFinality") and out["localConsoleHTTP"]
+                                   and out["services"]["sse-v4-console.service"]["active"])
+    gates=[]
+    if not out["preparationVerified"]: gates.append("preparation_not_verified")
+    if not out["services"]["sse-v4-agent.service"]["active"]: gates.append("signing_agent_inactive")
+    if not out.get("finalizedBalanceWei",0): gates.append("unfunded_wallet")
+    if "monitor" in out["roles"] and not (out["monitorPosition"] and out["monitorPosition"][3] and not out["monitorPosition"][4]):
+        gates.append("monitor_registration_pending")
+    if "provider" in out["roles"] and (not out["providerConfigured"] or not out["services"]["sse-v4-provider-outputs.service"]["active"]):
+        gates.append("provider_worker_or_endpoint_pending")
+    out["activationGates"]=gates
+    out["liveRoleExecutionProven"]=False
     print(json.dumps(out,indent=2))
-if __name__=="__main__": main()
+    return 0 if out["preparationVerified"] else 2
+if __name__=="__main__": raise SystemExit(main())

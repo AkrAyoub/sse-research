@@ -34,5 +34,41 @@ class RelayPolicy(unittest.TestCase):
         self.assertEqual(m.overlay("fca0:2328:77e5:740c:ce60::1"),"fca0:2328:77e5:740c:ce60::1")
         for address in ("::1","::","2001:db8::1","10.50.56.8"):
             with self.assertRaises(ValueError): m.overlay(address)
+class ConcurrentRelay(unittest.TestCase):
+    def test_second_request_progresses_while_first_waits(self):
+        import http.client
+        import threading
+        import socket
+        from http.server import BaseHTTPRequestHandler
+        entered=threading.Event()
+        release=threading.Event()
+        class Handler(BaseHTTPRequestHandler):
+            def do_GET(self):
+                if self.path=="/hold":
+                    entered.set()
+                    release.wait(5)
+                self.send_response(200)
+                self.end_headers()
+                self.wfile.write(b"ok")
+            def log_message(self,*args): pass
+        srv=m.BoundedServer(("127.0.0.1",0),Handler)
+        th=threading.Thread(target=srv.serve_forever,daemon=True)
+        th.start()
+        held=None
+        try:
+            held=socket.create_connection(srv.server_address,timeout=2)
+            held.sendall(b"GET /hold HTTP/1.0\r\n\r\n")
+            self.assertTrue(entered.wait(2))
+            client=http.client.HTTPConnection(*srv.server_address,timeout=2)
+            try:
+                client.request("GET","/ready")
+                self.assertEqual(client.getresponse().read(),b"ok")
+            finally:
+                client.close()
+        finally:
+            release.set()
+            if held is not None: held.close()
+            srv.shutdown(); srv.server_close(); th.join(2)
+
 if __name__=="__main__":
     unittest.main()

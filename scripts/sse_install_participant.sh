@@ -20,6 +20,7 @@ elif [[ -z "$ROLES" ]]; then
   echo "Native full_node/observer/validator: secure checkpoint/enrollment gate remains outstanding."
   read -r -p 'Select roles (comma-separated): ' ROLES
 fi
+ROLES="$(printf '%s' "$ROLES" | tr -d '[:space:]')"
 [[ "$ROLES" =~ ^(consumer|provider|monitor|keeper)(,(consumer|provider|monitor|keeper))*$ ]] || { echo "Invalid/unsupported roles"; exit 2; }
 echo "VM=$(id -un) ROLES=$ROLES SOURCE=$SHA"
 # Native nodes are deliberately never modified here. If native clients are
