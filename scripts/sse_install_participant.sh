@@ -18,17 +18,22 @@ for ARG in "$@"; do
   else echo "Unexpected installer argument"; exit 2; fi
 done
 POL="$HOME/.config/sse-v4/policy.json"
+parse_roles(){ python3 -B scripts/sse_v4_select_roles.py "$1"; }
 if [[ -f "$POL" && ! -L "$POL" ]]; then
   OLD="$(python3 -B -c 'import json,sys; print(",".join(json.load(open(sys.argv[1]))["roles"]))' "$POL")"
-  [[ -z "$ROLES" || "$ROLES" == "$OLD" ]] || { echo "Existing role policy differs; preserve it"; exit 2; }
+  if [[ -n "$ROLES" ]]; then
+    [[ "$(parse_roles "$ROLES" | tr ',' '\n' | sort)" == "$(parse_roles "$OLD" | tr ',' '\n' | sort)" ]] || { echo "Existing role policy differs; preserve it"; exit 2; }
+  fi
   ROLES="$OLD"
 elif [[ -z "$ROLES" ]]; then
-  echo "Available application roles: consumer,provider,monitor,keeper"
+  echo "Available application roles: 1=consumer 2=provider 3=monitor 4=keeper"
   echo "Native full_node/observer/validator: secure checkpoint/enrollment gate remains outstanding."
-  read -r -p 'Select roles (comma-separated): ' ROLES
+  while true; do
+    read -r -p 'Select one or more roles (e.g. 3,4 or monitor,keeper): ' RAW
+    if ROLES="$(parse_roles "$RAW")"; then break; fi
+  done
 fi
-ROLES="$(printf '%s' "$ROLES" | tr -d '[:space:]')"
-[[ "$ROLES" =~ ^(consumer|provider|monitor|keeper)(,(consumer|provider|monitor|keeper))*$ ]] || { echo "Invalid/unsupported roles"; exit 2; }
+ROLES="$(parse_roles "$ROLES")"
 echo "VM=$(id -un) ROLES=$ROLES SOURCE=$SHA"
 # Native nodes are deliberately never modified here. If native clients are
 # already installed, require their actual local EL+CL gate, not a relay.
@@ -62,7 +67,10 @@ sleep 3
 systemctl --user is-active sse-v4-console.service
 curl --noproxy '*' -fsS --max-time 15 http://127.0.0.1:8790/ -o /dev/null
 if [[ "$PUBLISH" == 1 ]]; then
-  "$PY" -B scripts/sse_v4_publish_web.py --apply
+  if "$PY" -B scripts/sse_v4_publish_web.py --apply; then :; else
+    rc=$?
+    if [[ "$rc" == 3 ]]; then echo "PUBLIC_DASHBOARD_PENDING=true; check --status later"; else exit "$rc"; fi
+  fi
 fi
 "$PY" -B tools/sse_v4_participant_status.py
 echo "SSE_PREPARATION_VERIFIED=true; activation, funding and provider admission separately gated"

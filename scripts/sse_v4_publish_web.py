@@ -67,7 +67,17 @@ def ensure_bin():
             require(hashlib.sha256(target.read_bytes()).hexdigest()==DIGEST,"download digest mismatch")
             subprocess.run(["install","-m","700",str(target),str(BIN)],check=True)
     require(BIN.is_file() and BIN.stat().st_uid==os.getuid() and hashlib.sha256(BIN.read_bytes()).hexdigest()==DIGEST,"existing binary not reviewed pin; preserve")
-def apply():
+class Pending(RuntimeError): pass
+
+def wait_url(seconds):
+    deadline=time.monotonic()+seconds
+    while True:
+        try: return current_url()
+        except Exception:
+            if time.monotonic()>=deadline: raise Pending("tunnel active but external HTTPS not verified")
+            time.sleep(min(3,max(0,deadline-time.monotonic())))
+
+def apply(seconds=180):
     require(os.geteuid()!=0 and run("uname","-m")=="x86_64","unprivileged amd64 owner required")
     require(not run("git","-C",str(ROOT),"status","--porcelain"),"clean pinned source required")
     require(PY.is_file() and active("sse-v4-console.service"),"local V4 preparation required")
@@ -105,24 +115,27 @@ def apply():
         except Exception:time.sleep(2)
     else:raise RuntimeError("public-mode local console not verified; no new tunnel started")
     run("systemctl","--user","enable","--now",TUNNEL)
-    for i in range(12):
-        try:
-            url=current_url()
-            print("PUBLIC_DASHBOARD_URL="+url,flush=True)
-            print("PUBLIC_DASHBOARD_HTTPS_VERIFIED=true",flush=True)
-            return
-        except Exception:time.sleep(3)
-    raise RuntimeError("public HTTPS not verified; local dashboard preserved, inspect tunnel journal")
+    url=wait_url(seconds)
+    print("PUBLIC_DASHBOARD_URL="+url,flush=True)
+    print("PUBLIC_DASHBOARD_HTTPS_VERIFIED=true",flush=True)
 def main():
     p=argparse.ArgumentParser(description=__doc__)
     g=p.add_mutually_exclusive_group(required=True)
     g.add_argument("--apply",action="store_true");g.add_argument("--status",action="store_true")
+    p.add_argument("--wait-seconds",type=int,default=180,help="bounded external readiness wait")
     a=p.parse_args()
+    if not 0<=a.wait_seconds<=300: p.error("wait must be 0..300")
     try:
-        if a.apply:apply()
+        if a.apply:apply(a.wait_seconds)
         else:
-            print("PUBLIC_DASHBOARD_URL="+current_url())
+            print("PUBLIC_DASHBOARD_URL="+wait_url(a.wait_seconds))
             print("PUBLIC_DASHBOARD_HTTPS_VERIFIED=true")
+    except Pending as e:
+        if active(CONSOLE) and active(TUNNEL):
+            print("PUBLIC_DASHBOARD_PENDING: "+str(e),file=sys.stderr)
+            return 3
+        print("PUBLIC_DASHBOARD_NOT_VERIFIED: services inactive",file=sys.stderr)
+        return 2
     except Exception as e:
         print("PUBLIC_DASHBOARD_NOT_VERIFIED: "+str(e),file=sys.stderr)
         return 2

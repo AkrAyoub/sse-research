@@ -13,7 +13,18 @@ CERT="$PWD/release/chain31340-optional-rpc-vm4709.crt"
 FP=967643892bf4eeb3028acd87ab8f849073d0e1ff6f93e122dae4640b69c03d3d
 REMOTE=fca0:2328:77e5:740c:ce60::1
 [[ "$(openssl x509 -in "$CERT" -outform DER | sha256sum | awk '{print $1}')" == "$FP" ]] || fail "certificate fingerprint mismatch"
-probe(){ curl -fsS --max-time 15 http://127.0.0.1:28545 -H 'Content-Type: application/json' -d '{"jsonrpc":"2.0","id":1,"method":"eth_chainId","params":[]}' | /usr/bin/python3 -c 'import json,sys; r=json.load(sys.stdin); assert r.get("result")=="0x7a6c"'; }
+probe(){
+  /usr/bin/python3 -B - <<'PYCODE'
+import json,urllib.request
+opener=urllib.request.build_opener(urllib.request.ProxyHandler({}))
+for method,params in (("eth_chainId",[]),("eth_blockNumber",[]),("eth_getBlockByNumber",["0x0",False])):
+    req=urllib.request.Request("http://127.0.0.1:28545",data=json.dumps(dict(jsonrpc="2.0",id=1,method=method,params=params)).encode(),headers={"Content-Type":"application/json"})
+    with opener.open(req,timeout=15) as r: result=json.load(r)["result"]
+    if method=="eth_chainId": assert result=="0x7a6c"
+    elif method=="eth_blockNumber": assert int(result,16)>0
+    else: assert result["hash"]=="0x5f7cbcd4f1ddfbbedbdd2b180b83d9eff49d4b7263643858d7be2e9c243936bf"
+PYCODE
+}
 if probe 2>/dev/null; then
   echo "R361_EXISTING_RPC_HEALTHY=true"
   exit 0

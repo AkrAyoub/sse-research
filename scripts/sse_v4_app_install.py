@@ -219,7 +219,7 @@ def install(roles, publish, rpc, python, input_fn=input, prepare_only=False, adv
     print("PUBLIC_WALLET_ADDRESS="+loaded["wallet"])
     print("V4_ROLES="+",".join(loaded["roles"]))
     print("Persistence across logout requires: loginctl enable-linger $USER (owner decision, needs sudo).")
-    print("Public URL: run scripts/sse_publish_application_dashboard.sh against port 8791 (read-only instance).")
+    print("Public URL: use scripts/sse_v4_publish_web.py --apply (separate public-mode console).")
 
 
 def main():

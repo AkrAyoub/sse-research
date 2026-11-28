@@ -67,7 +67,10 @@ class ConcurrentRelay(unittest.TestCase):
                 client.close()
         finally:
             release.set()
-            if held is not None: held.close()
+            if held is not None:
+                try:
+                    while held.recv(1024): pass
+                finally: held.close()
             srv.shutdown(); srv.server_close(); th.join(2)
 
 if __name__=="__main__":
