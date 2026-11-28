@@ -3,6 +3,7 @@
 import json
 import os
 from pathlib import Path
+import time
 import subprocess
 import sys
 import urllib.request
@@ -47,6 +48,9 @@ def main():
         st.verify_deployment(ask,m)
         out["deploymentVerified"]=True
         out["finalized"]=st.finalized(ask)
+        f=ask("eth_getBlockByNumber",["finalized",False])
+        out["finalityAgeSeconds"]=int(time.time())-int(f["timestamp"],16)
+        out["recentFinality"]=0<=out["finalityAgeSeconds"]<1800
         if out["wallet"]:
             out["finalizedBalanceWei"]=int(ask("eth_getBalance",[out["wallet"],"finalized"]),16)
             if "monitor" in out["roles"]:

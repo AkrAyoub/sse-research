@@ -9,7 +9,8 @@ raw signed transaction forwarding requires explicit server opt-in.
 import argparse
 import hashlib
 import http.client
-from http.server import BaseHTTPRequestHandler, HTTPServer
+from http.server import BaseHTTPRequestHandler, ThreadingHTTPServer
+from threading import BoundedSemaphore
 import ipaddress
 import json
 import re
@@ -104,13 +105,43 @@ def make_handler(connect,allow_send):
         def log_message(self,*args): pass
     return Handler
 
-class IPv6Server(HTTPServer):
+class BoundedServer(ThreadingHTTPServer):
+    daemon_threads=True
+    request_queue_size=64
+    max_workers=16
+    tls_context=None
+
+    def __init__(self,*args,**kwargs):
+        self.slots=BoundedSemaphore(self.max_workers)
+        super().__init__(*args,**kwargs)
+
+    def process_request(self,request,address):
+        # No unbounded queue or threads; reject excess connections without
+        # reading requests or resubmitting signed transactions.
+        if not self.slots.acquire(blocking=False):
+            self.shutdown_request(request)
+            return
+        try:
+            super().process_request(request,address)
+        except BaseException:
+            self.slots.release()
+            self.shutdown_request(request)
+            raise
+
+    def process_request_thread(self,request,address):
+        try:
+            request.settimeout(10)
+            if self.tls_context is not None:
+                request=self.tls_context.wrap_socket(request,server_side=True)
+            super().process_request_thread(request,address)
+        except OSError:
+            self.shutdown_request(request)
+        finally:
+            self.slots.release()
+
+class IPv6Server(BoundedServer):
     import socket
     address_family=socket.AF_INET6
-    def get_request(self):
-        sock,addr=super().get_request()
-        sock.settimeout(10)
-        return sock,addr
 
 def main():
     p=argparse.ArgumentParser(description=__doc__)
@@ -133,15 +164,7 @@ def main():
         ctx.minimum_version=ssl.TLSVersion.TLSv1_2
         ctx.load_cert_chain(a.cert,a.key)
         server=IPv6Server((a.bind,19443),make_handler(lambda:http.client.HTTPConnection("127.0.0.1",a.upstream_port,timeout=8),a.allow_raw_send))
-        # Handshake timeout applies before TLS negotiation.
-        original=server.get_request
-        def tls_request():
-            sock,addr=original()
-            try: return ctx.wrap_socket(sock,server_side=True),addr
-            except Exception:
-                sock.close()
-                raise
-        server.get_request=tls_request
+        server.tls_context=ctx  # negotiate in bounded workers, not accept loop
     else:
         pem=a.cert.read_text("ascii")
         der=ssl.PEM_cert_to_DER_cert(pem)
@@ -150,7 +173,7 @@ def main():
         ctx=ssl.create_default_context(cafile=str(a.cert))
         ctx.minimum_version=ssl.TLSVersion.TLSv1_2
         # Standard certificate verification and IP SAN matching remain enabled.
-        server=HTTPServer(("127.0.0.1",a.local_port),make_handler(lambda:http.client.HTTPSConnection(a.remote,19443,context=ctx,timeout=12),a.allow_raw_send))
+        server=BoundedServer(("127.0.0.1",a.local_port),make_handler(lambda:http.client.HTTPSConnection(a.remote,19443,context=ctx,timeout=12),a.allow_raw_send))
     print("R299_RELAY_READY",a.mode,"raw_send",a.allow_raw_send,flush=True)
     try: server.serve_forever()
     finally: server.server_close()

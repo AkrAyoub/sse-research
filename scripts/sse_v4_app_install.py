@@ -114,6 +114,8 @@ def ask_caps(input_fn=input):
 def wallet(keystore_dir, input_fn=input):
     keystore_dir.mkdir(mode=0o700, parents=True, exist_ok=True)
     from sse_pos_r237_v2_approved_local_eip712_sign import safe_keystore
+    import sse_v4_state as st
+    st.private_dir(keystore_dir)
     existing = sorted(keystore_dir.glob("UTC--*"))
     if len(existing) > 1:
         raise Refused("multiple local wallets; explicit selection required")
@@ -168,14 +170,17 @@ def plan_actions(roles, publish, rpc):
 
 
 def install(roles, publish, rpc, python, input_fn=input, prepare_only=False, advanced_gas=False):
+    for name in ("sse-v4-agent.service", "sse-v4-provider-outputs.service"):
+        if subprocess.run(["systemctl","--user","is-active","--quiet",name]).returncode==0:
+            raise Refused("active signing or provider service; explicit rolling migration required")
     for d in (STATE, CONFIG, UNITS):
         d.mkdir(mode=0o700, parents=True, exist_ok=True)
     import sse_v4_state as st
     st.private_dir(STATE)
     st.private_dir(CONFIG)
     pol_path = CONFIG / "policy.json"
-    if pol_path.exists():
-        existing = json.loads(pol_path.read_text())
+    if pol_path.exists() or pol_path.is_symlink():
+        existing = st.read_json(pol_path)
         if set(existing.get("roles", [])) != set(roles):
             raise Refused("existing policy roles differ; review and update the policy explicitly before reinstall")
         print("Keeping existing policy", pol_path)
@@ -198,13 +203,17 @@ def install(roles, publish, rpc, python, input_fn=input, prepare_only=False, adv
     if publish:
         units["sse-v4-console-public.service"] = render_unit("sse-v4-console.service.in", MODE="public", PORT=8791, **common)
     for name, text in units.items():
-        (UNITS / name).write_text(text)
+        target = UNITS / name
+        if target.is_symlink():
+            raise Refused("linked service unit refused")
+        target.write_text(text)
     subprocess.run(["systemctl", "--user", "daemon-reload"], check=True)
     for name in units:
         if name in ("sse-v4-agent.service", "sse-v4-provider-outputs.service") and prepare_only:
             print(name + " prepared, not started; provider output requires agent deployment identity.")
             continue
         subprocess.run(["systemctl", "--user", "enable", "--now", name], check=True)
+        subprocess.run(["systemctl", "--user", "restart", name], check=True)
     from sse_v4_agent import load_policy
     loaded = load_policy(pol_path)
     print("PUBLIC_WALLET_ADDRESS="+loaded["wallet"])
