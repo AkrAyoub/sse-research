@@ -1,7 +1,7 @@
 #!/usr/bin/env python3
 """Single role-selection and preparation entry point for original chain31340.
 
-Plan is default; --apply approves the displayed preparation plan once.
+Plan is default; --apply is explicit consent to non-signing preparation.
 Fresh lightweight hosts use a pinned optional RPC adapter, not a forced full
 node. Native fresh install is intentionally gated until verified checkpoint
 onboarding is implemented. Existing native nodes are never reinstalled.
@@ -71,7 +71,7 @@ def plan(roles,commit,publish_console=False,transport="auto",existing_native=Fal
 
 def main(argv=None):
     p=argparse.ArgumentParser(description=__doc__)
-    p.add_argument("--roles",required=True)
+    p.add_argument("--roles",help="comma-separated roles; omit for one role-selection prompt")
     p.add_argument("--commit",required=True)
     p.add_argument("--transport",choices=("auto","local","relay"),default="auto")
     p.add_argument("--existing-native",action="store_true")
@@ -82,7 +82,12 @@ def main(argv=None):
     try:
         if os.geteuid()==0:
             raise Refused("unprivileged owner required")
-        steps=plan(a.roles.split(","),a.commit,a.publish_readonly_console,a.transport,a.existing_native,a.existing_app)
+        if a.roles is None:
+            print("Available roles: "+", ".join(ROLES))
+            raw=input("Select roles (comma-separated): ")
+        else:
+            raw=a.roles
+        steps=plan([r.strip() for r in raw.split(",")],a.commit,a.publish_readonly_console,a.transport,a.existing_native,a.existing_app)
         print(json.dumps(dict(schema="SSE_SETUP_PLAN_V2",steps=steps,activationClaimed=False),indent=2),flush=True)
         if not a.apply:
             return 0
@@ -92,8 +97,8 @@ def main(argv=None):
         dirty=subprocess.check_output(["git","status","--porcelain"],cwd=REPO,text=True)
         if actual!=a.commit or dirty:
             raise Refused("pinned clean source required")
-        if input("Type PREPARE-SSE-ROLES to approve this preparation plan: ")!="PREPARE-SSE-ROLES":
-            raise Refused("not authorized")
+        # --apply authorizes only preparation. Delegated sensitive operations
+        # retain their own local owner authorization gates.
         for step in steps:
             print("== "+step["id"]+" ==",flush=True)
             rc=subprocess.call(step["argv"],cwd=REPO)

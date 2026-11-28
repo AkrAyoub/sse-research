@@ -10,9 +10,9 @@ It does NOT install clients, does NOT create validator keys, and never moves fun
 
 One command, idempotent:
   python3 scripts/sse_v4_app_install.py --roles consumer,monitor [--plan]
-Interactions are limited to legitimate owner choices: roles, wallet keystore
-(import path or create), spending caps, and whether to publish the read-only
-console. No IPs, contract addresses, VM names or ports are typed by the user:
+Normal preparation asks only for roles and local wallet selection/creation.
+Published bounded TEST ETH gas defaults are used automatically; advanced gas
+policy overrides are opt-in. Public console publication remains opt-in. No IPs, contract addresses, VM names or ports are typed by the user:
 contracts come from the verified release manifest; RPC comes from the local
 node or the manifest's replaceable rpcHints, each verified by chain id+genesis.
 """
@@ -86,6 +86,18 @@ def policy_for(roles, wallet, keystore, caps, extra):
     return p
 
 
+DEFAULT_GAS_CAPS = {
+    "maxFeePerGasWei": 10**6,
+    "maxPriorityFeePerGasWei": 1000,
+    "maxGasPerTx": 3_000_000,
+    "dailyGasWeiBudget": 10**15,
+}
+
+
+def default_caps():
+    return dict(DEFAULT_GAS_CAPS)
+
+
 def ask_caps(input_fn=input):
     print("Spending authorization (gas only; automatic actions never send value).")
     def num(prompt, default):
@@ -148,12 +160,14 @@ def plan_actions(roles, publish, rpc):
         acts.append(("unit", "sse-v4-provider-outputs.service"))
     if publish:
         acts.append(("unit", "sse-v4-console-public.service"))
-    acts.append(("enable", [a[1] for a in acts if a[0] == "unit"]))
+    acts.append(("enable", [a[1] for a in acts if a[0] == "unit" and a[1] not in ("sse-v4-agent.service", "sse-v4-provider-outputs.service")]))
+    acts.append(("prepared-not-started", [a[1] for a in acts if a[0] == "unit" and a[1] in ("sse-v4-agent.service", "sse-v4-provider-outputs.service")]))
     return {"roles": roles, "rpc": rpc, "actions": [(k, str(v)) for k, v in acts],
-            "note": "Re-running is idempotent: policy and wallet are never overwritten; units are re-rendered."}
+            "defaultGasCaps": default_caps(), "activationClaimed": False,
+            "note": "Existing policy and wallet preserved; units rendered. No funding, registration or signing."}
 
 
-def install(roles, publish, rpc, python, input_fn=input, prepare_only=False):
+def install(roles, publish, rpc, python, input_fn=input, prepare_only=False, advanced_gas=False):
     for d in (STATE, CONFIG, UNITS):
         d.mkdir(mode=0o700, parents=True, exist_ok=True)
     import sse_v4_state as st
@@ -167,7 +181,9 @@ def install(roles, publish, rpc, python, input_fn=input, prepare_only=False):
         print("Keeping existing policy", pol_path)
     else:
         addr, ks = wallet(CONFIG / "keystore", input_fn)
-        pol = policy_for(roles, addr, ks, ask_caps(input_fn), {})
+        caps = ask_caps(input_fn) if advanced_gas else default_caps()
+        print("APPLICATION_GAS_POLICY="+json.dumps(caps,sort_keys=True))
+        pol = policy_for(roles, addr, ks, caps, {})
         fd = os.open(pol_path, os.O_WRONLY | os.O_CREAT | os.O_EXCL, 0o600)
         with os.fdopen(fd, "w") as fh:
             json.dump(pol, fh, indent=2)
@@ -202,6 +218,7 @@ def main():
     p.add_argument("--roles", help="comma-separated subset of " + ",".join(ROLES))
     p.add_argument("--publish-readonly-console", action="store_true")
     p.add_argument("--plan", action="store_true", help="print the plan, change nothing")
+    p.add_argument("--advanced-gas", action="store_true", help="opt in to gas spending prompts for a new policy")
     p.add_argument("--prepare-only", action="store_true", help="prepare local policy and units, start console but not signing agent")
     a = p.parse_args()
     raw = a.roles or input("Roles (" + ",".join(ROLES) + "): ")
@@ -223,7 +240,7 @@ def main():
         return
     if not a.prepare_only:
         raise Refused("use --prepare-only first; agent activation requires a separately authorized credential or interactive signer")
-    install(roles, a.publish_readonly_console, rpc, sys.executable, prepare_only=True)
+    install(roles, a.publish_readonly_console, rpc, sys.executable, prepare_only=True, advanced_gas=a.advanced_gas)
 
 
 if __name__ == "__main__":
