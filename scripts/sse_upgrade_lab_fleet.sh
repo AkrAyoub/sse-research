@@ -3,6 +3,8 @@
 set -euo pipefail
 cd "$(dirname "${BASH_SOURCE[0]}")/.."
 SHA="$(git rev-parse HEAD)"
+WEB=()
+if [[ "${1:-}" == --publish-web ]]; then WEB=(--publish-web); elif [[ $# != 0 ]]; then exit 2; fi
 [[ "$(id -u)" != 0 && -z "$(git status --porcelain)" ]]
 case "$(id -un)" in
   ayoubakrvm4709)
@@ -17,7 +19,7 @@ case "$(id -un)" in
   *)
     POL="$HOME/.config/sse-v4/policy.json"
     if [[ -f "$POL" ]]; then
-      bash scripts/sse_install_participant.sh --upgrade
+      bash scripts/sse_install_participant.sh --upgrade "${WEB[@]}"
     else
       case "$(id -un)" in
         ayoubakrvm4707) ROLES=consumer,monitor,keeper ;;
@@ -27,6 +29,6 @@ case "$(id -un)" in
         ayoubakrvm4719) ROLES=consumer,monitor,keeper ;;
         *) ROLES="" ;;
       esac
-      bash scripts/sse_install_participant.sh --upgrade "$ROLES"
+      bash scripts/sse_install_participant.sh --upgrade "$ROLES" "${WEB[@]}"
     fi ;;
 esac

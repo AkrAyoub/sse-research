@@ -633,6 +633,8 @@ def make_handler(console):
                     return self._send(200, console.overview(q))
                 if p == ["mode"]:
                     return self._send(200, {"mode": console.mode})
+                if p == ["public-instance"] and console.mode == "public":
+                    return self._send(200, {"instance": getattr(console, "public_instance", None), "chainId": st.CHAIN_ID})
                 if p == ["requests"]:
                     return self._send(200, console.requests(q))
                 if len(p) == 2 and p[0] == "request" and INT.fullmatch(p[1]):
@@ -737,14 +739,18 @@ def main():
     p.add_argument("--mode", choices=("local", "public"), default="local")
     p.add_argument("--port", type=int, default=8790)
     p.add_argument("--state", type=Path)
+    p.add_argument("--public-instance", help="nonsecret per-host public console identity")
     p.add_argument("--beacon", help="local beacon API, e.g. http://127.0.0.1:25052")
     p.add_argument("--rewards-dir", help="native reward collector output, e.g. ~/.local/share/sse-native-rewards")
     a = p.parse_args()
     from sse_chain_read import LocalRPC
-    ask = LocalRPC(a.rpc).request
+    ask = LocalRPC(a.rpc, timeout=20).request
     manifest = st.load_manifest(a.manifest)
     st.verify_deployment(ask, manifest)
     console = Console(ask, manifest, a.mode, a.state, a.beacon, a.rewards_dir)
+    if a.public_instance is not None and (a.mode != "public" or not re.fullmatch(r"[0-9a-f]{32}", a.public_instance)):
+        p.error("invalid public instance")
+    console.public_instance = a.public_instance
     # Public exposure happens only through the separate tunnel/reverse proxy,
     # which must point at a --mode public instance. Always bind loopback.
     ThreadingHTTPServer(("127.0.0.1", a.port), make_handler(console)).serve_forever()

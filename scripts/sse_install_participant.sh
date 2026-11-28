@@ -1,6 +1,6 @@
 #!/usr/bin/env bash
 # One entry point for fresh or already prepared application participants.
-# No native-node reset, signing activation, funds, or automatic public exposure.
+# No native-node reset, signing activation or funds. --publish-web opts into public read-only HTTPS.
 set -euo pipefail
 umask 077
 ROOT="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
@@ -9,7 +9,14 @@ cd "$ROOT"
 SHA="$(git rev-parse HEAD)"
 MODE="${1:---install}"
 [[ "$MODE" == --install || "$MODE" == --upgrade ]] || { echo "Use --install or --upgrade"; exit 2; }
-ROLES="${2:-}"
+ROLES=""
+PUBLISH=0
+shift || true
+for ARG in "$@"; do
+  if [[ "$ARG" == --publish-web ]]; then PUBLISH=1
+  elif [[ -z "$ROLES" ]]; then ROLES="$ARG"
+  else echo "Unexpected installer argument"; exit 2; fi
+done
 POL="$HOME/.config/sse-v4/policy.json"
 if [[ -f "$POL" && ! -L "$POL" ]]; then
   OLD="$(python3 -B -c 'import json,sys; print(",".join(json.load(open(sys.argv[1]))["roles"]))' "$POL")"
@@ -54,5 +61,8 @@ sudo -n loginctl enable-linger "$(id -un)"
 sleep 3
 systemctl --user is-active sse-v4-console.service
 curl --noproxy '*' -fsS --max-time 15 http://127.0.0.1:8790/ -o /dev/null
+if [[ "$PUBLISH" == 1 ]]; then
+  "$PY" -B scripts/sse_v4_publish_web.py --apply
+fi
 "$PY" -B tools/sse_v4_participant_status.py
-echo "SSE_PREPARATION_VERIFIED=true; activation, funding, provider admission and public hosting separately gated"
+echo "SSE_PREPARATION_VERIFIED=true; activation, funding and provider admission separately gated"

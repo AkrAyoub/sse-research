@@ -24,7 +24,7 @@ def enabled(name):
 
 def main():
     if os.geteuid()==0: raise SystemExit("run as participant owner")
-    units=("sse-rpc-adapter.service","sse-v4-console.service","sse-v4-console-public.service","sse-v4-agent.service","sse-v4-provider-outputs.service")
+    units=("sse-rpc-adapter.service","sse-v4-console.service","sse-v4-console-public.service","sse-v4-web-dashboard.service","sse-v4-agent.service","sse-v4-provider-outputs.service")
     out={"host":run("id","-un"),"sourceCommit":run("git","-C",str(ROOT),"rev-parse","HEAD"),
          "overlayAddresses":run("ip","-6","-o","addr","show","scope","global"),
          "services":{n:{"active":active(n),"enabled":enabled(n)} for n in units},
@@ -60,6 +60,13 @@ def main():
         with urllib.request.urlopen("http://127.0.0.1:8790/",timeout=5) as r:
             out["localConsoleHTTP"]=r.status==200
     except Exception: pass
+    if out["services"]["sse-v4-web-dashboard.service"]["active"]:
+        try:
+            sys.path.insert(0,str(ROOT/"scripts"))
+            from sse_v4_publish_web import current_url
+            out["publicURL"]=current_url()
+            out["publicURLVerified"]=True
+        except Exception as e: out["webStatus"]=type(e).__name__
     out["preparationVerified"]=bool(out["wallet"] and out["roles"] and out["deploymentVerified"]
                                    and out.get("recentFinality") and out["localConsoleHTTP"]
                                    and out["services"]["sse-v4-console.service"]["active"])
